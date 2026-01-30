@@ -1,5 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { isPrivateIpAddress, isBlockedHostname, SsrfBlockedError } from "./ssrf.js";
+import { describe, it, expect, vi } from "vitest";
+import {
+  isPrivateIpAddress,
+  isBlockedHostname,
+  SsrfBlockedError,
+  createPinnedLookup,
+  resolvePinnedHostname,
+  createPinnedDispatcher,
+  closeDispatcher,
+} from "./ssrf.js";
 
 describe("ssrf", () => {
   describe("isPrivateIpAddress", () => {
@@ -182,6 +190,208 @@ describe("ssrf", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe("test message");
       expect(error.name).toBe("SsrfBlockedError");
+    });
+  });
+
+  describe("createPinnedLookup", () => {
+    it("should return pinned address for matching hostname", () => {
+      const lookup = createPinnedLookup({
+        hostname: "example.com",
+        addresses: ["1.2.3.4"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", (err, address, family) => {
+          expect(err).toBeNull();
+          expect(address).toBe("1.2.3.4");
+          expect(family).toBe(4);
+          resolve();
+        });
+      });
+    });
+
+    it("should cycle through multiple addresses", () => {
+      const lookup = createPinnedLookup({
+        hostname: "example.com",
+        addresses: ["1.2.3.4", "5.6.7.8"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", (err, address1) => {
+          expect(address1).toBe("1.2.3.4");
+          lookup("example.com", (err2, address2) => {
+            expect(address2).toBe("5.6.7.8");
+            resolve();
+          });
+        });
+      });
+    });
+
+    it("should return all addresses when requested", () => {
+      const lookup = createPinnedLookup({
+        hostname: "example.com",
+        addresses: ["1.2.3.4", "5.6.7.8"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", { all: true }, (err, addresses) => {
+          expect(err).toBeNull();
+          expect(addresses).toHaveLength(2);
+          resolve();
+        });
+      });
+    });
+
+    it("should detect IPv6 addresses", () => {
+      const lookup = createPinnedLookup({
+        hostname: "example.com",
+        addresses: ["2001:db8::1"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", (err, address, family) => {
+          expect(err).toBeNull();
+          expect(address).toBe("2001:db8::1");
+          expect(family).toBe(6);
+          resolve();
+        });
+      });
+    });
+
+    it("should filter by requested family", () => {
+      const lookup = createPinnedLookup({
+        hostname: "example.com",
+        addresses: ["1.2.3.4", "2001:db8::1"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", { family: 4 }, (err, address, family) => {
+          expect(address).toBe("1.2.3.4");
+          expect(family).toBe(4);
+          resolve();
+        });
+      });
+    });
+
+    it("should normalize hostname case", () => {
+      const lookup = createPinnedLookup({
+        hostname: "Example.COM",
+        addresses: ["1.2.3.4"],
+      });
+
+      return new Promise<void>((resolve) => {
+        lookup("example.com", (err, address) => {
+          expect(address).toBe("1.2.3.4");
+          resolve();
+        });
+      });
+    });
+  });
+
+  describe("resolvePinnedHostname", () => {
+    it("should throw for blocked hostname", async () => {
+      await expect(resolvePinnedHostname("localhost")).rejects.toThrow(SsrfBlockedError);
+    });
+
+    it("should throw for private IP as hostname", async () => {
+      await expect(resolvePinnedHostname("10.0.0.1")).rejects.toThrow(SsrfBlockedError);
+    });
+
+    it("should throw for invalid hostname", async () => {
+      await expect(resolvePinnedHostname("")).rejects.toThrow("Invalid hostname");
+    });
+
+    it("should throw for .local domains", async () => {
+      await expect(resolvePinnedHostname("myhost.local")).rejects.toThrow(SsrfBlockedError);
+    });
+
+    it("should resolve with mock lookup function", async () => {
+      const mockLookup = vi.fn().mockResolvedValue([
+        { address: "93.184.216.34", family: 4 },
+      ]);
+
+      const result = await resolvePinnedHostname("example.com", mockLookup);
+
+      expect(result.hostname).toBe("example.com");
+      expect(result.addresses).toContain("93.184.216.34");
+      expect(result.lookup).toBeInstanceOf(Function);
+    });
+
+    it("should throw when resolved IP is private", async () => {
+      const mockLookup = vi.fn().mockResolvedValue([
+        { address: "192.168.1.1", family: 4 },
+      ]);
+
+      await expect(resolvePinnedHostname("evil.com", mockLookup)).rejects.toThrow(
+        "Blocked: resolves to private/internal IP address"
+      );
+    });
+
+    it("should throw when no addresses resolved", async () => {
+      const mockLookup = vi.fn().mockResolvedValue([]);
+
+      await expect(resolvePinnedHostname("empty.com", mockLookup)).rejects.toThrow(
+        "Unable to resolve hostname"
+      );
+    });
+
+    it("should deduplicate resolved addresses", async () => {
+      const mockLookup = vi.fn().mockResolvedValue([
+        { address: "93.184.216.34", family: 4 },
+        { address: "93.184.216.34", family: 4 },
+      ]);
+
+      const result = await resolvePinnedHostname("example.com", mockLookup);
+      expect(result.addresses).toHaveLength(1);
+    });
+  });
+
+  describe("createPinnedDispatcher", () => {
+    it("should create an Agent dispatcher", () => {
+      const pinned = {
+        hostname: "example.com",
+        addresses: ["1.2.3.4"],
+        lookup: createPinnedLookup({ hostname: "example.com", addresses: ["1.2.3.4"] }),
+      };
+
+      const dispatcher = createPinnedDispatcher(pinned);
+      expect(dispatcher).toBeDefined();
+    });
+  });
+
+  describe("closeDispatcher", () => {
+    it("should handle null dispatcher", async () => {
+      await expect(closeDispatcher(null)).resolves.toBeUndefined();
+    });
+
+    it("should handle undefined dispatcher", async () => {
+      await expect(closeDispatcher(undefined)).resolves.toBeUndefined();
+    });
+
+    it("should call close on dispatcher with close method", async () => {
+      const mockDispatcher = {
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await closeDispatcher(mockDispatcher as any);
+      expect(mockDispatcher.close).toHaveBeenCalled();
+    });
+
+    it("should call destroy on dispatcher without close method", async () => {
+      const mockDispatcher = {
+        destroy: vi.fn(),
+      };
+
+      await closeDispatcher(mockDispatcher as any);
+      expect(mockDispatcher.destroy).toHaveBeenCalled();
+    });
+
+    it("should handle errors during close", async () => {
+      const mockDispatcher = {
+        close: vi.fn().mockRejectedValue(new Error("Close failed")),
+      };
+
+      await expect(closeDispatcher(mockDispatcher as any)).resolves.toBeUndefined();
     });
   });
 });
