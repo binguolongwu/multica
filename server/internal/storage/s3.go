@@ -15,20 +15,21 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// S3Storage S3 兼容存储实现（支持 AWS S3、MinIO 等）
 type S3Storage struct {
 	client      *s3.Client
-	bucket      string
-	cdnDomain   string // if set, returned URLs use this instead of bucket name
-	endpointURL string // if set, use path-style URLs (e.g. MinIO)
+	bucket      string // S3 存储桶名称
+	cdnDomain   string // CDN 域名（如果设置，返回的 URL 使用此域名而非桶名）
+	endpointURL string // 自定义端点（如果设置，使用路径样式 URL，例如 MinIO）
 }
 
-// NewS3StorageFromEnv creates an S3Storage from environment variables.
-// Returns nil if S3_BUCKET is not set.
+// NewS3StorageFromEnv 从环境变量创建 S3 存储实例
+// 如果未设置 S3_BUCKET 则返回 nil
 //
-// Environment variables:
-//   - S3_BUCKET (required)
-//   - S3_REGION (default: us-west-2)
-//   - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (optional; falls back to default credential chain)
+// 环境变量：
+//   - S3_BUCKET（必需）
+//   - S3_REGION（默认：us-west-2）
+//   - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY（可选；使用默认凭证链回退）
 func NewS3StorageFromEnv() *S3Storage {
 	bucket := os.Getenv("S3_BUCKET")
 	if bucket == "" {
@@ -79,8 +80,8 @@ func NewS3StorageFromEnv() *S3Storage {
 	}
 }
 
-// storageClass returns the appropriate S3 storage class.
-// Custom endpoints (e.g. MinIO) only support STANDARD; real AWS defaults to INTELLIGENT_TIERING.
+// storageClass 返回适当的 S3 存储类别
+// 自定义端点（例如 MinIO）仅支持 STANDARD；真实 AWS 默认使用 INTELLIGENT_TIERING
 func (s *S3Storage) storageClass() types.StorageClass {
 	if s.endpointURL != "" {
 		return types.StorageClassStandard
@@ -88,8 +89,8 @@ func (s *S3Storage) storageClass() types.StorageClass {
 	return types.StorageClassIntelligentTiering
 }
 
-// KeyFromURL extracts the S3 object key from a CDN or bucket URL.
-// e.g. "https://multica-static.copilothub.ai/abc123.png" → "abc123.png"
+// KeyFromURL 从 CDN 或桶 URL 中提取 S3 对象键
+// 例如："https://multica-static.copilothub.ai/abc123.png" → "abc123.png"
 func (s *S3Storage) KeyFromURL(rawURL string) string {
 	if s.endpointURL != "" {
 		prefix := strings.TrimRight(s.endpointURL, "/") + "/" + s.bucket + "/"
@@ -114,7 +115,7 @@ func (s *S3Storage) KeyFromURL(rawURL string) string {
 	return rawURL
 }
 
-// Delete removes an object from S3. Errors are logged but not fatal.
+// Delete 从 S3 删除对象。错误会被记录但不会导致致命错误。
 func (s *S3Storage) Delete(ctx context.Context, key string) {
 	if key == "" {
 		return
@@ -128,7 +129,7 @@ func (s *S3Storage) Delete(ctx context.Context, key string) {
 	}
 }
 
-// DeleteKeys removes multiple objects from S3. Best-effort, errors are logged.
+// DeleteKeys 从 S3 批量删除多个对象。尽力而为，错误会被记录。
 func (s *S3Storage) DeleteKeys(ctx context.Context, keys []string) {
 	for _, key := range keys {
 		s.Delete(ctx, key)

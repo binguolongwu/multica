@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { api } from "../api";
 import type { InboxItem } from "../types";
 
+// 收件箱查询键（React Query）
 export const inboxKeys = {
   all: (wsId: string) => ["inbox", wsId] as const,
   list: (wsId: string) => [...inboxKeys.all(wsId), "list"] as const,
@@ -15,9 +16,9 @@ export function inboxListOptions(wsId: string) {
 }
 
 /**
- * Deduplicate inbox items by issue_id (one entry per issue, Linear-style).
- * Exported for consumers to use in useMemo — not in queryOptions select
- * (to avoid new array references on every cache update).
+ * 按 issue_id 去重收件箱项（每个问题一个条目，Linear 风格）
+ * 导出供消费者在 useMemo 中使用——不在 queryOptions select 中使用
+ * （以避免每次缓存更新时产生新的数组引用）
  */
 export function deduplicateInboxItems(items: InboxItem[]): InboxItem[] {
   const active = items.filter((i) => !i.archived);

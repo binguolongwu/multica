@@ -23,12 +23,16 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
+// defaultOrigins 默认允许的跨域来源（开发环境）
 var defaultOrigins = []string{
-	"http://localhost:3000", // Next.js dev
-	"http://localhost:5173", // electron-vite dev
-	"http://localhost:5174", // electron-vite dev (fallback port)
+	"http://localhost:3000", // Next.js 前端开发服务器
+	"http://localhost:5173", // Electron 桌面端开发服务器
+	"http://localhost:5174", // Electron 开发服务器（备用端口）
 }
 
+// allowedOrigins 获取配置的允许跨域来源列表。
+// 优先级：CORS_ALLOWED_ORIGINS > FRONTEND_ORIGIN > defaultOrigins
+// 支持逗号分隔多个来源。
 func allowedOrigins() []string {
 	raw := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
 	if raw == "" {
@@ -52,12 +56,18 @@ func allowedOrigins() []string {
 	return origins
 }
 
-// NewRouter creates the fully-configured Chi router with all middleware and routes.
+// NewRouter 创建完整配置的 Chi 路由，包含所有中间件和路由。
+// 这是 HTTP 服务器的入口，组装所有组件：
+//   - 数据库连接池
+//   - WebSocket Hub（实时通信）
+//   - 事件总线
+//   - Handler（业务逻辑）
+//   - 中间件（认证、CORS、日志等）
 func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Router {
-	queries := db.New(pool)
-	emailSvc := service.NewEmailService()
+	queries := db.New(pool)              // sqlc 生成的查询对象
+	emailSvc := service.NewEmailService() // 邮件服务
 
-	// Initialize storage with S3 as primary, fallback to local
+	// 初始化存储：优先 S3，其次本地存储
 	var store storage.Storage
 	s3 := storage.NewS3StorageFromEnv()
 	if s3 != nil {
@@ -74,7 +84,7 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 
 	r := chi.NewRouter()
 
-	// Global middleware
+	// 全局中间件（所有请求都经过这些处理）
 	r.Use(chimw.RequestID)
 	r.Use(middleware.RequestLogger)
 	r.Use(chimw.Recoverer)
@@ -92,20 +102,22 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		MaxAge:           300,
 	}))
 
-	// Health check
+	// 健康检查端点（负载均衡器、监控使用）
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// WebSocket
+	// WebSocket 端点（实时通信）
+	// 成员资格检查器：验证用户是否属于请求的工作空间
+	// PAT 解析器：支持个人访问令牌认证
 	mc := &membershipChecker{queries: queries}
 	pr := &patResolver{queries: queries}
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		realtime.HandleWebSocket(hub, mc, pr, w, r)
 	})
 
-	// Local file serving (when using local storage)
+	// 本地文件服务（使用本地存储模式时，提供上传文件访问）
 	if local, ok := store.(*storage.LocalStorage); ok {
 		r.Get("/uploads/*", func(w http.ResponseWriter, r *http.Request) {
 			file := strings.TrimPrefix(r.URL.Path, "/uploads/")
@@ -113,13 +125,18 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		})
 	}
 
-	// Auth (public)
+	// 认证路由（公开访问，无需登录）
+	// 包括：发送验证码、验证登录、Google OAuth、退出登录
 	r.Post("/auth/send-code", h.SendCode)
 	r.Post("/auth/verify-code", h.VerifyCode)
 	r.Post("/auth/google", h.GoogleLogin)
 	r.Post("/auth/logout", h.Logout)
 
-	// Daemon API routes (require daemon token or valid user token)
+	// Daemon API 路由（需要 Daemon 令牌或有效的用户令牌）
+	// 这些端点供后台 Agent 运行时调用，包括：
+	//   - 运行时注册/心跳/注销
+	//   - 任务认领、状态报告
+	//   - 资源使用报告
 	r.Route("/api/daemon", func(r chi.Router) {
 		r.Use(middleware.DaemonAuth(queries))
 
@@ -145,12 +162,13 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		r.Get("/issues/{issueId}/gc-check", h.GetIssueGCCheck)
 	})
 
-	// Protected API routes
+	// 受保护的 API 路由（需要用户认证）
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(queries))
 		r.Use(middleware.RefreshCloudFrontCookies(cfSigner))
 
-		// --- User-scoped routes (no workspace context required) ---
+		// --- 用户级路由（不需要工作空间上下文）---
+		// 用户个人信息、文件上传等
 		r.Get("/api/me", h.GetMe)
 		r.Patch("/api/me", h.UpdateMe)
 		r.Post("/api/cli-token", h.IssueCliToken)
@@ -189,7 +207,8 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 			r.Delete("/{id}", h.RevokePersonalAccessToken)
 		})
 
-		// --- Workspace-scoped routes (all require workspace membership) ---
+		// --- 工作空间级路由（需要工作空间成员身份）---
+		// 问题、项目、Agent 等所有工作空间内的资源操作
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireWorkspaceMember(queries))
 

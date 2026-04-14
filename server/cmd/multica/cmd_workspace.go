@@ -15,39 +15,39 @@ import (
 
 var workspaceCmd = &cobra.Command{
 	Use:   "workspace",
-	Short: "Work with workspaces",
+	Short: "处理工作空间",
 }
 
 var workspaceListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all workspaces you belong to",
+	Short: "列出你所属的所有工作空间",
 	RunE:  runWorkspaceList,
 }
 
 var workspaceGetCmd = &cobra.Command{
 	Use:   "get [workspace-id]",
-	Short: "Get workspace details",
+	Short: "获取工作空间详情",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runWorkspaceGet,
 }
 
 var workspaceMembersCmd = &cobra.Command{
 	Use:   "members [workspace-id]",
-	Short: "List workspace members",
+	Short: "列出工作空间成员",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runWorkspaceMembers,
 }
 
 var workspaceWatchCmd = &cobra.Command{
 	Use:   "watch <workspace-id>",
-	Short: "Add a workspace to the daemon watch list",
+	Short: "将工作空间添加到守护进程监视列表",
 	Args:  exactArgs(1),
 	RunE:  runWatch,
 }
 
 var workspaceUnwatchCmd = &cobra.Command{
 	Use:   "unwatch <workspace-id>",
-	Short: "Remove a workspace from the daemon watch list",
+	Short: "从守护进程监视列表中移除工作空间",
 	Args:  exactArgs(1),
 	RunE:  runUnwatch,
 }

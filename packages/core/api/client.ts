@@ -1,3 +1,10 @@
+// API 客户端 - 与后端服务器通信的核心模块
+// 功能：
+//   - 封装 HTTP 请求
+//   - 统一错误处理
+//   - 自动认证令牌管理
+//   - 工作空间上下文管理
+
 import type {
   Issue,
   CreateIssueRequest,
@@ -56,19 +63,23 @@ import type {
 import { type Logger, noopLogger } from "../logger";
 import { createRequestId } from "../utils";
 
+// API 客户端配置选项
 export interface ApiClientOptions {
-  logger?: Logger;
-  onUnauthorized?: () => void;
+  logger?: Logger;           // 日志记录器（可选）
+  onUnauthorized?: () => void; // 认证失败时的回调
 }
 
+// 登录响应结构
 export interface LoginResponse {
-  token: string;
-  user: User;
+  token: string;  // JWT 令牌
+  user: User;     // 用户信息
 }
 
+// API 错误类
+// 封装 HTTP 错误响应，包含状态码和状态文本
 export class ApiError extends Error {
-  readonly status: number;
-  readonly statusText: string;
+  readonly status: number;      // HTTP 状态码
+  readonly statusText: string;  // 状态文本
 
   constructor(message: string, status: number, statusText: string) {
     super(message);
@@ -78,12 +89,14 @@ export class ApiError extends Error {
   }
 }
 
+// API 客户端类
+// 用于与 Multica 服务器进行所有 HTTP 通信
 export class ApiClient {
-  private baseUrl: string;
-  private token: string | null = null;
-  private workspaceId: string | null = null;
-  private logger: Logger;
-  private options: ApiClientOptions;
+  private baseUrl: string;                    // 服务器基础 URL
+  private token: string | null = null;        // 认证令牌
+  private workspaceId: string | null = null;  // 当前工作空间 ID
+  private logger: Logger;                     // 日志记录器
+  private options: ApiClientOptions;          // 配置选项
 
   constructor(baseUrl: string, options?: ApiClientOptions) {
     this.baseUrl = baseUrl;

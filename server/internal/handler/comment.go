@@ -18,20 +18,26 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
+// CommentResponse 评论的 API 响应结构
 type CommentResponse struct {
-	ID          string               `json:"id"`
-	IssueID     string               `json:"issue_id"`
-	AuthorType  string               `json:"author_type"`
-	AuthorID    string               `json:"author_id"`
-	Content     string               `json:"content"`
-	Type        string               `json:"type"`
-	ParentID    *string              `json:"parent_id"`
-	CreatedAt   string               `json:"created_at"`
-	UpdatedAt   string               `json:"updated_at"`
-	Reactions   []ReactionResponse   `json:"reactions"`
-	Attachments []AttachmentResponse `json:"attachments"`
+	ID          string               `json:"id"`          // 评论唯一 ID
+	IssueID     string               `json:"issue_id"`    // 所属问题 ID
+	AuthorType  string               `json:"author_type"` // 作者类型：member/agent
+	AuthorID    string               `json:"author_id"`   // 作者 ID
+	Content     string               `json:"content"`     // 评论内容（Markdown）
+	Type        string               `json:"type"`        // 类型：comment/system
+	ParentID    *string              `json:"parent_id"`   // 父评论 ID（支持回复）
+	CreatedAt   string               `json:"created_at"`  // 创建时间
+	UpdatedAt   string               `json:"updated_at"`  // 更新时间
+	Reactions   []ReactionResponse   `json:"reactions"`   // 表情反应列表
+	Attachments []AttachmentResponse `json:"attachments"` // 附件列表
 }
 
+// commentToResponse 将数据库评论模型转换为 API 响应
+// 参数：
+//   - c: 评论记录
+//   - reactions: 表情反应列表
+//   - attachments: 附件列表
 func commentToResponse(c db.Comment, reactions []ReactionResponse, attachments []AttachmentResponse) CommentResponse {
 	if reactions == nil {
 		reactions = []ReactionResponse{}
@@ -54,6 +60,9 @@ func commentToResponse(c db.Comment, reactions []ReactionResponse, attachments [
 	}
 }
 
+// ListComments 获取问题的评论列表
+// 支持分页查询（可选参数：limit、offset）
+// 权限要求：用户必须是工作空间成员
 func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 	issueID := chi.URLParam(r, "id")
 	issue, ok := h.loadIssueForUser(w, r, issueID)
@@ -61,7 +70,7 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse optional pagination query params.
+	// 解析可选的分页查询参数
 	q := r.URL.Query()
 	var limit, offset int32
 	var hasPagination bool

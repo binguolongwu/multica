@@ -18,30 +18,37 @@ import (
 	"github.com/multica-ai/multica/server/pkg/agent"
 )
 
-// workspaceState tracks registered runtimes for a single workspace.
+// workspaceState 跟踪单个工作空间的已注册运行时
+// 用于管理多运行时场景
 type workspaceState struct {
-	workspaceID string
-	runtimeIDs  []string
+	workspaceID string   // 工作空间 ID
+	runtimeIDs  []string // 该工作空间下的运行时 ID 列表
 }
 
-// Daemon is the local agent runtime that polls for and executes tasks.
+// Daemon 本地 Agent 运行时守护进程
+// 职责：
+//   - 轮询服务器获取待执行任务
+//   - 管理代码仓库缓存
+//   - 执行 Agent 任务
+//   - 上报任务状态和结果
 type Daemon struct {
-	cfg       Config
-	client    *Client
-	repoCache *repocache.Cache
-	logger    *slog.Logger
+	cfg       Config               // 配置
+	client    *Client              // 服务器客户端
+	repoCache *repocache.Cache     // 仓库缓存管理器
+	logger    *slog.Logger         // 日志记录器
 
-	mu           sync.Mutex
-	workspaces   map[string]*workspaceState
-	runtimeIndex map[string]Runtime // runtimeID -> Runtime for provider lookups
-	reloading    sync.Mutex         // prevents concurrent reloadWorkspaces
+	mu           sync.Mutex               // 互斥锁保护 workspaces
+	workspaces   map[string]*workspaceState // 工作空间状态映射
+	runtimeIndex map[string]Runtime         // 运行时索引（ID -> 运行时）
+	reloading    sync.Mutex                 // 防止并发重载
 
-	cancelFunc    context.CancelFunc // set by Run(); called by triggerRestart
-	restartBinary string             // non-empty after a successful update; path to the new binary
-	updating      atomic.Bool        // prevents concurrent update attempts
+	cancelFunc    context.CancelFunc // 取消函数（用于重启）
+	restartBinary string             // 更新后的新二进制文件路径
+	updating      atomic.Bool        // 防止并发更新
 }
 
-// New creates a new Daemon instance.
+// New 创建新的 Daemon 实例
+// 初始化仓库缓存目录和运行时索引
 func New(cfg Config, logger *slog.Logger) *Daemon {
 	cacheRoot := filepath.Join(cfg.WorkspacesRoot, ".repos")
 	return &Daemon{
@@ -54,13 +61,18 @@ func New(cfg Config, logger *slog.Logger) *Daemon {
 	}
 }
 
-// Run starts the daemon: resolves auth, registers runtimes, then polls for tasks.
+// Run 启动 Daemon
+// 启动流程：
+//   1. 解析认证信息
+//   2. 注册运行时
+//   3. 启动健康检查端口
+//   4. 开始轮询任务
 func (d *Daemon) Run(ctx context.Context) error {
-	// Wrap context so handleUpdate can cancel the daemon for restart.
+	// 包装上下文以便 handleUpdate 可以取消守护进程以进行重启
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancelFunc = cancel
 
-	// Bind health port early to detect another running daemon.
+	// 尽早绑定健康端口以检测另一个正在运行的守护进程
 	healthLn, err := d.listenHealth()
 	if err != nil {
 		return err
@@ -76,19 +88,19 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	d.logger.Info("starting daemon", logFields...)
 
-	// Load auth token from CLI config.
+	// 从 CLI 配置加载认证令牌
 	if err := d.resolveAuth(); err != nil {
 		return err
 	}
 
-	// Load and register watched workspaces.
+	// 加载并注册监视的工作空间
 	if err := d.loadWatchedWorkspaces(ctx); err != nil {
 		return err
 	}
 
-	// If no runtimes yet (empty watched list), run one sync cycle to discover
-	// workspaces from the API before giving up. workspaceSyncLoop normally
-	// handles this, but the runtime check below would fail before it runs.
+	// 如果还没有运行时（空监视列表），在放弃之前运行一个同步周期从 API 发现
+	// 工作空间。workspaceSyncLoop 通常处理这种情况，
+	// 但下面的运行时检查会在它运行之前失败
 	if len(d.allRuntimeIDs()) == 0 {
 		d.syncWorkspacesFromAPI(ctx)
 		// syncWorkspacesFromAPI writes to config; reload and register.
@@ -102,13 +114,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return fmt.Errorf("no runtimes registered")
 	}
 
-	// Deregister runtimes on shutdown (uses a fresh context since ctx will be cancelled).
+	// 关闭时注销运行时（使用新上下文，因为 ctx 将被取消）
 	defer d.deregisterRuntimes()
 
-	// Start config watcher for hot-reload.
+	// 启动配置监视器以支持热重载
 	go d.configWatchLoop(ctx)
 
-	// Start workspace sync loop to discover newly created workspaces.
+	// 启动工作空间同步循环以发现新创建的工作空间
 	go d.workspaceSyncLoop(ctx)
 
 	go d.heartbeatLoop(ctx)
@@ -118,13 +130,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 	return d.pollLoop(ctx)
 }
 
-// RestartBinary returns the path to the new binary if the daemon needs to restart
-// after a successful update, or empty string if no restart is needed.
+// RestartBinary 如果守护进程需要在成功更新后重启则返回新二进制文件的路径
+// 如果不需要重启则返回空字符串
 func (d *Daemon) RestartBinary() string {
 	return d.restartBinary
 }
 
-// deregisterRuntimes notifies the server that all runtimes are going offline.
+// deregisterRuntimes 通知服务器所有运行时都将离线
 func (d *Daemon) deregisterRuntimes() {
 	runtimeIDs := d.allRuntimeIDs()
 	if len(runtimeIDs) == 0 {
@@ -141,7 +153,7 @@ func (d *Daemon) deregisterRuntimes() {
 	}
 }
 
-// resolveAuth loads the auth token from the CLI config for the active profile.
+// resolveAuth 从活动配置文件的 CLI 配置加载认证令牌
 func (d *Daemon) resolveAuth() error {
 	cfg, err := cli.LoadCLIConfigForProfile(d.cfg.Profile)
 	if err != nil {

@@ -20,7 +20,7 @@ import (
 func main() {
 	logger.Init()
 
-	// Warn about missing configuration
+	// 警告缺失的配置
 	if os.Getenv("JWT_SECRET") == "" {
 		slog.Warn("JWT_SECRET is not set — using insecure default. Set JWT_SECRET for production use.")
 	}
@@ -38,7 +38,7 @@ func main() {
 		dbURL = "postgres://multica:multica@localhost:5432/multica?sslmode=disable"
 	}
 
-	// Connect to database
+	// 连接数据库
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -59,9 +59,9 @@ func main() {
 	registerListeners(bus, hub)
 
 	queries := db.New(pool)
-	// Order matters: subscriber listeners must register BEFORE notification listeners.
-	// The notification listener queries the subscriber table to determine recipients,
-	// so subscribers must be written first within the same synchronous event dispatch.
+	// 顺序很重要：订阅者监听器必须在通知监听器之前注册
+	// 通知监听器查询订阅者表以确定接收者
+	// 因此订阅者必须在同一同步事件分派中首先写入
 	registerSubscriberListeners(bus, queries)
 	registerActivityListeners(bus, queries)
 	registerNotificationListeners(bus, queries)
@@ -73,11 +73,11 @@ func main() {
 		Handler: r,
 	}
 
-	// Start background sweeper to mark stale runtimes as offline.
+	// 启动后台清理器将过期运行时标记为离线
 	sweepCtx, sweepCancel := context.WithCancel(context.Background())
 	go runRuntimeSweeper(sweepCtx, queries, bus)
 
-	// Graceful shutdown
+	// 优雅关闭
 	go func() {
 		slog.Info("server starting", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

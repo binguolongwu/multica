@@ -22,49 +22,49 @@ import (
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
-	Short: "Control the local agent runtime daemon",
+	Short: "控制本地代理运行时守护进程",
 }
 
 var daemonStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the local agent runtime daemon",
-	Long:  "Start the daemon process that polls for tasks and executes them using local agent CLIs (Claude, Codex).\nRuns in the background by default. Use --foreground to run in the current terminal.",
+	Short: "启动本地代理运行时守护进程",
+	Long:  "启动轮询任务并使用本地代理 CLI（Claude、Codex）执行它们的守护进程。\n默认在后台运行。使用 --foreground 在当前终端运行。",
 	RunE:  runDaemonStart,
 }
 
 var daemonStopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the running daemon",
+	Short: "停止运行的守护进程",
 	RunE:  runDaemonStop,
 }
 
 var daemonStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show daemon status",
+	Short: "显示守护进程状态",
 	RunE:  runDaemonStatus,
 }
 
 var daemonLogsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "Show daemon logs",
+	Short: "显示守护进程日志",
 	RunE:  runDaemonLogs,
 }
 
 func init() {
 	f := daemonStartCmd.Flags()
-	f.Bool("foreground", false, "Run in the foreground instead of background")
-	f.String("daemon-id", "", "Unique daemon identifier (env: MULTICA_DAEMON_ID)")
-	f.String("device-name", "", "Human-readable device name (env: MULTICA_DAEMON_DEVICE_NAME)")
-	f.String("runtime-name", "", "Runtime display name (env: MULTICA_AGENT_RUNTIME_NAME)")
-	f.Duration("poll-interval", 0, "Task poll interval (env: MULTICA_DAEMON_POLL_INTERVAL)")
-	f.Duration("heartbeat-interval", 0, "Heartbeat interval (env: MULTICA_DAEMON_HEARTBEAT_INTERVAL)")
-	f.Duration("agent-timeout", 0, "Per-task timeout (env: MULTICA_AGENT_TIMEOUT)")
-	f.Int("max-concurrent-tasks", 0, "Max tasks running in parallel (env: MULTICA_DAEMON_MAX_CONCURRENT_TASKS)")
+	f.Bool("foreground", false, "在前台运行而非后台")
+	f.String("daemon-id", "", "唯一守护进程标识符（环境变量：MULTICA_DAEMON_ID）")
+	f.String("device-name", "", "人类可读的设备名称（环境变量：MULTICA_DAEMON_DEVICE_NAME）")
+	f.String("runtime-name", "", "运行时显示名称（环境变量：MULTICA_AGENT_RUNTIME_NAME）")
+	f.Duration("poll-interval", 0, "任务轮询间隔（环境变量：MULTICA_DAEMON_POLL_INTERVAL）")
+	f.Duration("heartbeat-interval", 0, "心跳间隔（环境变量：MULTICA_DAEMON_HEARTBEAT_INTERVAL）")
+	f.Duration("agent-timeout", 0, "每个任务的超时时间（环境变量：MULTICA_AGENT_TIMEOUT）")
+	f.Int("max-concurrent-tasks", 0, "并行运行的最大任务数（环境变量：MULTICA_DAEMON_MAX_CONCURRENT_TASKS）")
 
-	daemonLogsCmd.Flags().BoolP("follow", "f", false, "Follow log output")
-	daemonLogsCmd.Flags().IntP("lines", "n", 50, "Number of lines to show")
+	daemonLogsCmd.Flags().BoolP("follow", "f", false, "跟随日志输出")
+	daemonLogsCmd.Flags().IntP("lines", "n", 50, "显示的行数")
 
-	daemonStatusCmd.Flags().String("output", "table", "Output format: table or json")
+	daemonStatusCmd.Flags().String("output", "table", "输出格式：table 或 json")
 
 	daemonCmd.AddCommand(daemonStartCmd)
 	daemonCmd.AddCommand(daemonStopCmd)
@@ -72,8 +72,8 @@ func init() {
 	daemonCmd.AddCommand(daemonLogsCmd)
 }
 
-// daemonDirForProfile returns the state directory for the given profile.
-// Empty profile → ~/.multica/, named profile → ~/.multica/profiles/<name>/.
+// daemonDirForProfile 返回指定配置文件的状态目录
+// 空配置文件 → ~/.multica/，命名配置文件 → ~/.multica/profiles/<name>/
 func daemonDirForProfile(profile string) string {
 	dir, err := cli.ProfileDir(profile)
 	if err != nil {

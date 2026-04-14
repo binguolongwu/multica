@@ -17,45 +17,45 @@ import (
 
 var issueCmd = &cobra.Command{
 	Use:   "issue",
-	Short: "Work with issues",
+	Short: "处理问题",
 }
 
 var issueListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List issues in the workspace",
+	Short: "列出工作空间中的问题",
 	RunE:  runIssueList,
 }
 
 var issueGetCmd = &cobra.Command{
 	Use:   "get <id>",
-	Short: "Get issue details",
+	Short: "获取问题详情",
 	Args:  exactArgs(1),
 	RunE:  runIssueGet,
 }
 
 var issueCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create a new issue",
+	Short: "创建新问题",
 	RunE:  runIssueCreate,
 }
 
 var issueUpdateCmd = &cobra.Command{
 	Use:   "update <id>",
-	Short: "Update an issue",
+	Short: "更新问题",
 	Args:  exactArgs(1),
 	RunE:  runIssueUpdate,
 }
 
 var issueAssignCmd = &cobra.Command{
 	Use:   "assign <id>",
-	Short: "Assign an issue to a member or agent",
+	Short: "将问题分配给成员或代理",
 	Args:  exactArgs(1),
 	RunE:  runIssueAssign,
 }
 
 var issueStatusCmd = &cobra.Command{
 	Use:   "status <id> <status>",
-	Short: "Change issue status",
+	Short: "更改问题状态",
 	Args:  exactArgs(2),
 	RunE:  runIssueStatus,
 }

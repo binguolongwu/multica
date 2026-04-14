@@ -22,15 +22,17 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
+// UserResponse 用户信息的 API 响应结构
 type UserResponse struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Email     string  `json:"email"`
-	AvatarURL *string `json:"avatar_url"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID        string  `json:"id"`         // 用户唯一 ID
+	Name      string  `json:"name"`       // 姓名
+	Email     string  `json:"email"`      // 邮箱
+	AvatarURL *string `json:"avatar_url"` // 头像 URL
+	CreatedAt string  `json:"created_at"` // 创建时间
+	UpdatedAt string  `json:"updated_at"` // 更新时间
 }
 
+// userToResponse 将数据库用户模型转换为 API 响应
 func userToResponse(u db.User) UserResponse {
 	return UserResponse{
 		ID:        uuidToString(u.ID),
@@ -42,20 +44,25 @@ func userToResponse(u db.User) UserResponse {
 	}
 }
 
+// LoginResponse 登录接口的响应结构
 type LoginResponse struct {
-	Token string       `json:"token"`
-	User  UserResponse `json:"user"`
+	Token string       `json:"token"` // JWT 令牌
+	User  UserResponse `json:"user"`  // 用户信息
 }
 
+// SendCodeRequest 发送验证码的请求参数
 type SendCodeRequest struct {
-	Email string `json:"email"`
+	Email string `json:"email"` // 邮箱地址
 }
 
+// VerifyCodeRequest 验证验证码的请求参数
 type VerifyCodeRequest struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email string `json:"email"` // 邮箱地址
+	Code  string `json:"code"`  // 验证码
 }
 
+// generateCode 生成 6 位数字验证码
+// 使用加密安全的随机数生成器
 func generateCode() (string, error) {
 	var buf [4]byte
 	if _, err := rand.Read(buf[:]); err != nil {
@@ -65,6 +72,9 @@ func generateCode() (string, error) {
 	return fmt.Sprintf("%06d", n), nil
 }
 
+// issueJWT 为用户签发 JWT 令牌
+// 令牌有效期：30 天
+// 包含字段：用户 ID、邮箱、姓名、签发时间、过期时间
 func (h *Handler) issueJWT(user db.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":   uuidToString(user.ID),
@@ -76,6 +86,8 @@ func (h *Handler) issueJWT(user db.User) (string, error) {
 	return token.SignedString(auth.JWTSecret())
 }
 
+// findOrCreateUser 查找或创建用户
+// 如果用户不存在，自动创建新用户（以邮箱作为默认名称）
 func (h *Handler) findOrCreateUser(ctx context.Context, email string) (db.User, error) {
 	user, err := h.Queries.GetUserByEmail(ctx, email)
 	if err != nil {

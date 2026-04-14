@@ -45,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create migrations tracking table
+	// 创建迁移跟踪表
 	_, err = pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version TEXT PRIMARY KEY,
@@ -57,10 +57,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Find migration files
+	// 查找迁移文件
 	migrationsDir := "migrations"
 	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
-		// Try from server/ directory
+		// 尝试从 server/ 目录
 		migrationsDir = "server/migrations"
 	}
 
@@ -81,7 +81,7 @@ func main() {
 		version := extractVersion(file)
 
 		if direction == "up" {
-			// Check if already applied
+			// 检查是否已应用
 			var exists bool
 			err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)", version).Scan(&exists)
 			if err != nil {
@@ -93,7 +93,7 @@ func main() {
 				continue
 			}
 		} else {
-			// Check if applied (only rollback applied ones)
+			// 检查是否已应用（仅回滚已应用的）
 			var exists bool
 			err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)", version).Scan(&exists)
 			if err != nil {
@@ -136,7 +136,7 @@ func main() {
 
 func extractVersion(filename string) string {
 	base := filepath.Base(filename)
-	// Remove .up.sql or .down.sql
+	// 移除 .up.sql 或 .down.sql
 	base = strings.TrimSuffix(base, ".up.sql")
 	base = strings.TrimSuffix(base, ".down.sql")
 	return base

@@ -15,12 +15,12 @@ import (
 
 func uuidToString(u pgtype.UUID) string { return util.UUIDToString(u) }
 
-// Auth middleware validates JWT tokens or Personal Access Tokens.
-// Token sources (in priority order):
-//  1. Authorization: Bearer <token> header (PAT or JWT)
-//  2. multica_auth HttpOnly cookie (JWT) — requires valid CSRF token for state-changing requests
+// Auth 认证中间件，验证 JWT 令牌或个人访问令牌（PAT）
+// 令牌来源（按优先级）：
+//   1. Authorization: Bearer <token> 头（PAT 或 JWT）
+//   2. multica_auth HttpOnly Cookie（JWT）— 状态变更请求需要有效 CSRF 令牌
 //
-// Sets X-User-ID and X-User-Email headers on the request for downstream handlers.
+// 认证成功后，在请求头中设置 X-User-ID 和 X-User-Email 供下游处理器使用
 func Auth(queries *db.Queries) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -31,14 +31,14 @@ func Auth(queries *db.Queries) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Cookie-based auth requires CSRF validation for state-changing methods.
+			// Cookie 认证需要对状态变更方法进行 CSRF 验证
 			if fromCookie && !auth.ValidateCSRF(r) {
 				slog.Debug("auth: CSRF validation failed", "path", r.URL.Path)
 				http.Error(w, `{"error":"CSRF validation failed"}`, http.StatusForbidden)
 				return
 			}
 
-			// PAT: tokens starting with "mul_"
+			// PAT：以 "mul_" 开头的令牌
 			if strings.HasPrefix(tokenString, "mul_") {
 				if queries == nil {
 					http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
@@ -54,14 +54,14 @@ func Auth(queries *db.Queries) func(http.Handler) http.Handler {
 
 				r.Header.Set("X-User-ID", uuidToString(pat.UserID))
 
-				// Best-effort: update last_used_at
+				// 尽力而为：异步更新最后使用时间
 				go queries.UpdatePersonalAccessTokenLastUsed(context.Background(), pat.ID)
 
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// JWT
+			// JWT 令牌验证
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, jwt.ErrSignatureInvalid

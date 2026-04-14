@@ -5,52 +5,51 @@ import (
 	"sync"
 )
 
-// Event represents a domain event published by handlers or services.
+// Event 表示由处理器或服务发布的领域事件
 type Event struct {
-	Type        string // e.g. "issue:created", "inbox:new"
-	WorkspaceID string // routes to correct Hub room
-	ActorType   string // "member", "agent", or "system"
+	Type        string // 事件类型，例如 "issue:created", "inbox:new"
+	WorkspaceID string // 路由到正确的 Hub 房间
+	ActorType   string // 触发者类型："member"（成员）、"agent"（代理）、"system"（系统）
 	ActorID     string
-	Payload     any // JSON-serializable, same shape as current WS payloads
+	Payload     any // 可 JSON 序列化的数据，格式与当前 WebSocket 载荷相同
 }
 
-// Handler is a function that processes an event.
+// Handler 是处理事件的函数类型
 type Handler func(Event)
 
-// Bus is an in-process synchronous pub/sub event bus.
+// Bus 是进程内同步的发布/订阅事件总线
 type Bus struct {
 	mu             sync.RWMutex
 	listeners      map[string][]Handler
 	globalHandlers []Handler
 }
 
-// New creates a new event bus.
+// New 创建新的事件总线
 func New() *Bus {
 	return &Bus{
 		listeners: make(map[string][]Handler),
 	}
 }
 
-// Subscribe registers a handler for a given event type.
-// Handlers are called synchronously in registration order.
+// Subscribe 为指定事件类型注册处理器
+// 处理器按注册顺序同步调用
 func (b *Bus) Subscribe(eventType string, h Handler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.listeners[eventType] = append(b.listeners[eventType], h)
 }
 
-// SubscribeAll registers a handler that receives ALL events regardless of type.
-// Global handlers are called after type-specific handlers.
+// SubscribeAll 注册接收所有事件（无论类型）的全局处理器
+// 全局处理器在特定类型处理器之后调用
 func (b *Bus) SubscribeAll(h Handler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.globalHandlers = append(b.globalHandlers, h)
 }
 
-// Publish dispatches an event to all registered handlers for that event type.
-// Type-specific handlers run first, then global (SubscribeAll) handlers.
-// Each handler is called synchronously. Panics in individual handlers are
-// recovered so one failing handler does not prevent others from executing.
+// Publish 将事件分派给该事件类型的所有注册处理器
+// 先执行特定类型处理器，然后执行全局（SubscribeAll）处理器
+// 每个处理器同步调用。单个处理器中的 panic 会被恢复，确保一个失败的处理器不会阻止其他处理器执行
 func (b *Bus) Publish(e Event) {
 	b.mu.RLock()
 	handlers := b.listeners[e.Type]

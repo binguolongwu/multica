@@ -14,11 +14,15 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
+// nonAlpha 用于移除非字母字符（生成 Issue 前缀用）
 var nonAlpha = regexp.MustCompile(`[^a-zA-Z]`)
+
+// workspaceSlugPattern 验证工作空间 slug 格式：小写字母、数字、横线，不能连续横线
 var workspaceSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
-// generateIssuePrefix produces a 2-5 char uppercase prefix from a workspace name.
-// Examples: "Jiayuan's Workspace" → "JIA", "My Team" → "MYT", "AB" → "AB".
+// generateIssuePrefix 从工作空间名称生成 2-5 字符的大写前缀（用于 Issue 编号）。
+// 示例："Jiayuan's Workspace" → "JIA", "My Team" → "MYT", "AB" → "AB"
+// 业务逻辑：Issue 编号格式为 "前缀-数字"（如 JIA-42），前缀从名称提取首字母。
 func generateIssuePrefix(name string) string {
 	letters := nonAlpha.ReplaceAllString(name, "")
 	if len(letters) == 0 {
@@ -31,19 +35,21 @@ func generateIssuePrefix(name string) string {
 	return letters
 }
 
+// WorkspaceResponse 工作空间 API 响应结构
 type WorkspaceResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description *string `json:"description"`
-	Context     *string `json:"context"`
-	Settings    any     `json:"settings"`
-	Repos       any     `json:"repos"`
-	IssuePrefix string  `json:"issue_prefix"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID          string  `json:"id"`           // 工作空间唯一 ID
+	Name        string  `json:"name"`         // 显示名称
+	Slug        string  `json:"slug"`         // URL 友好标识（如 my-workspace）
+	Description *string `json:"description"`  // 描述（可选）
+	Context     *string `json:"context"`      // AI 上下文提示（可选）
+	Settings    any     `json:"settings"`     // 设置（JSON）
+	Repos       any     `json:"repos"`        // 关联代码仓库（JSON）
+	IssuePrefix string  `json:"issue_prefix"` // Issue 编号前缀（如 JIA）
+	CreatedAt   string  `json:"created_at"`   // 创建时间
+	UpdatedAt   string  `json:"updated_at"`   // 更新时间
 }
 
+// workspaceToResponse 将数据库工作空间模型转换为 API 响应
 func workspaceToResponse(w db.Workspace) WorkspaceResponse {
 	var settings any
 	if w.Settings != nil {
@@ -73,14 +79,16 @@ func workspaceToResponse(w db.Workspace) WorkspaceResponse {
 	}
 }
 
+// MemberResponse 成员基础信息响应（不含用户详情）
 type MemberResponse struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	UserID      string `json:"user_id"`
-	Role        string `json:"role"`
-	CreatedAt   string `json:"created_at"`
+	ID          string `json:"id"`           // 成员记录 ID
+	WorkspaceID string `json:"workspace_id"`// 工作空间 ID
+	UserID      string `json:"user_id"`     // 用户 ID
+	Role        string `json:"role"`        // 角色：owner/admin/member
+	CreatedAt   string `json:"created_at"`  // 加入时间
 }
 
+// memberToResponse 将数据库成员模型转换为 API 响应
 func memberToResponse(m db.Member) MemberResponse {
 	return MemberResponse{
 		ID:          uuidToString(m.ID),
@@ -91,6 +99,8 @@ func memberToResponse(m db.Member) MemberResponse {
 	}
 }
 
+// ListWorkspaces 获取当前用户加入的所有工作空间列表。
+// 使用场景：用户登录后侧边栏显示工作空间切换器。
 func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
@@ -111,6 +121,8 @@ func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// GetWorkspace 获取单个工作空间的详细信息。
+// 权限要求：调用者必须是工作空间成员（由路由中间件控制）。
 func (h *Handler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := workspaceIDFromURL(r, "id")
 
@@ -122,14 +134,21 @@ func (h *Handler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, workspaceToResponse(ws))
 }
 
+// CreateWorkspaceRequest 创建工作空间的请求参数
 type CreateWorkspaceRequest struct {
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description *string `json:"description"`
-	Context     *string `json:"context"`
-	IssuePrefix *string `json:"issue_prefix"`
+	Name        string  `json:"name"`         // 工作空间名称（必填）
+	Slug        string  `json:"slug"`         // URL 标识（必填，如 my-team）
+	Description *string `json:"description"`// 描述（可选）
+	Context     *string `json:"context"`    // AI 上下文（可选）
+	IssuePrefix *string `json:"issue_prefix"`// 自定义 Issue 前缀（可选，默认从名称生成）
 }
 
+// CreateWorkspace 创建新的工作空间，创建者自动成为 owner。
+// 业务逻辑：
+//   1. 验证 slug 格式合法
+//   2. 使用事务：创建工作空间 + 添加创建者为 owner
+//   3. 自动生成或接受自定义 Issue 前缀
+// 创建成功后用户立即拥有该工作空间的完全权限。
 func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
@@ -201,15 +220,19 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, workspaceToResponse(ws))
 }
 
+// UpdateWorkspaceRequest 更新工作空间的请求参数（全部可选）
 type UpdateWorkspaceRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Context     *string `json:"context"`
-	Settings    any     `json:"settings"`
-	Repos       any     `json:"repos"`
-	IssuePrefix *string `json:"issue_prefix"`
+	Name        *string `json:"name"`         // 新名称
+	Description *string `json:"description"`// 新描述
+	Context     *string `json:"context"`    // 新 AI 上下文
+	Settings    any     `json:"settings"`   // 新设置（JSON）
+	Repos       any     `json:"repos"`      // 新仓库配置（JSON）
+	IssuePrefix *string `json:"issue_prefix"`// 新 Issue 前缀（谨慎修改，影响编号连续性）
 }
 
+// UpdateWorkspace 更新工作空间信息。
+// 权限要求：通常是管理员或 owner（由路由中间件控制）。
+// 发布后通过 WebSocket 广播更新，使所有在线成员看到实时变更。
 func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := workspaceIDFromURL(r, "id")
 
@@ -265,6 +288,8 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, workspaceToResponse(ws))
 }
 
+// ListMembers 获取工作空间的成员列表（基础信息）。
+// 注意：不包含用户姓名、邮箱等详情，如需请使用 ListMembersWithUser。
 func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	workspaceID := chi.URLParam(r, "id")
 	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
@@ -285,17 +310,20 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// MemberWithUserResponse 包含用户详情的成员响应
 type MemberWithUserResponse struct {
-	ID          string  `json:"id"`
-	WorkspaceID string  `json:"workspace_id"`
-	UserID      string  `json:"user_id"`
-	Role        string  `json:"role"`
-	CreatedAt   string  `json:"created_at"`
-	Name        string  `json:"name"`
-	Email       string  `json:"email"`
-	AvatarURL   *string `json:"avatar_url"`
+	ID          string  `json:"id"`           // 成员记录 ID
+	WorkspaceID string  `json:"workspace_id"` // 工作空间 ID
+	UserID      string  `json:"user_id"`      // 用户 ID
+	Role        string  `json:"role"`         // 角色
+	CreatedAt   string  `json:"created_at"`   // 加入时间
+	Name        string  `json:"name"`         // 用户姓名
+	Email       string  `json:"email"`        // 用户邮箱
+	AvatarURL   *string `json:"avatar_url"`   // 头像 URL（可选）
 }
 
+// ListMembersWithUser 获取工作空间成员列表（含用户详情）。
+// 使用场景：成员管理页面显示姓名、邮箱、头像。
 func (h *Handler) ListMembersWithUser(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 
@@ -322,11 +350,13 @@ func (h *Handler) ListMembersWithUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// CreateMemberRequest 创建成员/发送邀请的请求参数
 type CreateMemberRequest struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Email string `json:"email"` // 被邀请人邮箱
+	Role  string `json:"role"`  // 邀请角色：admin 或 member（不能是 owner）
 }
 
+// memberWithUserResponse 组合成员记录和用户信息，生成完整响应
 func memberWithUserResponse(member db.Member, user db.User) MemberWithUserResponse {
 	return MemberWithUserResponse{
 		ID:          uuidToString(member.ID),
@@ -340,9 +370,12 @@ func memberWithUserResponse(member db.Member, user db.User) MemberWithUserRespon
 	}
 }
 
+// normalizeMemberRole 规范化成员角色输入。
+// 空值默认为 "member"，支持的值：owner、admin、member。
+// 返回值：(规范化后的角色, 是否有效)
 func normalizeMemberRole(role string) (string, bool) {
 	if role == "" {
-		return "member", true
+		return "member", true // 默认普通成员
 	}
 
 	role = strings.TrimSpace(role)
@@ -354,6 +387,9 @@ func normalizeMemberRole(role string) (string, bool) {
 	}
 }
 
+// CreateMember 创建成员（原有流程，现已被邀请流程替代）。
+// 当前行为：如果用户不存在，自动创建用户；如果已是成员，返回冲突。
+// 注意：新功能应使用 CreateInvitation 邀请流程。
 func (h *Handler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 	requester, ok := h.workspaceMember(w, r, workspaceID)
@@ -386,7 +422,7 @@ func (h *Handler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	user, err := h.Queries.GetUserByEmail(r.Context(), email)
 	if err != nil {
 		if isNotFound(err) {
-			// Auto-create user with email so they can be invited before signing up
+			// 用户不存在时自动创建账户（方便预邀请未注册用户）
 			user, err = h.Queries.CreateUser(r.Context(), db.CreateUserParams{
 				Name:  email,
 				Email: email,
@@ -427,10 +463,16 @@ func (h *Handler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, memberWithUserResponse(member, user))
 }
 
+// UpdateMemberRequest 更新成员角色的请求
 type UpdateMemberRequest struct {
-	Role string `json:"role"`
+	Role string `json:"role"` // 新角色：admin 或 member
 }
 
+// UpdateMember 修改成员角色。
+// 权限控制：
+//   - 只有 owner 可以授予/撤销 owner 权限
+//   - 不能降级最后一个 owner（防止工作空间无主）
+// 变更后发布 WebSocket 事件通知所有在线客户端。
 func (h *Handler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 	requester, ok := h.workspaceMember(w, r, workspaceID)
@@ -501,6 +543,9 @@ func (h *Handler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, memberWithUserResponse(updatedMember, user))
 }
 
+// DeleteMember 从工作空间移除成员。
+// 安全限制：不能删除最后一个 owner。
+// 被移除成员将立即失去该工作空间的所有访问权限。
 func (h *Handler) DeleteMember(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 	requester, ok := h.workspaceMember(w, r, workspaceID)
@@ -549,6 +594,9 @@ func (h *Handler) DeleteMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// LeaveWorkspace 当前用户主动退出工作空间。
+// 限制：最后一个 owner 不能退出（必须先转移所有权或删除工作空间）。
+// 退出后立即清除成员关系，用户不再能看到该工作空间。
 func (h *Handler) LeaveWorkspace(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 	member, ok := h.workspaceMember(w, r, workspaceID)
@@ -585,6 +633,10 @@ func (h *Handler) LeaveWorkspace(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// DeleteWorkspace 删除整个工作空间（危险操作！）。
+// 会级联删除所有关联数据：成员、Agent、问题、评论等。
+// 权限要求：只有 owner 可以执行（由路由中间件控制）。
+// 删除后发布 WebSocket 事件通知所有客户端清理状态。
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "id")
 

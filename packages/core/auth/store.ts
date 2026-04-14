@@ -7,7 +7,7 @@ export interface AuthStoreOptions {
   storage: StorageAdapter;
   onLogin?: () => void;
   onLogout?: () => void;
-  /** When true, rely on HttpOnly cookies instead of localStorage for auth tokens. */
+  /** 当为 true 时，使用 HttpOnly Cookie 而非 localStorage 存储认证令牌 */
   cookieAuth?: boolean;
 }
 
@@ -31,10 +31,11 @@ export function createAuthStore(options: AuthStoreOptions) {
     user: null,
     isLoading: true,
 
+    // 初始化认证状态
     initialize: async () => {
       if (cookieAuth) {
-        // In cookie mode, the HttpOnly cookie is sent automatically.
-        // Try to fetch the current user — if the cookie exists the server will accept it.
+        // Cookie 模式：HttpOnly Cookie 会自动发送
+        // 尝试获取当前用户——如果 Cookie 存在服务器会接受
         try {
           const user = await api.getMe();
           set({ user, isLoading: false });
@@ -44,7 +45,7 @@ export function createAuthStore(options: AuthStoreOptions) {
         return;
       }
 
-      // Token mode: read from localStorage (Electron / legacy).
+      // 令牌模式：从 localStorage 读取（Electron / 旧版）
       const token = storage.getItem("multica_token");
       if (!token) {
         set({ isLoading: false });
@@ -71,7 +72,7 @@ export function createAuthStore(options: AuthStoreOptions) {
     verifyCode: async (email: string, code: string) => {
       const { token, user } = await api.verifyCode(email, code);
       if (!cookieAuth) {
-        // Token mode: persist for Electron / legacy.
+        // 令牌模式：为 Electron / 旧版持久化存储
         storage.setItem("multica_token", token);
         api.setToken(token);
       }

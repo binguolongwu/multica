@@ -10,26 +10,25 @@ import (
 
 const defaultCLIConfigPath = ".multica/config.json"
 
-// WatchedWorkspace represents a workspace the daemon should monitor for tasks.
+// WatchedWorkspace 表示守护进程应监视任务的工作空间
 type WatchedWorkspace struct {
 	ID   string `json:"id"`
 	Name string `json:"name,omitempty"`
 }
 
-// CLIConfig holds persistent CLI settings.
+// CLIConfig 保存持久化的 CLI 设置
 type CLIConfig struct {
 	ServerURL         string             `json:"server_url,omitempty"`
 	AppURL            string             `json:"app_url,omitempty"`
 	WorkspaceID       string             `json:"workspace_id,omitempty"`
 	Token             string             `json:"token,omitempty"`
 	WatchedWorkspaces []WatchedWorkspace `json:"watched_workspaces,omitempty"`
-	// UnwatchedWorkspaces is a denylist of workspace IDs the user has
-	// explicitly opted out of. The daemon's periodic sync from the API
-	// respects this list and won't re-add excluded workspaces.
+	// UnwatchedWorkspaces 是用户明确选择退出的工作空间 ID 的拒绝列表
+	// 守护进程从 API 的定期同步会尊重此列表，不会重新添加排除的工作空间
 	UnwatchedWorkspaces []string `json:"unwatched_workspaces,omitempty"`
 }
 
-// IsUnwatched reports whether the given workspace ID is in the denylist.
+// IsUnwatched 报告给定的工作空间 ID 是否在拒绝列表中
 func (c *CLIConfig) IsUnwatched(id string) bool {
 	for _, u := range c.UnwatchedWorkspaces {
 		if u == id {
@@ -39,7 +38,7 @@ func (c *CLIConfig) IsUnwatched(id string) bool {
 	return false
 }
 
-// AddUnwatchedWorkspace adds an ID to the denylist. Returns true if added.
+// AddUnwatchedWorkspace 将 ID 添加到拒绝列表。如果已添加则返回 true
 func (c *CLIConfig) AddUnwatchedWorkspace(id string) bool {
 	if c.IsUnwatched(id) {
 		return false
@@ -48,7 +47,7 @@ func (c *CLIConfig) AddUnwatchedWorkspace(id string) bool {
 	return true
 }
 
-// RemoveUnwatchedWorkspace removes an ID from the denylist. Returns true if removed.
+// RemoveUnwatchedWorkspace 从拒绝列表中移除 ID。如果已移除则返回 true
 func (c *CLIConfig) RemoveUnwatchedWorkspace(id string) bool {
 	for i, u := range c.UnwatchedWorkspaces {
 		if u == id {
@@ -59,7 +58,7 @@ func (c *CLIConfig) RemoveUnwatchedWorkspace(id string) bool {
 	return false
 }
 
-// AddWatchedWorkspace adds a workspace to the watch list. Returns true if added.
+// AddWatchedWorkspace 将工作空间添加到监视列表。如果已添加则返回 true
 func (c *CLIConfig) AddWatchedWorkspace(id, name string) bool {
 	for _, w := range c.WatchedWorkspaces {
 		if w.ID == id {
@@ -70,7 +69,7 @@ func (c *CLIConfig) AddWatchedWorkspace(id, name string) bool {
 	return true
 }
 
-// RemoveWatchedWorkspace removes a workspace from the watch list. Returns true if found.
+// RemoveWatchedWorkspace 从监视列表中移除工作空间。如果找到则返回 true
 func (c *CLIConfig) RemoveWatchedWorkspace(id string) bool {
 	for i, w := range c.WatchedWorkspaces {
 		if w.ID == id {

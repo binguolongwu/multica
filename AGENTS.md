@@ -43,5 +43,7 @@ pnpm test             # TS unit tests (Vitest)
 make test             # Go tests
 make check            # Full verification pipeline
 ```
+### 代码注释
+- 请用中文写注释,所有 func 函数,都要写注释,重要的逻辑都加上中文解释,目标是使初级程序员能看到整个项目的业务逻辑.
 
 See CLAUDE.md for the complete command reference.

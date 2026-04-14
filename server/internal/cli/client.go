@@ -13,19 +13,21 @@ import (
 	"time"
 )
 
-// APIClient is a REST client for the Multica server API.
-// Used by ctrl subcommands (agent, runtime, status, etc.). Requests
-// automatically include auth and execution context headers when configured.
+// APIClient Multica 服务器 API 的 REST 客户端
+// 用于 CLI 子命令（agent、runtime、status 等）
+// 请求自动包含认证和执行上下文头信息
 type APIClient struct {
-	BaseURL     string
-	WorkspaceID string
-	Token       string
-	AgentID     string // When set, requests are attributed to this agent instead of the user.
-	TaskID      string // When set, sent as X-Task-ID for agent-task validation.
-	HTTPClient  *http.Client
+	BaseURL     string     // 服务器基础 URL
+	WorkspaceID string     // 工作空间 ID
+	Token       string     // 认证令牌
+	AgentID     string     // 当设置时，请求归因于该 Agent 而非用户
+	TaskID      string     // 当设置时，作为 X-Task-ID 发送用于任务验证
+	HTTPClient  *http.Client // HTTP 客户端（带超时配置）
 }
 
-// NewAPIClient creates a new API client for ctrl commands.
+// NewAPIClient 创建新的 API 客户端（用于控制命令）
+// 默认超时：15 秒
+func NewAPIClient(baseURL, workspaceID, token string) *APIClient {
 func NewAPIClient(baseURL, workspaceID, token string) *APIClient {
 	return &APIClient{
 		BaseURL:     strings.TrimRight(baseURL, "/"),
@@ -34,7 +36,8 @@ func NewAPIClient(baseURL, workspaceID, token string) *APIClient {
 		HTTPClient:  &http.Client{Timeout: 15 * time.Second},
 	}
 }
-
+// setHeaders 设置请求头信息
+// 包括：Authorization、X-Workspace-ID、X-Agent-ID、X-Task-ID
 func (c *APIClient) setHeaders(req *http.Request) {
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
@@ -50,7 +53,9 @@ func (c *APIClient) setHeaders(req *http.Request) {
 	}
 }
 
-// GetJSON performs a GET request and decodes the JSON response.
+// GetJSON 执行 GET 请求并解码 JSON 响应
+// 自动处理错误响应（状态码 >= 400 时返回错误）
+func (c *APIClient) GetJSON(ctx context.Context, path string, out any) error {
 func (c *APIClient) GetJSON(ctx context.Context, path string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
 	if err != nil {
@@ -74,9 +79,8 @@ func (c *APIClient) GetJSON(ctx context.Context, path string, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// GetJSONWithHeaders performs a GET request, decodes the JSON response, and
-// returns the response headers. Useful when callers need header values like
-// X-Total-Count for pagination.
+// GetJSONWithHeaders 执行 GET 请求，解码 JSON 响应并返回响应头
+// 使用场景：调用者需要获取分页头信息（如 X-Total-Count）
 func (c *APIClient) GetJSONWithHeaders(ctx context.Context, path string, out any) (http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
 	if err != nil {

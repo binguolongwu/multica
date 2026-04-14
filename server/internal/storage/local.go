@@ -11,17 +11,18 @@ import (
 	"strings"
 )
 
+// LocalStorage 本地文件系统存储实现
 type LocalStorage struct {
-	uploadDir string
-	baseURL   string
+	uploadDir string // 上传文件存放目录
+	baseURL   string // 文件访问基础 URL（可选，用于生成完整访问链接）
 }
 
-// NewLocalStorageFromEnv creates a LocalStorage from environment variables.
-// Returns nil if upload directory cannot be created.
+// NewLocalStorageFromEnv 从环境变量创建本地存储实例
+// 如果上传目录无法创建则返回 nil
 //
-// Environment variables:
-//   - LOCAL_UPLOAD_DIR (default: "./data/uploads")
-//   - LOCAL_UPLOAD_BASE_URL (optional, e.g., "http://localhost:8080")
+// 环境变量：
+//   - LOCAL_UPLOAD_DIR（默认："./data/uploads"）
+//   - LOCAL_UPLOAD_BASE_URL（可选，例如 "http://localhost:8080"）
 func NewLocalStorageFromEnv() *LocalStorage {
 	uploadDir := os.Getenv("LOCAL_UPLOAD_DIR")
 	if uploadDir == "" {
@@ -98,8 +99,8 @@ func (s *LocalStorage) ServeFile(w http.ResponseWriter, r *http.Request, filenam
 	filePath := filepath.Join(s.uploadDir, filename)
 	slog.Info("serving file", "filename", filename, "filepath", filePath)
 
-	// Use http.ServeFile which has built-in path traversal protection
-	// It sanitizes the path and prevents access outside the directory
+	// 使用 http.ServeFile 内置路径遍历保护
+	// 它会清理路径并防止访问目录外的文件
 	http.ServeFile(w, r, filePath)
 }
 

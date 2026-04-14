@@ -13,28 +13,31 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
+// AgentResponse Agent（AI 助手）的 API 响应结构
 type AgentResponse struct {
-	ID                 string            `json:"id"`
-	WorkspaceID        string            `json:"workspace_id"`
-	RuntimeID          string            `json:"runtime_id"`
-	Name               string            `json:"name"`
-	Description        string            `json:"description"`
-	Instructions       string            `json:"instructions"`
-	AvatarURL          *string           `json:"avatar_url"`
-	RuntimeMode        string            `json:"runtime_mode"`
-	RuntimeConfig      any               `json:"runtime_config"`
-	CustomEnv          map[string]string `json:"custom_env"`
-	Visibility         string            `json:"visibility"`
-	Status             string            `json:"status"`
-	MaxConcurrentTasks int32             `json:"max_concurrent_tasks"`
-	OwnerID            *string           `json:"owner_id"`
-	Skills             []SkillResponse   `json:"skills"`
-	CreatedAt          string            `json:"created_at"`
-	UpdatedAt          string            `json:"updated_at"`
-	ArchivedAt         *string           `json:"archived_at"`
-	ArchivedBy         *string           `json:"archived_by"`
+	ID                 string            `json:"id"`                   // Agent 唯一 ID
+	WorkspaceID        string            `json:"workspace_id"`         // 所属工作空间
+	RuntimeID          string            `json:"runtime_id"`         // 关联的运行时 ID
+	Name               string            `json:"name"`               // Agent 名称
+	Description        string            `json:"description"`        // 描述
+	Instructions       string            `json:"instructions"`       // 系统指令（给 AI 的提示）
+	AvatarURL          *string           `json:"avatar_url"`         // 头像 URL
+	RuntimeMode        string            `json:"runtime_mode"`       // 运行时模式：daemon/cloud
+	RuntimeConfig      any               `json:"runtime_config"`     // 运行时配置（JSON）
+	CustomEnv          map[string]string `json:"custom_env"`         // 自定义环境变量
+	Visibility         string            `json:"visibility"`         // 可见性：public/private
+	Status             string            `json:"status"`             // 状态：online/offline/busy
+	MaxConcurrentTasks int32             `json:"max_concurrent_tasks"`// 最大并发任务数
+	OwnerID            *string           `json:"owner_id"`           // 创建者 ID
+	Skills             []SkillResponse   `json:"skills"`             // 关联的技能列表
+	CreatedAt          string            `json:"created_at"`         // 创建时间
+	UpdatedAt          string            `json:"updated_at"`         // 更新时间
+	ArchivedAt         *string           `json:"archived_at"`        // 归档时间（nil 表示未归档）
+	ArchivedBy         *string           `json:"archived_by"`        // 归档者 ID
 }
 
+// agentToResponse 将数据库 Agent 模型转换为 API 响应
+// 处理 JSON 字段的反序列化（RuntimeConfig、CustomEnv）
 func agentToResponse(a db.Agent) AgentResponse {
 	var rc any
 	if a.RuntimeConfig != nil {
@@ -77,27 +80,27 @@ func agentToResponse(a db.Agent) AgentResponse {
 	}
 }
 
-// RepoData holds repository information included in claim responses so the
-// daemon can set up worktrees for each workspace repo.
+// RepoData 仓库信息，用于 Agent 任务认领响应
+// Daemon 使用此信息为每个仓库创建工作目录（worktree）
 type RepoData struct {
-	URL         string `json:"url"`
-	Description string `json:"description"`
+	URL         string `json:"url"`         // 仓库克隆 URL
+	Description string `json:"description"` // 仓库描述
 }
-
+// AgentTaskResponse Agent 任务的 API 响应结构
 type AgentTaskResponse struct {
-	ID             string         `json:"id"`
-	AgentID        string         `json:"agent_id"`
-	RuntimeID      string         `json:"runtime_id"`
-	IssueID        string         `json:"issue_id"`
-	WorkspaceID    string         `json:"workspace_id"`
-	Status         string         `json:"status"`
-	Priority       int32          `json:"priority"`
-	DispatchedAt   *string        `json:"dispatched_at"`
-	StartedAt      *string        `json:"started_at"`
-	CompletedAt    *string        `json:"completed_at"`
-	Result         any            `json:"result"`
-	Error          *string        `json:"error"`
-	Agent          *TaskAgentData `json:"agent,omitempty"`
+	ID             string         `json:"id"`              // 任务 ID
+	AgentID        string         `json:"agent_id"`        // 执行 Agent ID
+	RuntimeID      string         `json:"runtime_id"`      // 运行时 ID
+	IssueID        string         `json:"issue_id"`        // 关联问题 ID
+	WorkspaceID    string         `json:"workspace_id"`    // 工作空间 ID
+	Status         string         `json:"status"`          // 状态：pending/running/completed/failed/cancelled
+	Priority       int32          `json:"priority"`        // 优先级（数字越小越优先）
+	DispatchedAt   *string        `json:"dispatched_at"`   // 派发时间
+	StartedAt      *string        `json:"started_at"`      // 开始时间
+	CompletedAt    *string        `json:"completed_at"`    // 完成时间
+	Result         any            `json:"result"`          // 执行结果（JSON）
+	Error          *string        `json:"error"`           // 错误信息
+	Agent          *TaskAgentData `json:"agent,omitempty"` // Agent 基本信息（用于显示）
 	Repos          []RepoData     `json:"repos,omitempty"`
 	CreatedAt      string         `json:"created_at"`
 	PriorSessionID   string         `json:"prior_session_id,omitempty"`    // session ID from a previous task on same issue

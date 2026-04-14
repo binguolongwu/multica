@@ -25,31 +25,31 @@ const (
 	DefaultGCOrphanTTL           = 30 * 24 * time.Hour // 30 days
 )
 
-// Config holds all daemon configuration.
+// Config 保存所有守护进程配置
 type Config struct {
 	ServerBaseURL      string
 	DaemonID           string
 	DeviceName         string
 	RuntimeName        string
-	CLIVersion         string                // multica CLI version (e.g. "0.1.13")
-	LaunchedBy         string                // "desktop" when spawned by the Electron app, empty for standalone
-	Profile            string                // profile name (empty = default)
-	Agents             map[string]AgentEntry // keyed by provider: claude, codex, opencode, openclaw, hermes, gemini
-	WorkspacesRoot     string                // base path for execution envs (default: ~/multica_workspaces)
-	KeepEnvAfterTask   bool                  // preserve env after task for debugging
-	HealthPort         int                   // local HTTP port for health checks (default: 19514)
-	MaxConcurrentTasks int                   // max tasks running in parallel (default: 20)
-	GCEnabled          bool                  // enable periodic workspace garbage collection (default: true)
-	GCInterval         time.Duration         // how often the GC loop runs (default: 1h)
-	GCTTL              time.Duration         // clean dirs whose issue is done/canceled and updated_at < now()-TTL (default: 5d)
-	GCOrphanTTL        time.Duration         // clean orphan dirs (no meta or unknown issue) older than this (default: 30d)
+	CLIVersion         string                // multica CLI 版本（例如 "0.1.13"）
+	LaunchedBy         string                // 由 Electron 应用启动时为 "desktop"，独立运行为空
+	Profile            string                // 配置文件名称（空 = 默认）
+	Agents             map[string]AgentEntry // 按键值 provider 索引：claude、codex、opencode、openclaw、hermes、gemini
+	WorkspacesRoot     string                // 执行环境的基础路径（默认：~/multica_workspaces）
+	KeepEnvAfterTask   bool                  // 任务完成后保留环境用于调试
+	HealthPort         int                   // 健康检查的本地 HTTP 端口（默认：19514）
+	MaxConcurrentTasks int                   // 并行运行的最大任务数（默认：20）
+	GCEnabled          bool                  // 启用定期工作空间垃圾回收（默认：true）
+	GCInterval         time.Duration         // GC 循环运行频率（默认：1h）
+	GCTTL              time.Duration         // 清理问题已完成/已取消且 updated_at < now()-TTL 的目录（默认：5d）
+	GCOrphanTTL        time.Duration         // 清理超过此时间的孤立目录（无元数据或未知问题）（默认：30d）
 	PollInterval       time.Duration
 	HeartbeatInterval  time.Duration
 	AgentTimeout       time.Duration
 }
 
-// Overrides allows CLI flags to override environment variables and defaults.
-// Zero values are ignored and the env/default value is used instead.
+// Overrides 允许 CLI 标志覆盖环境变量和默认值
+// 零值被忽略，使用环境变量/默认值
 type Overrides struct {
 	ServerURL          string
 	WorkspacesRoot     string

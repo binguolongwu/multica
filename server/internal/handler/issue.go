@@ -20,30 +20,34 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
-// IssueResponse is the JSON response for an issue.
+// IssueResponse 问题的 JSON 响应结构
+// 包含问题的完整信息，用于 API 返回
 type IssueResponse struct {
-	ID                 string                  `json:"id"`
-	WorkspaceID        string                  `json:"workspace_id"`
-	Number             int32                   `json:"number"`
-	Identifier         string                  `json:"identifier"`
-	Title              string                  `json:"title"`
-	Description        *string                 `json:"description"`
-	Status             string                  `json:"status"`
-	Priority           string                  `json:"priority"`
-	AssigneeType       *string                 `json:"assignee_type"`
-	AssigneeID         *string                 `json:"assignee_id"`
-	CreatorType        string                  `json:"creator_type"`
-	CreatorID          string                  `json:"creator_id"`
-	ParentIssueID      *string                 `json:"parent_issue_id"`
-	ProjectID          *string                 `json:"project_id"`
-	Position           float64                 `json:"position"`
-	DueDate            *string                 `json:"due_date"`
-	CreatedAt          string                  `json:"created_at"`
-	UpdatedAt          string                  `json:"updated_at"`
-	Reactions          []IssueReactionResponse `json:"reactions,omitempty"`
-	Attachments        []AttachmentResponse    `json:"attachments,omitempty"`
+	ID                 string                  `json:"id"`                  // 问题唯一 ID
+	WorkspaceID        string                  `json:"workspace_id"`        // 所属工作空间 ID
+	Number             int32                   `json:"number"`              // 工作空间内的问题编号（递增）
+	Identifier         string                  `json:"identifier"`          // 可读标识符（如 JIA-42）
+	Title              string                  `json:"title"`               // 标题
+	Description        *string                 `json:"description"`         // 描述（Markdown）
+	Status             string                  `json:"status"`              // 状态：backlog/todo/in_progress/done/cancelled
+	Priority           string                  `json:"priority"`            // 优先级：urgent/high/medium/low
+	AssigneeType       *string                 `json:"assignee_type"`       // 被指派人类型：member/agent
+	AssigneeID         *string                 `json:"assignee_id"`         // 被指派人 ID
+	CreatorType        string                  `json:"creator_type"`        // 创建者类型
+	CreatorID          string                  `json:"creator_id"`          // 创建者 ID
+	ParentIssueID      *string                 `json:"parent_issue_id"`     // 父问题 ID（支持问题层级）
+	ProjectID          *string                 `json:"project_id"`          // 所属项目 ID
+	Position           float64                 `json:"position"`            // 排序位置（支持拖拽排序）
+	DueDate            *string                 `json:"due_date"`            // 截止日期
+	CreatedAt          string                  `json:"created_at"`          // 创建时间
+	UpdatedAt          string                  `json:"updated_at"`          // 更新时间
+	Reactions          []IssueReactionResponse `json:"reactions,omitempty"` // 表情反应
+	Attachments        []AttachmentResponse    `json:"attachments,omitempty"`// 附件列表
 }
-
+// issueToResponse 将数据库问题模型转换为 API 响应
+// 参数：
+//   - i: 数据库问题记录
+//   - issuePrefix: 工作空间的问题前缀（用于生成标识符）
 func issueToResponse(i db.Issue, issuePrefix string) IssueResponse {
 	identifier := issuePrefix + "-" + strconv.Itoa(int(i.Number))
 	return IssueResponse{
@@ -68,7 +72,8 @@ func issueToResponse(i db.Issue, issuePrefix string) IssueResponse {
 	}
 }
 
-// issueListRowToResponse converts a list-query row (no description) to an IssueResponse.
+// issueListRowToResponse 将列表查询结果（不含描述）转换为响应结构
+// 用于列表查询优化，减少数据传输量
 func issueListRowToResponse(i db.ListIssuesRow, issuePrefix string) IssueResponse {
 	identifier := issuePrefix + "-" + strconv.Itoa(int(i.Number))
 	return IssueResponse{
@@ -92,6 +97,7 @@ func issueListRowToResponse(i db.ListIssuesRow, issuePrefix string) IssueRespons
 	}
 }
 
+// openIssueRowToResponse 将未解决问题查询结果转换为响应结构
 func openIssueRowToResponse(i db.ListOpenIssuesRow, issuePrefix string) IssueResponse {
 	identifier := issuePrefix + "-" + strconv.Itoa(int(i.Number))
 	return IssueResponse{

@@ -16,23 +16,28 @@ import (
 	"github.com/multica-ai/multica/server/internal/auth"
 )
 
-// MembershipChecker verifies a user belongs to a workspace.
+// MembershipChecker 成员资格检查器接口
+// 验证用户是否属于指定工作空间
 type MembershipChecker interface {
 	IsMember(ctx context.Context, userID, workspaceID string) bool
 }
 
-// PATResolver resolves a Personal Access Token to a user ID.
-// Returns the user ID and true if the token is valid, or ("", false) otherwise.
+// PATResolver 个人访问令牌解析器接口
+// 将 PAT 解析为用户 ID
+// 返回值：(用户ID, 是否有效)
 type PATResolver interface {
 	ResolveToken(ctx context.Context, token string) (userID string, ok bool)
 }
 
-var allowedWSOrigins atomic.Value // holds []string
+// allowedWSOrigins 允许的 WebSocket 来源（原子存储）
+var allowedWSOrigins atomic.Value // 存储 []string
 
 func init() {
 	allowedWSOrigins.Store(loadAllowedOrigins())
 }
 
+// loadAllowedOrigins 从环境变量加载允许的跨域来源
+// 优先级：ALLOWED_ORIGINS > CORS_ALLOWED_ORIGINS > FRONTEND_ORIGIN > 默认值
 func loadAllowedOrigins() []string {
 	raw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
 	if raw == "" {
@@ -60,11 +65,13 @@ func loadAllowedOrigins() []string {
 	return origins
 }
 
-// SetAllowedOrigins overrides the WebSocket origin whitelist (called from router setup).
+// SetAllowedOrigins 设置允许的 WebSocket 来源白名单
+// 在路由器初始化时调用，覆盖环境变量配置
 func SetAllowedOrigins(origins []string) {
 	allowedWSOrigins.Store(origins)
 }
 
+// checkOrigin 检查请求来源是否在白名单中
 func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
@@ -76,6 +83,7 @@ func checkOrigin(r *http.Request) bool {
 			return true
 		}
 	}
+	// 拒绝未在白名单中的来源
 	slog.Warn("ws: rejected origin", "origin", origin)
 	return false
 }

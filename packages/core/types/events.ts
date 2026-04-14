@@ -6,7 +6,7 @@ import type { TimelineEntry } from "./activity";
 import type { Workspace, MemberWithUser } from "./workspace";
 import type { Project } from "./project";
 
-// WebSocket event types (matching Go server protocol/events.go)
+// WebSocket 事件类型（与 Go 服务器 protocol/events.go 匹配）
 export type WSEventType =
   | "issue:created"
   | "issue:updated"
@@ -55,24 +55,29 @@ export type WSEventType =
   | "pin:created"
   | "pin:deleted";
 
+// WebSocket 消息结构
 export interface WSMessage<T = unknown> {
-  type: WSEventType;
-  payload: T;
-  actor_id?: string;
+  type: WSEventType;  // 事件类型
+  payload: T;         // 事件数据
+  actor_id?: string;  // 触发者 ID（可选）
 }
 
+// 问题创建事件载荷
 export interface IssueCreatedPayload {
-  issue: Issue;
+  issue: Issue;  // 创建的问题
 }
 
+// 问题更新事件载荷
 export interface IssueUpdatedPayload {
-  issue: Issue;
+  issue: Issue;  // 更新后的问题
 }
 
+// 问题删除事件载荷
 export interface IssueDeletedPayload {
-  issue_id: string;
+  issue_id: string;  // 删除的问题 ID
 }
 
+// Agent 状态变更事件载荷
 export interface AgentStatusPayload {
   agent: Agent;
 }

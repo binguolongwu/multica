@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// requestError is returned by postJSON/getJSON when the server responds with an error status.
+// requestError 当服务器返回错误状态码时由 postJSON/getJSON 返回
 type requestError struct {
 	Method     string
 	Path       string
@@ -24,7 +24,7 @@ func (e *requestError) Error() string {
 	return fmt.Sprintf("%s %s returned %d: %s", e.Method, e.Path, e.StatusCode, e.Body)
 }
 
-// isWorkspaceNotFoundError returns true if the error is a 404 with "workspace not found" body.
+// isWorkspaceNotFoundError 如果错误是 404 且响应体包含 "workspace not found" 则返回 true
 func isWorkspaceNotFoundError(err error) bool {
 	var reqErr *requestError
 	if !errors.As(err, &reqErr) {
@@ -36,14 +36,14 @@ func isWorkspaceNotFoundError(err error) bool {
 	return strings.Contains(strings.ToLower(reqErr.Body), "workspace not found")
 }
 
-// Client handles HTTP communication with the Multica server daemon API.
+// Client 处理与 Multica 服务器守护进程 API 的 HTTP 通信
 type Client struct {
 	baseURL string
 	token   string
 	client  *http.Client
 }
 
-// NewClient creates a new daemon API client.
+// NewClient 创建新的守护进程 API 客户端
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
@@ -51,12 +51,12 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-// SetToken sets the auth token for authenticated requests.
+// SetToken 设置认证请求的身份验证令牌
 func (c *Client) SetToken(token string) {
 	c.token = token
 }
 
-// Token returns the current auth token.
+// Token 返回当前的身份验证令牌
 func (c *Client) Token() string {
 	return c.token
 }
@@ -83,7 +83,7 @@ func (c *Client) ReportProgress(ctx context.Context, taskID, summary string, ste
 	}, nil)
 }
 
-// TaskMessageData represents a single agent execution message for batch reporting.
+// TaskMessageData 表示批量报告的单个代理执行消息
 type TaskMessageData struct {
 	Seq     int            `json:"seq"`
 	Type    string         `json:"type"`
@@ -128,8 +128,8 @@ func (c *Client) FailTask(ctx context.Context, taskID, errMsg string) error {
 	}, nil)
 }
 
-// GetTaskStatus returns the current status of a task. Used by the daemon to
-// detect if a task was cancelled while it was executing.
+// GetTaskStatus 返回任务的当前状态。守护进程使用它来
+// 检测任务在执行期间是否被取消
 func (c *Client) GetTaskStatus(ctx context.Context, taskID string) (string, error) {
 	var resp struct {
 		Status string `json:"status"`
@@ -146,19 +146,19 @@ func (c *Client) ReportUsage(ctx context.Context, runtimeID string, entries []ma
 	}, nil)
 }
 
-// HeartbeatResponse contains the server's response to a heartbeat, including any pending actions.
+// HeartbeatResponse 包含服务器对心跳的响应，包括任何待处理的操作
 type HeartbeatResponse struct {
 	Status        string         `json:"status"`
 	PendingPing   *PendingPing   `json:"pending_ping,omitempty"`
 	PendingUpdate *PendingUpdate `json:"pending_update,omitempty"`
 }
 
-// PendingPing represents a ping test request from the server.
+// PendingPing 表示来自服务器的 ping 测试请求
 type PendingPing struct {
 	ID string `json:"id"`
 }
 
-// PendingUpdate represents a CLI update request from the server.
+// PendingUpdate 表示来自服务器的 CLI 更新请求
 type PendingUpdate struct {
 	ID            string `json:"id"`
 	TargetVersion string `json:"target_version"`
@@ -178,18 +178,18 @@ func (c *Client) ReportPingResult(ctx context.Context, runtimeID, pingID string,
 	return c.postJSON(ctx, fmt.Sprintf("/api/daemon/runtimes/%s/ping/%s/result", runtimeID, pingID), result, nil)
 }
 
-// ReportUpdateResult sends the CLI update result back to the server.
+// ReportUpdateResult 将 CLI 更新结果发送回服务器
 func (c *Client) ReportUpdateResult(ctx context.Context, runtimeID, updateID string, result map[string]any) error {
 	return c.postJSON(ctx, fmt.Sprintf("/api/daemon/runtimes/%s/update/%s/result", runtimeID, updateID), result, nil)
 }
 
-// WorkspaceInfo holds minimal workspace metadata returned by the API.
+// WorkspaceInfo 保存 API 返回的最小工作空间元数据
 type WorkspaceInfo struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// ListWorkspaces fetches all workspaces the authenticated user belongs to.
+// ListWorkspaces 获取认证用户所属的所有工作空间
 func (c *Client) ListWorkspaces(ctx context.Context) ([]WorkspaceInfo, error) {
 	var workspaces []WorkspaceInfo
 	if err := c.getJSON(ctx, "/api/workspaces", &workspaces); err != nil {
@@ -198,34 +198,34 @@ func (c *Client) ListWorkspaces(ctx context.Context) ([]WorkspaceInfo, error) {
 	return workspaces, nil
 }
 
-// IssueGCStatus holds the minimal issue info returned by the GC check endpoint.
+// IssueGCStatus 保存 GC 检查端点返回的最小问题信息
 type IssueGCStatus struct {
-	Status    string    `json:"status"`
-	UpdatedAt time.Time `json:"updated_at"`
+    Status    string    `json:"status"`
+    UpdatedAt time.Time `json:"updated_at"`
 }
 
-// GetIssueGCCheck returns the status and updated_at of an issue for GC decisions.
+// GetIssueGCCheck 获取指定问题 ID 的 GC 状态。如果问题不存在或无法删除
+// 则返回 nil 错误但 status=unknown 和 can_delete=false
 func (c *Client) GetIssueGCCheck(ctx context.Context, issueID string) (*IssueGCStatus, error) {
-	var resp IssueGCStatus
-	if err := c.getJSON(ctx, fmt.Sprintf("/api/daemon/issues/%s/gc-check", issueID), &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
+    var resp IssueGCStatus
+    if err := c.getJSON(ctx, fmt.Sprintf("/api/daemon/issues/%s/gc-check", issueID), &resp); err != nil {
+        return nil, err
+    }
+    return &resp, nil
 }
 
+// Deregister 注销指定运行时 ID
 func (c *Client) Deregister(ctx context.Context, runtimeIDs []string) error {
-	return c.postJSON(ctx, "/api/daemon/deregister", map[string]any{
-		"runtime_ids": runtimeIDs,
-	}, nil)
+    return c.postJSON(ctx, "/api/daemon/deregister", map[string]any{
+        "runtime_ids": runtimeIDs,
+    }, nil)
 }
 
-// RegisterResponse holds the server's response to a daemon registration.
+// RegisterResponse 是守护进程注册端点返回的响应
 type RegisterResponse struct {
-	Runtimes []Runtime  `json:"runtimes"`
-	Repos    []RepoData `json:"repos"`
+    Runtimes []Runtime  `json:"runtimes"`
+    Repos    []RepoData `json:"repos"`
 }
-
-func (c *Client) Register(ctx context.Context, req map[string]any) (*RegisterResponse, error) {
 	var resp RegisterResponse
 	if err := c.postJSON(ctx, "/api/daemon/register", req, &resp); err != nil {
 		return nil, err

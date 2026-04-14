@@ -22,18 +22,18 @@ import (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "Authenticate multica with Multica",
+	Short: "使用 Multica 进行身份验证",
 }
 
 var authStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show current authentication status",
+	Short: "显示当前认证状态",
 	RunE:  runAuthStatus,
 }
 
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
-	Short: "Remove stored authentication token",
+	Short: "移除存储的认证令牌",
 	RunE:  runAuthLogout,
 }
 

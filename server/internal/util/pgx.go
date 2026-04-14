@@ -7,12 +7,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// ParseUUID 将字符串解析为 pgtype.UUID
+// 如果解析失败返回无效的 UUID（Valid=false）
 func ParseUUID(s string) pgtype.UUID {
 	var u pgtype.UUID
 	_ = u.Scan(s)
 	return u
 }
 
+// UUIDToString 将 pgtype.UUID 转换为字符串表示
+// 无效 UUID 返回空字符串
 func UUIDToString(u pgtype.UUID) string {
 	if !u.Valid {
 		return ""
@@ -31,6 +35,8 @@ func UUIDToString(u pgtype.UUID) string {
 	return string(dst)
 }
 
+// TextToPtr 将 pgtype.Text 转换为 *string
+// 无效文本返回 nil
 func TextToPtr(t pgtype.Text) *string {
 	if !t.Valid {
 		return nil
@@ -38,6 +44,8 @@ func TextToPtr(t pgtype.Text) *string {
 	return &t.String
 }
 
+// PtrToText 将 *string 转换为 pgtype.Text
+// nil 指针返回无效 Text
 func PtrToText(s *string) pgtype.Text {
 	if s == nil {
 		return pgtype.Text{}
@@ -45,6 +53,8 @@ func PtrToText(s *string) pgtype.Text {
 	return pgtype.Text{String: *s, Valid: true}
 }
 
+// StrToText 将字符串转换为 pgtype.Text
+// 空字符串返回无效 Text
 func StrToText(s string) pgtype.Text {
 	if s == "" {
 		return pgtype.Text{}
@@ -52,6 +62,8 @@ func StrToText(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: true}
 }
 
+// TimestampToString 将时间戳转换为 RFC3339 格式的字符串
+// 无效时间戳返回空字符串
 func TimestampToString(t pgtype.Timestamptz) string {
 	if !t.Valid {
 		return ""
@@ -59,6 +71,8 @@ func TimestampToString(t pgtype.Timestamptz) string {
 	return t.Time.Format(time.RFC3339)
 }
 
+// TimestampToPtr 将时间戳转换为 *string（RFC3339 格式）
+// 无效时间戳返回 nil
 func TimestampToPtr(t pgtype.Timestamptz) *string {
 	if !t.Valid {
 		return nil
@@ -67,6 +81,8 @@ func TimestampToPtr(t pgtype.Timestamptz) *string {
 	return &s
 }
 
+// UUIDToPtr 将 UUID 转换为 *string
+// 无效 UUID 返回 nil
 func UUIDToPtr(u pgtype.UUID) *string {
 	if !u.Valid {
 		return nil

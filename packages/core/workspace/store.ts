@@ -1,3 +1,7 @@
+// 工作空间状态管理
+// 职责：管理当前选中的工作空间（UI 状态）
+// 注意：工作空间列表是服务器状态，存储在 React Query 中
+
 import { create } from "zustand";
 import type { Workspace, StorageAdapter } from "../types";
 import type { ApiClient } from "../api/client";
@@ -14,19 +18,21 @@ interface WorkspaceState {
   workspace: Workspace | null;
 }
 
+// 工作空间操作接口
 interface WorkspaceActions {
   /**
-   * Pick a workspace from a list and set it as current.
-   * The list itself is NOT stored here — it lives in React Query.
+   * 从列表中选择工作空间并设为当前
+   * 列表本身不存储在此处——它存在于 React Query 中
    */
   hydrateWorkspace: (
     wsList: Workspace[],
     preferredWorkspaceId?: string | null,
   ) => Workspace | null;
-  /** Switch to a workspace. Caller provides the full object (from React Query). */
+  /** 切换到指定工作空间。调用者提供完整对象（来自 React Query） */
   switchWorkspace: (ws: Workspace) => void;
-  /** Update current workspace data in place (e.g. after rename). */
+  /** 就地更新当前工作空间数据（例如重命名后） */
   updateWorkspace: (ws: Workspace) => void;
+  /** 清除当前工作空间 */
   clearWorkspace: () => void;
 }
 
@@ -36,8 +42,8 @@ export function createWorkspaceStore(api: ApiClient, options?: WorkspaceStoreOpt
   const storage = options?.storage;
 
   return create<WorkspaceStore>((set) => ({
-    // Only the currently selected workspace (UI state).
-    // The workspace list is server state and lives in React Query.
+    // 仅当前选中的工作空间（UI 状态）
+    // 工作空间列表是服务器状态，存在于 React Query 中
     workspace: null,
 
     hydrateWorkspace: (wsList, preferredWorkspaceId) => {

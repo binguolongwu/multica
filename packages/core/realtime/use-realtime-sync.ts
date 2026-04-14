@@ -56,21 +56,20 @@ export interface RealtimeSyncStores {
 }
 
 /**
- * Centralized WS -> store sync. Called once from WSProvider.
+ * 集中式 WebSocket -> 存储同步。由 WSProvider 调用一次。
  *
- * Uses the "WS as invalidation signal + refetch" pattern:
- * - onAny handler extracts event prefix and calls the matching store refresh
- * - Debounce per-prefix prevents rapid-fire refetches (e.g. bulk issue updates)
- * - Precise handlers only for side effects (toast, navigation, self-check)
+ * 使用 "WS 作为失效信号 + 重新获取" 模式：
+ * - onAny 处理器提取事件前缀并调用匹配的存储刷新
+ * - 按前缀防抖防止快速重复获取（例如批量问题更新）
+ * - 精确处理器仅用于副作用（提示、导航、自检）
  *
- * Per-issue events (comments, activity, reactions, subscribers) are handled
- * both here (invalidation fallback) and by per-page useWSEvent hooks (granular
- * updates). Daemon register events invalidate runtimes globally; heartbeats
- * are skipped to avoid excessive refetches.
+ * 每个问题的事件（评论、活动、反应、订阅者）在此处（失效回退）
+ * 和每页 useWSEvent 钩子（细粒度更新）中都有处理。
+ * Daemon 注册事件使运行时全局失效；心跳被跳过以避免过度重新获取。
  *
- * @param ws - WebSocket client instance (null when not yet connected)
- * @param stores - Platform-created Zustand store instances for auth and workspace
- * @param onToast - Optional callback for showing toast messages (platform-specific)
+ * @param ws - WebSocket 客户端实例（未连接时为 null）
+ * @param stores - 平台创建的 Zustand 存储实例（认证和工作空间）
+ * @param onToast - 可选的显示提示消息回调（平台特定）
  */
 export function useRealtimeSync(
   ws: WSClient | null,
@@ -79,7 +78,7 @@ export function useRealtimeSync(
 ) {
   const { authStore, workspaceStore } = stores;
   const qc = useQueryClient();
-  // Main sync: onAny -> refreshMap with debounce
+  // 主同步：onAny -> 带防抖的 refreshMap
   useEffect(() => {
     if (!ws) return;
 

@@ -17,34 +17,39 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
-// --- Response structs ---
+// --- 响应结构体 ---
 
+// SkillResponse 技能（AI 能力模块）的 API 响应结构
 type SkillResponse struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
-	Config      any    `json:"config"`
-	CreatedBy   *string `json:"created_by"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID          string  `json:"id"`          // 技能唯一 ID
+	WorkspaceID string  `json:"workspace_id"`// 所属工作空间
+	Name        string  `json:"name"`        // 技能名称
+	Description string  `json:"description"` // 技能描述
+	Content     string  `json:"content"`     // SKILL.md 内容（Markdown 格式）
+	Config      any     `json:"config"`      // 技能配置（JSON）
+	CreatedBy   *string `json:"created_by"`  // 创建者 ID
+	CreatedAt   string  `json:"created_at"`  // 创建时间
+	UpdatedAt   string  `json:"updated_at"`  // 更新时间
 }
 
+// SkillFileResponse 技能文件的 API 响应结构
 type SkillFileResponse struct {
-	ID        string `json:"id"`
-	SkillID   string `json:"skill_id"`
-	Path      string `json:"path"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID        string `json:"id"`         // 文件 ID
+	SkillID   string `json:"skill_id"`   // 所属技能 ID
+	Path      string `json:"path"`       // 文件路径（相对）
+	Content   string `json:"content"`      // 文件内容
+	CreatedAt string `json:"created_at"` // 创建时间
+	UpdatedAt string `json:"updated_at"` // 更新时间
 }
 
+// SkillWithFilesResponse 包含文件列表的完整技能响应
 type SkillWithFilesResponse struct {
 	SkillResponse
-	Files []SkillFileResponse `json:"files"`
+	Files []SkillFileResponse `json:"files"` // 关联文件列表
 }
 
+// skillToResponse 将数据库技能模型转换为 API 响应
+// 处理 Config JSON 字段的反序列化
 func skillToResponse(s db.Skill) SkillResponse {
 	var config any
 	if s.Config != nil {
@@ -67,6 +72,7 @@ func skillToResponse(s db.Skill) SkillResponse {
 	}
 }
 
+// skillFileToResponse 将数据库技能文件模型转换为 API 响应
 func skillFileToResponse(f db.SkillFile) SkillFileResponse {
 	return SkillFileResponse{
 		ID:        uuidToString(f.ID),
@@ -78,26 +84,29 @@ func skillFileToResponse(f db.SkillFile) SkillFileResponse {
 	}
 }
 
-// --- Request structs ---
+// --- 请求结构体 ---
 
+// CreateSkillRequest 创建技能的请求参数
 type CreateSkillRequest struct {
-	Name        string                   `json:"name"`
-	Description string                   `json:"description"`
-	Content     string                   `json:"content"`
-	Config      any                      `json:"config"`
-	Files       []CreateSkillFileRequest `json:"files,omitempty"`
+	Name        string                   `json:"name"`        // 技能名称（必填）
+	Description string                   `json:"description"` // 描述
+	Content     string                   `json:"content"`     // SKILL.md 内容
+	Config      any                      `json:"config"`      // 配置（JSON）
+	Files       []CreateSkillFileRequest `json:"files,omitempty"` // 关联文件（可选）
 }
 
+// CreateSkillFileRequest 创建技能文件的请求参数
 type CreateSkillFileRequest struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	Path    string `json:"path"`    // 文件路径
+	Content string `json:"content"` // 文件内容
 }
 
+// UpdateSkillRequest 更新技能的请求参数（全部可选）
 type UpdateSkillRequest struct {
-	Name        *string                  `json:"name"`
-	Description *string                  `json:"description"`
-	Content     *string                  `json:"content"`
-	Config      any                      `json:"config"`
+	Name        *string `json:"name"`        // 新名称
+	Description *string `json:"description"` // 新描述
+	Content     *string `json:"content"`     // 新内容
+	Config      any     `json:"config"`      // 新配置
 	Files       []CreateSkillFileRequest `json:"files,omitempty"`
 }
 

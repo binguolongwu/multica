@@ -16,8 +16,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "multica",
-	Short: "Multica CLI — local agent runtime and management tool",
-	Long:  "Work seamlessly with Multica from the command line.",
+	Short: "Multica CLI — 本地代理运行时和管理工具",
+	Long:  "从命令行无缝使用 Multica。",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -30,7 +30,7 @@ func init() {
 	rootCmd.PersistentFlags().String("workspace-id", "", "Workspace ID (env: MULTICA_WORKSPACE_ID)")
 	rootCmd.PersistentFlags().String("profile", "", "Configuration profile name (e.g. dev) — isolates config, daemon state, and workspaces")
 
-	// Core commands
+	// 核心命令
 	issueCmd.GroupID = groupCore
 	projectCmd.GroupID = groupCore
 	agentCmd.GroupID = groupCore
@@ -38,11 +38,11 @@ func init() {
 	repoCmd.GroupID = groupCore
 	skillCmd.GroupID = groupCore
 
-	// Runtime commands
+	// 运行时命令
 	daemonCmd.GroupID = groupRuntime
 	runtimeCmd.GroupID = groupRuntime
 
-	// Additional commands
+	// 附加命令
 	authCmd.GroupID = groupAdditional
 	loginCmd.GroupID = groupAdditional
 	setupCmd.GroupID = groupAdditional

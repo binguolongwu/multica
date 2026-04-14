@@ -1,4 +1,10 @@
 "use client";
+// 登录页面组件
+// 功能：
+//   - 用户登录认证
+//   - 支持 Google OAuth 登录
+//   - 支持 CLI 回调（桌面端集成）
+//   - 已登录用户自动重定向到仪表板
 
 import { Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -20,7 +26,8 @@ function LoginPageContent() {
   const platform = searchParams.get("platform");
   const nextUrl = searchParams.get("next") || "/issues";
 
-  // Already authenticated — redirect to dashboard (skip if CLI callback)
+  // 已认证用户 — 重定向到仪表板（CLI 回调时跳过）
+// 业务逻辑：避免已登录用户重复登录
   useEffect(() => {
     if (!isLoading && user && !cliCallbackRaw) {
       router.replace(nextUrl);
