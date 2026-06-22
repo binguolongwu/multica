@@ -1,0 +1,11 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: Check your email
+      - generic [ref=e6]: We sent a verification code to binguosoft65@gmail.com
+    - generic [ref=e7]:
+      - textbox [active] [ref=e18]
+      - button "Resend in 60s" [disabled] [ref=e20]
+    - button "Back" [ref=e21]
+  - region "Notifications alt+T"
+  - alert [ref=e16]

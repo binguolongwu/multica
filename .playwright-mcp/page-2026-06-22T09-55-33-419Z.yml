@@ -1,0 +1,17 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: Sign in to Multica
+      - generic [ref=e6]: Enter your email to get a login code
+    - generic [ref=e9]:
+      - generic [ref=e10]: Email
+      - textbox "Email" [active] [ref=e11]:
+        - /placeholder: you@example.com
+    - generic [ref=e12]:
+      - button "Continue" [disabled]
+      - generic [ref=e14]:
+        - text: Prefer the desktop app?
+        - link "Download" [ref=e15] [cursor=pointer]:
+          - /url: /download
+  - region "Notifications alt+T"
+  - alert [ref=e16]

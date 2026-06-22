@@ -70,7 +70,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="!max-w-[60vw]">
         <DialogHeader><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid w-full grid-cols-4">

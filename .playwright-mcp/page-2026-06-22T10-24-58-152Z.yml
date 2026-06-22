@@ -1,0 +1,213 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - button [ref=e12]:
+              - generic [ref=e14]: B
+              - generic [ref=e15]: binguomes
+              - img [ref=e16]
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - button [ref=e20]:
+              - img [ref=e21]
+              - generic [ref=e24]: 搜索...
+              - generic: Ctrl+K
+          - listitem [ref=e25]:
+            - button [ref=e26]:
+              - img [ref=e28]
+              - generic [ref=e31]: 新建 issue
+              - generic: C
+      - generic [ref=e32]:
+        - list [ref=e35]:
+          - listitem [ref=e36]:
+            - link [ref=e37] [cursor=pointer]:
+              - /url: /binguomes/inbox
+              - img [ref=e38]
+              - generic [ref=e41]: 收件箱
+          - listitem [ref=e42]:
+            - link [ref=e43] [cursor=pointer]:
+              - /url: /binguomes/my-issues
+              - img [ref=e44]
+              - generic [ref=e48]: 我的 issue
+        - generic [ref=e49]:
+          - generic [ref=e50]: 工作区
+          - list [ref=e52]:
+            - listitem [ref=e53]:
+              - link [ref=e54] [cursor=pointer]:
+                - /url: /binguomes/issues
+                - img [ref=e55]
+                - generic [ref=e58]: Issues
+            - listitem [ref=e59]:
+              - link [ref=e60] [cursor=pointer]:
+                - /url: /binguomes/projects
+                - img [ref=e61]
+                - generic [ref=e63]: 项目
+            - listitem [ref=e64]:
+              - link [ref=e65] [cursor=pointer]:
+                - /url: /binguomes/autopilots
+                - img [ref=e66]
+                - generic [ref=e68]: 自动化
+            - listitem [ref=e69]:
+              - link [ref=e70] [cursor=pointer]:
+                - /url: /binguomes/agents
+                - img [ref=e71]
+                - generic [ref=e74]: 智能体
+            - listitem [ref=e75]:
+              - link [ref=e76] [cursor=pointer]:
+                - /url: /binguomes/squads
+                - img [ref=e77]
+                - generic [ref=e82]: 小队
+            - listitem [ref=e83]:
+              - link [ref=e84] [cursor=pointer]:
+                - /url: /binguomes/wiki
+                - img [ref=e85]
+                - generic [ref=e87]: 知识库
+            - listitem [ref=e88]:
+              - link [ref=e89] [cursor=pointer]:
+                - /url: /binguomes/usage
+                - img [ref=e90]
+                - generic [ref=e92]: 用量
+        - generic [ref=e93]:
+          - generic [ref=e94]: 配置
+          - list [ref=e96]:
+            - listitem [ref=e97]:
+              - link [ref=e98] [cursor=pointer]:
+                - /url: /binguomes/runtimes
+                - img [ref=e99]
+                - generic [ref=e101]: 运行时
+            - listitem [ref=e103]:
+              - link [ref=e104] [cursor=pointer]:
+                - /url: /binguomes/skills
+                - img [ref=e105]
+                - generic [ref=e107]: Skills
+            - listitem [ref=e108]:
+              - link [ref=e109] [cursor=pointer]:
+                - /url: /binguomes/settings
+                - img [ref=e110]
+                - generic [ref=e113]: 设置
+      - button [ref=e116] [cursor=pointer]:
+        - img [ref=e117]
+      - button [ref=e120]
+    - main [ref=e121]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - img [ref=e124]
+          - heading [level=1] [ref=e126]: Wiki
+          - button [ref=e127]:
+            - img
+            - text: Ingest
+          - generic [ref=e128]:
+            - img [ref=e129]
+            - textbox [ref=e132]:
+              - /placeholder: Search wiki...
+        - generic [ref=e133]:
+          - generic [ref=e135]:
+            - button [ref=e137]:
+              - img [ref=e138]
+              - img [ref=e140]
+              - generic [ref=e142]: raw
+            - generic [ref=e143]:
+              - button [ref=e144]:
+                - img [ref=e145]
+                - img [ref=e147]
+                - generic [ref=e149]: wiki
+              - button [ref=e151]:
+                - img [ref=e152]
+                - img [ref=e154]
+                - generic [ref=e156]: concepts
+              - button [ref=e158]:
+                - img [ref=e159]
+                - img [ref=e161]
+                - generic [ref=e163]: entities
+              - button [ref=e165]:
+                - img [ref=e166]
+                - img [ref=e168]
+                - generic [ref=e170]: learnings
+              - button [ref=e172]:
+                - img [ref=e173]
+                - img [ref=e175]
+                - generic [ref=e177]: projects
+              - button [ref=e179]:
+                - img [ref=e180]
+                - img [ref=e182]
+                - generic [ref=e184]: sources
+              - button [ref=e186]:
+                - img [ref=e187]
+                - img [ref=e189]
+                - generic [ref=e191]: synthesis
+              - button [ref=e192]:
+                - img [ref=e193]
+                - generic [ref=e196]: index.md
+              - button [ref=e197]:
+                - img [ref=e198]
+                - generic [ref=e201]: log.md
+            - button [ref=e202]:
+              - img [ref=e203]
+              - generic [ref=e206]: AGENTS.md
+            - button [ref=e207]:
+              - img [ref=e208]
+              - generic [ref=e211]: IDEA.md
+          - generic [ref=e214]:
+            - img [ref=e215]
+            - paragraph [ref=e218]: Select a page from the tree to read
+      - generic [ref=e219]:
+        - generic [ref=e223]:
+          - generic [ref=e224]:
+            - button [ref=e225]:
+              - img
+            - button [ref=e227]:
+              - generic [ref=e228]: 新对话
+              - img [ref=e229]
+          - generic [ref=e231]:
+            - button [ref=e232]:
+              - img
+            - button [ref=e233]:
+              - img
+        - generic [ref=e235]:
+          - heading [level=3] [ref=e236]: 和你的智能体对话
+          - paragraph [ref=e237]: ✨ 它们了解你的工作区—— issue、项目、skill。
+          - paragraph [ref=e238]: 让它做一份总结、规划你的一天，或交给它一个小任务。
+        - generic [ref=e240]:
+          - img [ref=e241]
+          - generic [ref=e244]: 需要先有一个智能体才能开始对话。
+        - generic [ref=e245]:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - paragraph: 输入消息…
+            - generic:
+              - generic: 暂无智能体
+            - generic:
+              - button [disabled]:
+                - img
+  - region "Notifications alt+T"
+  - alert [ref=e246]
+  - dialog "Ingest Knowledge" [ref=e250]:
+    - heading "Ingest Knowledge" [level=2] [ref=e252]
+    - generic [ref=e253]:
+      - tablist [ref=e254]:
+        - tab "Inbox" [active] [selected] [ref=e255]:
+          - img
+          - text: Inbox
+        - tab "URL" [ref=e256]:
+          - img
+          - text: URL
+        - tab "File" [ref=e257]:
+          - img
+          - text: File
+        - tab "Write" [ref=e258]:
+          - img
+          - text: Write
+      - tabpanel "Inbox" [ref=e259]:
+        - paragraph [ref=e260]: Select inbox items to ingest as wiki sources.
+        - paragraph [ref=e261]: No inbox items
+        - button "Ingest" [disabled]:
+          - img
+          - text: Ingest
+    - button "Close" [ref=e262]:
+      - img
+      - generic [ref=e263]: Close
