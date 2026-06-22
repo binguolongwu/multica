@@ -19,6 +19,7 @@
     "changelog": "Change log",
     "feedback": "Feedback"
   },
+  "wiki_page": { "title": "Wiki", "ingest": "Ingest", "wiki_agent": "Wiki agent", "search": "Search wiki..." },
   "workspace_loader": {
     "loading_workspace": "Loading workspace…",
     "loading_named_prefix": "Loading"

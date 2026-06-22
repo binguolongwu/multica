@@ -19,6 +19,7 @@
     "changelog": "更新日志",
     "feedback": "反馈"
   },
+  "wiki_page": { "title": "知识库", "ingest": "摄取", "wiki_agent": "Wiki 智能体", "search": "搜索..." },
   "workspace_loader": {
     "loading_workspace": "正在加载工作区...",
     "loading_named_prefix": "正在加载"
