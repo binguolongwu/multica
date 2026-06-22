@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -221,6 +222,13 @@ func (h *Handler) CreateWikiSpace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "wiki space already exists or is invalid")
 		return
 	}
+
+	// Bootstrap initial wiki pages
+	if err := h.WikiService.BootstrapSpace(r.Context(), space.ID, req.Slug); err != nil {
+		// Log but don't fail — the space was created successfully
+		slog.Warn("wiki: failed to bootstrap space", "space_id", uuidToString(space.ID), "error", err)
+	}
+
 	writeJSON(w, http.StatusCreated, wikiSpaceToResponse(space))
 }
 
@@ -383,29 +391,35 @@ func (h *Handler) ListWikiPages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if search != "" {
-		pages, err := h.Queries.SearchWikiPages(r.Context(), db.SearchWikiPagesParams{
-			SpaceID:        space.ID,
-			PlaintoTsquery: search,
-		})
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "search failed")
-			return
-		}
-		if pages == nil {
-			pages = []db.SearchWikiPagesRow{}
-		}
-		writeJSON(w, http.StatusOK, pages)
-		return
-	}
-
 	pages, err := h.Queries.ListWikiPages(r.Context(), space.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list wiki pages")
 		return
 	}
+
+	// Auto-bootstrap initial pages if space is empty
+	if len(pages) == 0 {
+		if err := h.WikiService.BootstrapSpace(r.Context(), space.ID, slug); err != nil {
+			slog.Warn("wiki: auto-bootstrap pages failed", "space_id", uuidToString(space.ID), "error", err)
+		}
+		pages, err = h.Queries.ListWikiPages(r.Context(), space.ID)
+		if err != nil {
+			pages = nil
+		}
+	}
 	if pages == nil {
 		pages = []db.WikiPage{}
+	}
+
+	if search != "" {
+		dbResults, err := h.Queries.SearchWikiPages(r.Context(), db.SearchWikiPagesParams{
+			SpaceID:        space.ID,
+			PlaintoTsquery: search,
+		})
+		if err == nil && len(dbResults) > 0 {
+			writeJSON(w, http.StatusOK, dbResults)
+			return
+		}
 	}
 
 	resp := make([]wikiPageResponse, 0, len(pages))
