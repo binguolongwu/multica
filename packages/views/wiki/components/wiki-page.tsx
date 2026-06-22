@@ -4,7 +4,8 @@ import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2 } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
-import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions } from "@multica/core/wiki";
+import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace } from "@multica/core/wiki";
+import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { WikiFileTree } from "./wiki-file-tree";
@@ -19,6 +20,7 @@ export function WikiPage() {
   const [spaceSlug] = useState(DEFAULT_SPACE);
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
+  const createSpace = useCreateWikiSpace(wsId);
   const { data: pages, isLoading: pagesLoading } = useQuery(
     wikiPagesOptions(wsId, spaceSlug, searchQuery ? { search: searchQuery } : undefined),
   );
@@ -49,6 +51,13 @@ export function WikiPage() {
             Create a wiki space to start building your knowledge base.
           </p>
         </div>
+        <Button
+          onClick={() => createSpace.mutate({ display_name: "default" })}
+          disabled={createSpace.isPending}
+        >
+          <BookOpen className="mr-2 h-4 w-4" />
+          {createSpace.isPending ? "Creating..." : "Create Wiki"}
+        </Button>
       </div>
     );
   }
