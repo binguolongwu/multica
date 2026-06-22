@@ -280,7 +280,11 @@ export class PreviewUnsupportedError extends Error {
 // encodePathKeepSlash encodes URI components but preserves forward slashes,
 // so wiki page paths like "wiki/concepts/foo.md" stay as URL path segments.
 function encodePathKeepSlash(path: string): string {
-  return path.split("/").map(encodeURIComponent).join("/");
+  return path
+    .split("/")
+    .filter((p) => p !== ".." && p !== ".")
+    .map(encodeURIComponent)
+    .join("/");
 }
 
 export class ApiClient {
