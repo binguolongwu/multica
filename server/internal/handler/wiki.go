@@ -907,10 +907,18 @@ func (h *Handler) GetWikiOperation(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	slug := chi.URLParam(r, "slug")
 	id := chi.URLParam(r, "id")
 
-	op, err := h.Queries.GetWikiOperation(r.Context(), parseUUID(id))
+	space, err := h.WikiService.EnsureSpaceActive(r.Context(), parseUUID(workspaceID), slug)
 	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	op, err := h.Queries.GetWikiOperation(r.Context(), parseUUID(id))
+	if err != nil || uuidToString(op.SpaceID) != uuidToString(space.ID) {
 		writeError(w, http.StatusNotFound, "operation not found")
 		return
 	}
