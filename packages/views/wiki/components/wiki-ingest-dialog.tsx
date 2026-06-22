@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Globe, FileUp, PenLine, Inbox, Loader2 } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
-import { useCreateWikiSource } from "@multica/core/wiki";
+import { useCreateWikiSource, useCreateWikiOperation } from "@multica/core/wiki";
 import { useT } from "../../i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@multica/ui/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
@@ -14,12 +14,13 @@ import { Input } from "@multica/ui/components/ui/input";
 import { Textarea } from "@multica/ui/components/ui/textarea";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 
-interface Props { open: boolean; onOpenChange: (v: boolean) => void; spaceSlug: string; }
+interface Props { open: boolean; onOpenChange: (v: boolean) => void; spaceSlug: string; wikiAgentId?: string; }
 
-export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
+export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }: Props) {
   const wsId = useWorkspaceId();
   const { t } = useT("layout");
   const createSource = useCreateWikiSource(wsId, spaceSlug);
+  const createOp = useCreateWikiOperation(wsId, spaceSlug);
   const [tab, setTab] = useState("inbox");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [url, setUrl] = useState("");
@@ -31,7 +32,13 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   const { data: inboxItems, isLoading: inboxLoading } = useQuery(inboxListOptions(wsId));
 
-  const done = () => { setBusy(false); setError(""); onOpenChange(false); };
+  const done = () => {
+    setBusy(false); setError(""); onOpenChange(false);
+    // Trigger wiki maintainer agent to organize ingested content
+    if (wikiAgentId) {
+      createOp.mutate({ operation_type: "ingest", title: "Process new raw sources", prompt: "Review raw/ for new sources and ingest them into wiki/." });
+    }
+  };
   const fail = (msg: string) => { setError(msg); setBusy(false); };
 
   const handleInbox = () => {

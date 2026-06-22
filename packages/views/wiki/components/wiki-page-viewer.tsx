@@ -47,6 +47,9 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
 
   const { body, fm } = useMemo(() => parseFrontmatter(page.content), [page.content]);
   const headings = useMemo(() => extractHeadings(body), [body]);
+  // Escape HTML in content before rendering to prevent tags from being
+  // interpreted as raw HTML by the markdown renderer's rehype-raw pass.
+  const safeBody = body.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const displayTitle = fm.title || page.title || page.path;
 
   const handleSave = () => {
@@ -95,7 +98,7 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
             </div>
           ) : (
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <Markdown>{body}</Markdown>
+              <Markdown>{safeBody}</Markdown>
             </div>
           )}
           {page.links && page.links.length > 0 && (
@@ -117,9 +120,17 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
           <h4 className="mb-2 text-xs font-semibold text-muted-foreground">{t(($) => $.wiki_page.on_this_page)}</h4>
           <nav className="space-y-0.5">
             {headings.map((h) => (
-              <a key={h.id} href={`#${h.id}`} className="block truncate rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" style={{ paddingLeft: 8 + (h.level - 1) * 12 }}>
+              <button
+                key={h.id}
+                className="block w-full truncate rounded px-2 py-0.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                style={{ paddingLeft: 8 + (h.level - 1) * 12 }}
+                onClick={() => {
+                  const el = document.getElementById(h.id) || [...document.querySelectorAll('h1,h2,h3,h4')].find(e => e.textContent?.trim() === h.text);
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              >
                 {h.text}
-              </a>
+              </button>
             ))}
           </nav>
         </aside>

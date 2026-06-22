@@ -181,7 +181,7 @@ export function WikiPage() {
         </div>
       </div>
 
-      <WikiIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} spaceSlug={spaceSlug} />
+      <WikiIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} spaceSlug={spaceSlug} wikiAgentId={wikiAgentId} />
     </div>
   );
 }
