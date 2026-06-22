@@ -119,7 +119,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-[60vw] flex max-h-[80vh] flex-col overflow-hidden">
+      <DialogContent className="!max-w-[60vw] flex h-[80vh] flex-col overflow-hidden">
         <DialogHeader className="shrink-0"><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Tabs value={tab} onValueChange={setTab}>
