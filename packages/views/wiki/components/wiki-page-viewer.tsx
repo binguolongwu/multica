@@ -7,6 +7,7 @@ import { useUpsertWikiPage } from "@multica/core/wiki";
 import { useWorkspaceId } from "@multica/core/hooks";
 import type { WikiPageDetail } from "@multica/core/wiki";
 import { Button } from "@multica/ui/components/ui/button";
+import { useT } from "../../i18n";
 
 function parseFrontmatter(content: string): { body: string; fm: Record<string, string> } {
   if (!content.startsWith("---\n")) return { body: content, fm: {} };
@@ -39,6 +40,7 @@ function extractHeadings(content: string): { id: string; text: string; level: nu
 
 export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPageDetail; spaceSlug?: string }) {
   const wsId = useWorkspaceId();
+  const { t } = useT("layout");
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(page.content);
   const upsert = useUpsertWikiPage(wsId, spaceSlug);
@@ -62,7 +64,7 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
             <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
             {!editing && (
               <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="mr-1 h-3.5 w-3.5" />Edit
+                <Pencil className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.edit)}
               </Button>
             )}
           </div>
@@ -71,11 +73,11 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
             {fm.tags && fm.tags.split(",").map((t: string) => (
               <span key={t} className="rounded bg-muted px-1.5 py-0.5">{t.trim()}</span>
             ))}
-            <span>Updated: {new Date(page.updated_at).toLocaleDateString()}</span>
+            <span>Updated: {new Date(page.updated_at).toLocaleDateString('zh-CN')}</span>
           </div>
           {Object.keys(fm).filter((k) => k !== "title" && k !== "tags").length > 0 && (
             <details className="mb-6 rounded border bg-muted/30 px-4 py-2">
-              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Properties</summary>
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">{t(($) => $.wiki_page.properties)}</summary>
               <dl className="mt-2 space-y-1 text-xs">
                 {Object.entries(fm).filter(([k]) => k !== "title" && k !== "tags").map(([k, v]) => (
                   <div key={k} className="flex gap-2"><dt className="font-medium text-muted-foreground">{k}:</dt><dd>{v}</dd></div>
@@ -87,8 +89,8 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
             <div className="space-y-4">
               <textarea className="min-h-[400px] w-full resize-y rounded-md border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary" value={editContent} onChange={(e) => setEditContent(e.target.value)} />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleSave} disabled={upsert.isPending}>{upsert.isPending ? "Saving..." : <><Check className="mr-1 h-3.5 w-3.5" />Save</>}</Button>
-                <Button size="sm" variant="outline" onClick={() => { setEditContent(page.content); setEditing(false); }}><X className="mr-1 h-3.5 w-3.5" />Cancel</Button>
+                <Button size="sm" onClick={handleSave} disabled={upsert.isPending}>{upsert.isPending ? t(($) => $.wiki_page.saving) : <><Check className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.save)}</>}</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditContent(page.content); setEditing(false); }}><X className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.cancel)}</Button>
               </div>
             </div>
           ) : (
@@ -98,13 +100,13 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
           )}
           {page.links && page.links.length > 0 && (
             <div className="mt-8 border-t pt-6">
-              <h3 className="mb-2 text-sm font-semibold">Links</h3>
+              <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.links)}</h3>
               <ul className="space-y-1">{page.links.map((l) => <li key={l.target} className="text-sm"><span className={l.exists ? "text-primary" : "text-muted-foreground line-through"}>{l.title || l.target}</span>{l.snippet && <span className="ml-2 text-xs text-muted-foreground">— {l.snippet}</span>}</li>)}</ul>
             </div>
           )}
           {page.backlinks && page.backlinks.length > 0 && (
             <div className="mt-6 border-t pt-6">
-              <h3 className="mb-2 text-sm font-semibold">Backlinks ({page.backlinks.length})</h3>
+              <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.backlinks)} ({page.backlinks.length})</h3>
               <ul className="space-y-2">{page.backlinks.map((bl) => <li key={bl.source} className="text-sm"><span className="font-medium text-primary">{bl.title || bl.source}</span>{bl.context && <p className="mt-0.5 text-xs text-muted-foreground">{bl.context}</p>}</li>)}</ul>
             </div>
           )}
@@ -112,7 +114,7 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
       </div>
       {headings.length > 1 && (
         <aside className="hidden w-44 shrink-0 overflow-y-auto border-l px-3 py-8 xl:block">
-          <h4 className="mb-2 text-xs font-semibold text-muted-foreground">On this page</h4>
+          <h4 className="mb-2 text-xs font-semibold text-muted-foreground">{t(($) => $.wiki_page.on_this_page)}</h4>
           <nav className="space-y-0.5">
             {headings.map((h) => (
               <a key={h.id} href={`#${h.id}`} className="block truncate rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" style={{ paddingLeft: 8 + (h.level - 1) * 12 }}>

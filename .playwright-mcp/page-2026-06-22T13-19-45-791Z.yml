@@ -1,0 +1,486 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - button [ref=e289]:
+              - generic [ref=e14]: B
+              - generic [ref=e15]: binguosoft
+              - img [ref=e16]
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - button [ref=e290]:
+              - img [ref=e21]
+              - generic [ref=e24]: 搜索...
+              - generic: Ctrl+K
+          - listitem [ref=e25]:
+            - button [ref=e291]:
+              - img [ref=e28]
+              - generic [ref=e31]: 新建 issue
+              - generic: C
+      - generic [ref=e32]:
+        - list [ref=e35]:
+          - listitem [ref=e36]:
+            - link [ref=e292] [cursor=pointer]:
+              - /url: /binguosoft/inbox
+              - img [ref=e38]
+              - generic [ref=e41]: 收件箱
+              - generic [ref=e42]: "2"
+          - listitem [ref=e43]:
+            - link [ref=e293] [cursor=pointer]:
+              - /url: /binguosoft/my-issues
+              - img [ref=e45]
+              - generic [ref=e49]: 我的 issue
+        - generic [ref=e50]:
+          - generic [ref=e51]: 工作区
+          - list [ref=e53]:
+            - listitem [ref=e54]:
+              - link [ref=e294] [cursor=pointer]:
+                - /url: /binguosoft/issues
+                - img [ref=e56]
+                - generic [ref=e59]: Issues
+            - listitem [ref=e60]:
+              - link [ref=e295] [cursor=pointer]:
+                - /url: /binguosoft/projects
+                - img [ref=e62]
+                - generic [ref=e64]: 项目
+            - listitem [ref=e65]:
+              - link [ref=e296] [cursor=pointer]:
+                - /url: /binguosoft/autopilots
+                - img [ref=e67]
+                - generic [ref=e69]: 自动化
+            - listitem [ref=e70]:
+              - link [ref=e297] [cursor=pointer]:
+                - /url: /binguosoft/agents
+                - img [ref=e72]
+                - generic [ref=e75]: 智能体
+            - listitem [ref=e76]:
+              - link [ref=e298] [cursor=pointer]:
+                - /url: /binguosoft/squads
+                - img [ref=e78]
+                - generic [ref=e83]: 小队
+            - listitem [ref=e84]:
+              - link [ref=e299] [cursor=pointer]:
+                - /url: /binguosoft/wiki
+                - img [ref=e86]
+                - generic [ref=e88]: 知识库
+            - listitem [ref=e89]:
+              - link [ref=e300] [cursor=pointer]:
+                - /url: /binguosoft/usage
+                - img [ref=e91]
+                - generic [ref=e93]: 用量
+        - generic [ref=e94]:
+          - generic [ref=e95]: 配置
+          - list [ref=e97]:
+            - listitem [ref=e98]:
+              - link [ref=e301] [cursor=pointer]:
+                - /url: /binguosoft/runtimes
+                - img [ref=e100]
+                - generic [ref=e102]: 运行时
+            - listitem [ref=e104]:
+              - link [ref=e302] [cursor=pointer]:
+                - /url: /binguosoft/skills
+                - img [ref=e106]
+                - generic [ref=e108]: Skills
+            - listitem [ref=e109]:
+              - link [ref=e303] [cursor=pointer]:
+                - /url: /binguosoft/settings
+                - img [ref=e111]
+                - generic [ref=e114]: 设置
+      - button [ref=e304] [cursor=pointer]:
+        - img [ref=e118]
+      - button [ref=e305]
+    - main [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - img [ref=e125]
+          - heading [level=1] [ref=e306]: Wiki
+          - button [ref=e307]:
+            - button [ref=e308]:
+              - generic [ref=e130]: Wiki agent
+              - img
+          - button [ref=e309]:
+            - img
+            - text: Ingest
+          - generic [ref=e132]:
+            - img [ref=e133]
+            - textbox [ref=e310]:
+              - /placeholder: Search wiki...
+        - generic [ref=e137]:
+          - generic [ref=e139]:
+            - button [ref=e311]:
+              - img [ref=e142]
+              - img [ref=e144]
+              - generic [ref=e146]: raw
+            - generic [ref=e147]:
+              - button [ref=e312]:
+                - img [ref=e149]
+                - img [ref=e151]
+                - generic [ref=e153]: wiki
+              - button [ref=e313]:
+                - img [ref=e156]
+                - img [ref=e158]
+                - generic [ref=e160]: areas
+              - button [ref=e314]:
+                - img [ref=e163]
+                - img [ref=e165]
+                - generic [ref=e167]: concepts
+              - button [ref=e315]:
+                - img [ref=e170]
+                - img [ref=e172]
+                - generic [ref=e174]: entities
+              - button [ref=e316]:
+                - img [ref=e177]
+                - img [ref=e179]
+                - generic [ref=e181]: projects
+              - button [ref=e317]:
+                - img [ref=e184]
+                - img [ref=e186]
+                - generic [ref=e188]: sources
+              - button [ref=e318]:
+                - img [ref=e191]
+                - img [ref=e193]
+                - generic [ref=e195]: synthesis
+              - button [ref=e319]:
+                - img [ref=e197]
+                - generic [ref=e200]: index.md
+              - button [ref=e320]:
+                - img [ref=e202]
+                - generic [ref=e205]: log.md
+            - button [ref=e321]:
+              - img [ref=e207]
+              - generic [ref=e210]: AGENTS.md
+            - button [ref=e322]:
+              - img [ref=e212]
+              - generic [ref=e215]: IDEA.md
+          - generic [ref=e274]:
+            - generic [ref=e275]:
+              - heading [level=1] [ref=e323]: Wiki Index
+              - button [ref=e324]:
+                - img
+                - text: Edit
+            - generic [ref=e278]:
+              - generic [ref=e279]: index
+              - generic [ref=e280]: "Updated: 6/22/2026"
+            - heading [level=1] [ref=e325]:
+              - text: Wiki Index\n\n## Sources\n\n*(none yet)
+              - emphasis [ref=e284]: \n\n## Projects\n\n
+              - text: (none yet)
+              - emphasis [ref=e285]: \n\n## Entities\n\n
+              - text: (none yet)
+              - emphasis [ref=e286]: \n\n## Concepts\n\n
+              - text: (none yet)
+              - emphasis [ref=e287]: \n\n## Synthesis\n\n
+              - text: (none yet)
+              - emphasis [ref=e288]: \n\n## Areas\n\n
+              - text: (none yet)*\n
+      - generic [ref=e223]:
+        - generic [ref=e227]:
+          - generic [ref=e228]:
+            - button [ref=e229]:
+              - img
+            - generic [ref=e230]:
+              - button [ref=e326]:
+                - generic [ref=e232]: 新对话
+                - img [ref=e233]
+              - generic [ref=e237]: "5"
+          - generic [ref=e238]:
+            - button [ref=e239]:
+              - img
+            - button [ref=e240]:
+              - img
+        - generic [ref=e241]:
+          - generic [ref=e242]:
+            - heading [level=3] [ref=e328]: 你好，我是 📋产品经理
+            - paragraph [ref=e244]: 试试问
+          - generic [ref=e245]:
+            - button [ref=e329]: 📋按优先级列出我未完成的任务
+            - button [ref=e330]: 📝总结一下我今天做了什么
+            - button [ref=e331]: 💡规划接下来该做什么
+        - generic [ref=e250]:
+          - paragraph [ref=e255]: 输入消息…
+          - button [ref=e332] [cursor=pointer]:
+            - link [ref=e333]:
+              - img [ref=e262]
+            - generic [ref=e266]: 📋产品经理
+            - img [ref=e267]
+          - generic [ref=e269]:
+            - button [ref=e336]:
+              - img
+            - button [disabled]:
+              - img
+  - region "Notifications alt+T"
+  - alert [ref=e271]
+  - dialog "Ingest Knowledge" [ref=e340]:
+    - heading "Ingest Knowledge" [level=2] [ref=e342]
+    - generic [ref=e343]:
+      - tablist [ref=e344]:
+        - tab "Inbox" [active] [selected] [ref=e345]:
+          - img
+          - text: Inbox
+        - tab "URL" [ref=e346]:
+          - img
+          - text: URL
+        - tab "File" [ref=e347]:
+          - img
+          - text: File
+        - tab "Write" [ref=e348]:
+          - img
+          - text: Write
+      - tabpanel "Inbox" [ref=e349]:
+        - generic [ref=e350]:
+          - generic [ref=e351] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 # 🔍 缤果软件 · 创业商机调研报告 > 调研时间：2026年6月15日 | 按公司业务矩阵权重排序 --- ## 一、🏆 软件与AI工具（权重最高） ### 核心趋势：2026是\"手搓" [ref=e352]'
+            - generic [ref=e353]:
+              - paragraph [ref=e354]: 寻找创业商机
+              - paragraph [ref=e355]: "# 🔍 缤果软件 · 创业商机调研报告 > 调研时间：2026年6月15日 | 按公司业务矩阵权重排序 --- ## 一、🏆 软件与AI工具（权重最高） ### 核心趋势：2026是\"手搓"
+          - generic [ref=e356] [cursor=pointer]:
+            - checkbox "寻找创业商机" [ref=e357]
+            - generic [ref=e358]:
+              - paragraph [ref=e359]: 寻找创业商机
+              - paragraph
+          - generic [ref=e360] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 API Error: 400 thinking options type cannot be disabled when reasoning_effort is set" [ref=e361]'
+            - generic [ref=e362]:
+              - paragraph [ref=e363]: 寻找创业商机
+              - paragraph [ref=e364]: "API Error: 400 thinking options type cannot be disabled when reasoning_effort is set"
+          - generic [ref=e365] [cursor=pointer]:
+            - checkbox "寻找创业商机" [ref=e366]
+            - generic [ref=e367]:
+              - paragraph [ref=e368]: 寻找创业商机
+              - paragraph
+          - generic [ref=e369] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 API Error: 400 thinking options type cannot be disabled when reasoning_effort is set" [ref=e370]'
+            - generic [ref=e371]:
+              - paragraph [ref=e372]: 寻找创业商机
+              - paragraph [ref=e373]: "API Error: 400 thinking options type cannot be disabled when reasoning_effort is set"
+          - generic [ref=e374] [cursor=pointer]:
+            - checkbox "寻找创业商机" [ref=e375]
+            - generic [ref=e376]:
+              - paragraph [ref=e377]: 寻找创业商机
+              - paragraph
+          - generic [ref=e378] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 API Error: 400 thinking options type cannot be disabled when reasoning_effort is set" [ref=e379]'
+            - generic [ref=e380]:
+              - paragraph [ref=e381]: 寻找创业商机
+              - paragraph [ref=e382]: "API Error: 400 thinking options type cannot be disabled when reasoning_effort is set"
+          - generic [ref=e383] [cursor=pointer]:
+            - checkbox "寻找创业商机" [ref=e384]
+            - generic [ref=e385]:
+              - paragraph [ref=e386]: 寻找创业商机
+              - paragraph
+          - generic [ref=e387] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 API Error: 400 thinking options type cannot be disabled when reasoning_effort is set" [ref=e388]'
+            - generic [ref=e389]:
+              - paragraph [ref=e390]: 寻找创业商机
+              - paragraph [ref=e391]: "API Error: 400 thinking options type cannot be disabled when reasoning_effort is set"
+          - generic [ref=e392] [cursor=pointer]:
+            - checkbox "寻找创业商机" [ref=e393]
+            - generic [ref=e394]:
+              - paragraph [ref=e395]: 寻找创业商机
+              - paragraph
+          - generic [ref=e396] [cursor=pointer]:
+            - 'checkbox "寻找创业商机 API Error: 400 thinking options type cannot be disabled when reasoning_effort is set" [ref=e397]'
+            - generic [ref=e398]:
+              - paragraph [ref=e399]: 寻找创业商机
+              - paragraph [ref=e400]: "API Error: 400 thinking options type cannot be disabled when reasoning_effort is set"
+          - generic [ref=e401] [cursor=pointer]:
+            - checkbox "2026-05-27 每日新闻摘要 — AI电商、编程代理与电商技术动态" [ref=e402]
+            - generic [ref=e403]:
+              - paragraph [ref=e404]: 2026-05-27 每日新闻摘要 — AI电商、编程代理与电商技术动态
+              - paragraph
+          - generic [ref=e405] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月28日" [ref=e406]
+            - generic [ref=e407]:
+              - paragraph [ref=e408]: 每日新闻摘要 - 2026年5月28日
+              - paragraph
+          - generic [ref=e409] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月28日" [ref=e410]
+            - generic [ref=e411]:
+              - paragraph [ref=e412]: 每日新闻摘要 - 2026年5月28日
+              - paragraph
+          - generic [ref=e413] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月28日 📰 **每日科技新闻摘要 — 2026年5月28日** [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@1689140" [ref=e414]
+            - generic [ref=e415]:
+              - paragraph [ref=e416]: 每日新闻摘要 - 2026年5月28日
+              - paragraph [ref=e417]: 📰 **每日科技新闻摘要 — 2026年5月28日** [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@1689140
+          - generic [ref=e418] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e419]
+            - generic [ref=e420]:
+              - paragraph [ref=e421]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e422] [cursor=pointer]:
+            - checkbox "2026-05-27 每日新闻摘要 — AI电商、编程代理与电商技术动态" [ref=e423]
+            - generic [ref=e424]:
+              - paragraph [ref=e425]: 2026-05-27 每日新闻摘要 — AI电商、编程代理与电商技术动态
+              - paragraph
+          - generic [ref=e426] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e427]
+            - generic [ref=e428]:
+              - paragraph [ref=e429]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e430] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 # 📰 每日新闻摘要 — 2026年5月27日 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@qq" [ref=e431]'
+            - generic [ref=e432]:
+              - paragraph [ref=e433]: 每日新闻摘要
+              - paragraph [ref=e434]: "# 📰 每日新闻摘要 — 2026年5月27日 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@qq"
+          - generic [ref=e435] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e436]
+            - generic [ref=e437]:
+              - paragraph [ref=e438]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e439] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e440]
+            - generic [ref=e441]:
+              - paragraph [ref=e442]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e443] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e444]
+            - generic [ref=e445]:
+              - paragraph [ref=e446]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e447] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 ## 📰 每日新闻摘要 — 2026-05-26 > 专注 AI Agent、电商技术、开源生态三大赛道，精选今日热点。 --- ### 🤖 AI Agent & 大模型 **1. Sal" [ref=e448]'
+            - generic [ref=e449]:
+              - paragraph [ref=e450]: 每日新闻摘要
+              - paragraph [ref=e451]: "## 📰 每日新闻摘要 — 2026-05-26 > 专注 AI Agent、电商技术、开源生态三大赛道，精选今日热点。 --- ### 🤖 AI Agent & 大模型 **1. Sal"
+          - generic [ref=e452] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e453]
+            - generic [ref=e454]:
+              - paragraph [ref=e455]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e456] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e457]
+            - generic [ref=e458]:
+              - paragraph [ref=e459]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e460] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e461]
+            - generic [ref=e462]:
+              - paragraph [ref=e463]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e464] [cursor=pointer]:
+            - checkbox "每日新闻摘要 📰 **每日新闻摘要 — 2026年5月25日** [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@" [ref=e465]
+            - generic [ref=e466]:
+              - paragraph [ref=e467]: 每日新闻摘要
+              - paragraph [ref=e468]: 📰 **每日新闻摘要 — 2026年5月25日** [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@
+          - generic [ref=e469] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e470]
+            - generic [ref=e471]:
+              - paragraph [ref=e472]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e473] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月24日 AI/科技/安全动态" [ref=e474]
+            - generic [ref=e475]:
+              - paragraph [ref=e476]: 每日新闻摘要 - 2026年5月24日 AI/科技/安全动态
+              - paragraph
+          - generic [ref=e477] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e478]
+            - generic [ref=e479]:
+              - paragraph [ref=e480]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e481] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 ## 📰 每日新闻摘要 — 2026年5月24日 各位好，以下是今日科技行业重要新闻汇总： --- ### 🤖 AI 与大模型 **1. OpenAI 发布 GPT-5.5 与 GPT-5" [ref=e482]'
+            - generic [ref=e483]:
+              - paragraph [ref=e484]: 每日新闻摘要
+              - paragraph [ref=e485]: "## 📰 每日新闻摘要 — 2026年5月24日 各位好，以下是今日科技行业重要新闻汇总： --- ### 🤖 AI 与大模型 **1. OpenAI 发布 GPT-5.5 与 GPT-5"
+          - generic [ref=e486] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e487]
+            - generic [ref=e488]:
+              - paragraph [ref=e489]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e490] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e491]
+            - generic [ref=e492]:
+              - paragraph [ref=e493]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e494] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e495]
+            - generic [ref=e496]:
+              - paragraph [ref=e497]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e498] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 ## 📰 每日新闻摘要 — 2026年5月23日 > 聚焦：AI 智能体 · 电商技术 · 开源工具链 · 行业政策 --- ### 🤖 AI 大模型 & 智能体 **1. Cohere" [ref=e499]'
+            - generic [ref=e500]:
+              - paragraph [ref=e501]: 每日新闻摘要
+              - paragraph [ref=e502]: "## 📰 每日新闻摘要 — 2026年5月23日 > 聚焦：AI 智能体 · 电商技术 · 开源工具链 · 行业政策 --- ### 🤖 AI 大模型 & 智能体 **1. Cohere"
+          - generic [ref=e503] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e504]
+            - generic [ref=e505]:
+              - paragraph [ref=e506]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e507] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e508]
+            - generic [ref=e509]:
+              - paragraph [ref=e510]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e511] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e512]
+            - generic [ref=e513]:
+              - paragraph [ref=e514]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e515] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 ## 📰 每日新闻摘要 — 2026年5月22日 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@q" [ref=e516]'
+            - generic [ref=e517]:
+              - paragraph [ref=e518]: 每日新闻摘要
+              - paragraph [ref=e519]: "## 📰 每日新闻摘要 — 2026年5月22日 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@q"
+          - generic [ref=e520] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e521]
+            - generic [ref=e522]:
+              - paragraph [ref=e523]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e524] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月21日" [ref=e525]
+            - generic [ref=e526]:
+              - paragraph [ref=e527]: 每日新闻摘要 - 2026年5月21日
+              - paragraph
+          - generic [ref=e528] [cursor=pointer]:
+            - checkbox "每日新闻摘要 - 2026年5月21日" [ref=e529]
+            - generic [ref=e530]:
+              - paragraph [ref=e531]: 每日新闻摘要 - 2026年5月21日
+              - paragraph
+          - generic [ref=e532] [cursor=pointer]:
+            - 'checkbox "每日新闻摘要 - 2026年5月21日 ## 📰 每日科技新闻摘要 — 2026年5月21日 各位好 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@1689" [ref=e533]'
+            - generic [ref=e534]:
+              - paragraph [ref=e535]: 每日新闻摘要 - 2026年5月21日
+              - paragraph [ref=e536]: "## 📰 每日科技新闻摘要 — 2026年5月21日 各位好 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@1689"
+          - generic [ref=e537] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e538]
+            - generic [ref=e539]:
+              - paragraph [ref=e540]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e541] [cursor=pointer]:
+            - checkbox "2026-05-20 每日技术新闻摘要" [ref=e542]
+            - generic [ref=e543]:
+              - paragraph [ref=e544]: 2026-05-20 每日技术新闻摘要
+              - paragraph
+          - generic [ref=e545] [cursor=pointer]:
+            - checkbox "2026-05-20 每日技术新闻摘要" [ref=e546]
+            - generic [ref=e547]:
+              - paragraph [ref=e548]: 2026-05-20 每日技术新闻摘要
+              - paragraph
+          - generic [ref=e549] [cursor=pointer]:
+            - 'checkbox "2026-05-20 每日技术新闻摘要 # 📰 2026-05-20 每日技术新闻摘要 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@qq" [ref=e550]'
+            - generic [ref=e551]:
+              - paragraph [ref=e552]: 2026-05-20 每日技术新闻摘要
+              - paragraph [ref=e553]: "# 📰 2026-05-20 每日技术新闻摘要 [@落伍](mention://member/2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef) [@16891404@qq"
+          - generic [ref=e554] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e555]
+            - generic [ref=e556]:
+              - paragraph [ref=e557]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e558] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e559]
+            - generic [ref=e560]:
+              - paragraph [ref=e561]: 每日新闻摘要
+              - paragraph
+          - generic [ref=e562] [cursor=pointer]:
+            - checkbox "每日新闻摘要" [ref=e563]
+            - generic [ref=e564]:
+              - paragraph [ref=e565]: 每日新闻摘要
+              - paragraph
+        - button "Ingest" [disabled]
+    - button "Close" [ref=e566]:
+      - img
+      - generic [ref=e567]: Close

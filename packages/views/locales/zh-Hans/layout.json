@@ -19,7 +19,16 @@
     "changelog": "更新日志",
     "feedback": "反馈"
   },
-  "wiki_page": { "title": "知识库", "ingest": "摄取", "wiki_agent": "Wiki 智能体", "search": "搜索..." },
+  "wiki_page": {
+    "title": "知识库", "ingest": "摄取", "wiki_agent": "Wiki 智能体", "search": "搜索...",
+    "edit": "编辑", "save": "保存", "cancel": "取消", "saving": "保存中...",
+    "links": "链接", "backlinks": "反向链接", "properties": "属性", "on_this_page": "本页导航",
+    "no_pages": "暂无页面", "select_page": "从左侧目录选择页面阅读",
+    "page_not_found": "页面未找到",
+    "not_setup_title": "知识库未设置",
+    "not_setup_desc": "创建一个知识库空间以开始构建知识库。",
+    "create_wiki": "创建知识库", "creating": "创建中..."
+  },
   "workspace_loader": {
     "loading_workspace": "正在加载工作区...",
     "loading_named_prefix": "正在加载"

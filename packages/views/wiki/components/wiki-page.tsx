@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@multica/ui/components/
 import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/ui/tooltip";
 import { ActorAvatar } from "../../common/actor-avatar";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
+import { useT } from "../../i18n";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
 import { WikiIngestDialog } from "./wiki-ingest-dialog";
@@ -20,6 +21,7 @@ const DEFAULT_SPACE = "default";
 
 export function WikiPage() {
   const wsId = useWorkspaceId();
+  const { t } = useT("layout");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [spaceSlug] = useState(DEFAULT_SPACE);
@@ -61,9 +63,9 @@ export function WikiPage() {
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
         <BookOpen className="h-12 w-12 text-muted-foreground" />
         <div className="text-center">
-          <h2 className="text-lg font-semibold">Wiki not set up</h2>
+          <h2 className="text-lg font-semibold">{t(($) => $.wiki_page.not_setup_title)}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create a wiki space to start building your knowledge base.
+            {t(($) => $.wiki_page.not_setup_desc)}
           </p>
         </div>
         <Button
@@ -71,7 +73,7 @@ export function WikiPage() {
           disabled={createSpace.isPending}
         >
           <BookOpen className="mr-2 h-4 w-4" />
-          {createSpace.isPending ? "Creating..." : "Create Wiki"}
+          {createSpace.isPending ? t(($) => $.wiki_page.creating) : t(($) => $.wiki_page.create_wiki)}
         </Button>
       </div>
     );
@@ -82,7 +84,7 @@ export function WikiPage() {
       {/* Top bar */}
       <div className="flex items-center gap-3 border-b px-4 py-2">
         <BookOpen className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-sm font-semibold">Wiki</h1>
+        <h1 className="text-sm font-semibold">{t(($) => $.wiki_page.title)}</h1>
         <div className="flex-1" />
         <Popover open={agentOpen} onOpenChange={setAgentOpen}>
           <PopoverTrigger>
@@ -93,7 +95,7 @@ export function WikiPage() {
                   {selectedAgent.name}
                   <span className="text-muted-foreground">({selectedAgent.runtime_mode || "cloud"})</span>
                 </span>
-              ) : <span className="text-muted-foreground">Wiki agent</span>}
+              ) : <span className="text-muted-foreground">{t(($) => $.wiki_page.wiki_agent)}</span>}
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -130,13 +132,13 @@ export function WikiPage() {
         </Popover>
         <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
           <Download className="mr-1 h-4 w-4" />
-          Ingest
+          {t(($) => $.wiki_page.ingest)}
         </Button>
         <div className="relative w-64">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="h-8 pl-8 text-sm"
-            placeholder="Search wiki..."
+            placeholder={t(($) => $.wiki_page.search)}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -160,7 +162,7 @@ export function WikiPage() {
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <div className="text-center">
                 <FileText className="mx-auto h-10 w-10" />
-                <p className="mt-2">Select a page from the tree to read</p>
+                <p className="mt-2">{t(($) => $.wiki_page.select_page)}</p>
               </div>
             </div>
           ) : pageLoading ? (

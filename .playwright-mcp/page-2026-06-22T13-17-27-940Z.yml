@@ -1,0 +1,199 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - list [ref=e11]:
+          - listitem [ref=e12]:
+            - button "B binguosoft" [ref=e552]:
+              - generic [ref=e15]: B
+              - generic [ref=e16]: binguosoft
+              - img [ref=e17]
+        - list [ref=e19]:
+          - listitem [ref=e20]:
+            - button "搜索... Ctrl+K" [ref=e553]:
+              - img [ref=e22]
+              - generic [ref=e25]: 搜索...
+              - generic: Ctrl+K
+          - listitem [ref=e26]:
+            - button "新建 issue C" [ref=e554]:
+              - img [ref=e29]
+              - generic [ref=e32]: 新建 issue
+              - generic: C
+      - generic [ref=e33]:
+        - list [ref=e36]:
+          - listitem [ref=e37]:
+            - link "收件箱 2" [ref=e555] [cursor=pointer]:
+              - /url: /binguosoft/inbox
+              - img [ref=e39]
+              - generic [ref=e42]: 收件箱
+              - generic [ref=e43]: "2"
+          - listitem [ref=e44]:
+            - link "我的 issue" [ref=e556] [cursor=pointer]:
+              - /url: /binguosoft/my-issues
+              - img [ref=e46]
+              - generic [ref=e50]: 我的 issue
+        - generic [ref=e51]:
+          - generic [ref=e52]: 工作区
+          - list [ref=e54]:
+            - listitem [ref=e55]:
+              - link "Issues" [ref=e557] [cursor=pointer]:
+                - /url: /binguosoft/issues
+                - img [ref=e57]
+                - generic [ref=e60]: Issues
+            - listitem [ref=e61]:
+              - link "项目" [ref=e558] [cursor=pointer]:
+                - /url: /binguosoft/projects
+                - img [ref=e63]
+                - generic [ref=e65]: 项目
+            - listitem [ref=e66]:
+              - link "自动化" [ref=e559] [cursor=pointer]:
+                - /url: /binguosoft/autopilots
+                - img [ref=e68]
+                - generic [ref=e70]: 自动化
+            - listitem [ref=e71]:
+              - link "智能体" [ref=e560] [cursor=pointer]:
+                - /url: /binguosoft/agents
+                - img [ref=e73]
+                - generic [ref=e76]: 智能体
+            - listitem [ref=e77]:
+              - link "小队" [ref=e561] [cursor=pointer]:
+                - /url: /binguosoft/squads
+                - img [ref=e79]
+                - generic [ref=e84]: 小队
+            - listitem [ref=e85]:
+              - link "知识库" [ref=e562] [cursor=pointer]:
+                - /url: /binguosoft/wiki
+                - img [ref=e87]
+                - generic [ref=e89]: 知识库
+            - listitem [ref=e90]:
+              - link "用量" [ref=e563] [cursor=pointer]:
+                - /url: /binguosoft/usage
+                - img [ref=e92]
+                - generic [ref=e94]: 用量
+        - generic [ref=e95]:
+          - generic [ref=e96]: 配置
+          - list [ref=e98]:
+            - listitem [ref=e99]:
+              - link "运行时" [ref=e564] [cursor=pointer]:
+                - /url: /binguosoft/runtimes
+                - img [ref=e101]
+                - generic [ref=e103]: 运行时
+            - listitem [ref=e105]:
+              - link "Skills" [ref=e565] [cursor=pointer]:
+                - /url: /binguosoft/skills
+                - img [ref=e107]
+                - generic [ref=e109]: Skills
+            - listitem [ref=e110]:
+              - link "设置" [ref=e566] [cursor=pointer]:
+                - /url: /binguosoft/settings
+                - img [ref=e112]
+                - generic [ref=e115]: 设置
+      - button "帮助" [ref=e567] [cursor=pointer]:
+        - img [ref=e119]
+      - button "切换侧边栏" [ref=e568]
+    - main [ref=e123]:
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - img [ref=e126]
+          - heading "Wiki" [level=1] [ref=e569]
+          - button "Wiki agent" [ref=e570]:
+            - button "Wiki agent" [ref=e571]:
+              - generic [ref=e131]: Wiki agent
+              - img
+          - button "Ingest" [ref=e572]:
+            - img
+            - text: Ingest
+          - generic [ref=e133]:
+            - img [ref=e134]
+            - textbox "Search wiki..." [ref=e573]
+        - generic [ref=e138]:
+          - generic [ref=e140]:
+            - button "raw" [ref=e574]:
+              - img [ref=e143]
+              - img [ref=e145]
+              - generic [ref=e147]: raw
+            - generic [ref=e148]:
+              - button "wiki" [ref=e575]:
+                - img [ref=e150]
+                - img [ref=e152]
+                - generic [ref=e154]: wiki
+              - button "areas" [ref=e576]:
+                - img [ref=e157]
+                - img [ref=e159]
+                - generic [ref=e161]: areas
+              - button "concepts" [ref=e577]:
+                - img [ref=e164]
+                - img [ref=e166]
+                - generic [ref=e168]: concepts
+              - button "entities" [ref=e578]:
+                - img [ref=e171]
+                - img [ref=e173]
+                - generic [ref=e175]: entities
+              - button "projects" [ref=e579]:
+                - img [ref=e178]
+                - img [ref=e180]
+                - generic [ref=e182]: projects
+              - button "sources" [ref=e580]:
+                - img [ref=e185]
+                - img [ref=e187]
+                - generic [ref=e189]: sources
+              - button "synthesis" [ref=e581]:
+                - img [ref=e192]
+                - img [ref=e194]
+                - generic [ref=e196]: synthesis
+              - button "index.md" [ref=e582]:
+                - img [ref=e198]
+                - generic [ref=e201]: index.md
+              - button "log.md" [ref=e583]:
+                - img [ref=e203]
+                - generic [ref=e206]: log.md
+            - button "AGENTS.md" [ref=e584]:
+              - img [ref=e208]
+              - generic [ref=e211]: AGENTS.md
+            - button "IDEA.md" [ref=e585]:
+              - img [ref=e213]
+              - generic [ref=e216]: IDEA.md
+          - generic [ref=e219]:
+            - img [ref=e220]
+            - paragraph [ref=e223]: Select a page from the tree to read
+      - generic [ref=e224]:
+        - generic [ref=e228]:
+          - generic [ref=e229]:
+            - button [ref=e230]:
+              - img
+            - generic [ref=e231]:
+              - button "新对话" [ref=e586]:
+                - generic [ref=e233]: 新对话
+                - img [ref=e234]
+              - generic "另一个对话有未读回复" [ref=e587]:
+                - generic [ref=e238]: "5"
+          - generic [ref=e239]:
+            - button [ref=e240]:
+              - img
+            - button [ref=e241]:
+              - img
+        - generic [ref=e242]:
+          - generic [ref=e243]:
+            - heading "你好，我是 📋产品经理" [level=3] [ref=e588]
+            - paragraph [ref=e245]: 试试问
+          - generic [ref=e246]:
+            - button "📋按优先级列出我未完成的任务" [ref=e589]
+            - button "📝总结一下我今天做了什么" [ref=e590]
+            - button "💡规划接下来该做什么" [ref=e591]
+        - generic [ref=e251]:
+          - paragraph [ref=e256]: 输入消息…
+          - 'button "Status: Online 📋产品经理" [ref=e592] [cursor=pointer]':
+            - 'link "Status: Online" [ref=e593]':
+              - generic [ref=e261]:
+                - generic "📋产品经理" [ref=e594]:
+                  - img [ref=e263]
+                - 'generic "Status: Online" [ref=e595]'
+            - generic [ref=e267]: 📋产品经理
+            - img [ref=e268]
+          - generic [ref=e270]:
+            - button "添加附件" [ref=e596]:
+              - img
+            - button [disabled]:
+              - img
+  - region "Notifications alt+T"
+  - alert [ref=e5]
