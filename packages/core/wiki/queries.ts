@@ -24,35 +24,35 @@ export const wikiKeys = {
 };
 
 export function wikiSpacesOptions(wsId: string) {
-  return queryOptions({ queryKey: wikiKeys.spaces(wsId), queryFn: () => api.listWikiSpaces() });
+  return queryOptions({ queryKey: wikiKeys.spaces(wsId), queryFn: () => api.listWikiSpaces(wsId) });
 }
 
 export function wikiSpaceDetailOptions(wsId: string, slug: string) {
-  return queryOptions({ queryKey: wikiKeys.spaceDetail(wsId, slug), queryFn: () => api.getWikiSpace(slug) });
+  return queryOptions({ queryKey: wikiKeys.spaceDetail(wsId, slug), queryFn: () => api.getWikiSpace(wsId, slug) });
 }
 
 export function wikiPagesOptions(wsId: string, slug: string, params?: ListWikiPagesParams) {
   return queryOptions({
     queryKey: [...wikiKeys.pages(wsId, slug), params ?? {}] as const,
-    queryFn: () => api.listWikiPages(slug, params),
+    queryFn: () => api.listWikiPages(wsId, slug, params),
   });
 }
 
 export function wikiPageDetailOptions(wsId: string, slug: string, path: string) {
   return queryOptions({
     queryKey: wikiKeys.pageDetail(wsId, slug, path),
-    queryFn: () => api.getWikiPage(slug, path),
+    queryFn: () => api.getWikiPage(wsId, slug, path),
     enabled: !!path,
   });
 }
 
 export function wikiSourcesOptions(wsId: string, slug: string) {
-  return queryOptions({ queryKey: wikiKeys.sources(wsId, slug), queryFn: () => api.listWikiSources(slug) });
+  return queryOptions({ queryKey: wikiKeys.sources(wsId, slug), queryFn: () => api.listWikiSources(wsId, slug) });
 }
 
 export function wikiOperationsOptions(wsId: string, slug: string, params?: ListWikiOperationsParams) {
   return queryOptions({
     queryKey: [...wikiKeys.operations(wsId, slug), params ?? {}] as const,
-    queryFn: () => api.listWikiOperations(slug, params),
+    queryFn: () => api.listWikiOperations(wsId, slug, params),
   });
 }

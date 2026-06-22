@@ -2234,86 +2234,85 @@ export class ApiClient {
 
   // ── Wiki integration ──
 
-  async listWikiSpaces(): Promise<WikiSpace[]> {
-    return this.fetch("/api/wiki/spaces");
+  async listWikiSpaces(wsId: string): Promise<WikiSpace[]> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces`);
   }
 
-  async createWikiSpace(data: CreateWikiSpaceRequest): Promise<WikiSpace> {
-    return this.fetch("/api/wiki/spaces", { method: "POST", body: JSON.stringify(data) });
+  async createWikiSpace(wsId: string, data: CreateWikiSpaceRequest): Promise<WikiSpace> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async getWikiSpace(slug: string): Promise<WikiSpace> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`);
+  async getWikiSpace(wsId: string, slug: string): Promise<WikiSpace> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}`);
   }
 
-  async updateWikiSpace(slug: string, data: UpdateWikiSpaceRequest): Promise<WikiSpace> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`, { method: "PATCH", body: JSON.stringify(data) });
+  async updateWikiSpace(wsId: string, slug: string, data: UpdateWikiSpaceRequest): Promise<WikiSpace> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}`, { method: "PATCH", body: JSON.stringify(data) });
   }
 
-  async deleteWikiSpace(slug: string): Promise<void> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`, { method: "DELETE" });
+  async deleteWikiSpace(wsId: string, slug: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}`, { method: "DELETE" });
   }
 
-  async listWikiPages(slug: string, params?: ListWikiPagesParams): Promise<WikiPage[]> {
+  async listWikiPages(wsId: string, slug: string, params?: ListWikiPagesParams): Promise<WikiPage[]> {
     const search = new URLSearchParams();
     if (params?.search) search.set("search", params.search);
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages?${search}`);
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages?${search}`);
   }
 
-  async getWikiPage(slug: string, path: string): Promise<WikiPageDetail> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`);
+  async getWikiPage(wsId: string, slug: string, path: string): Promise<WikiPageDetail> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`);
   }
 
-  async upsertWikiPage(slug: string, path: string, data: WriteWikiPageRequest): Promise<WikiPage> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
+  async upsertWikiPage(wsId: string, slug: string, path: string, data: WriteWikiPageRequest): Promise<WikiPage> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, {
+      method: "PUT", body: JSON.stringify(data),
     });
   }
 
-  async deleteWikiPage(slug: string, path: string): Promise<void> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, { method: "DELETE" });
+  async deleteWikiPage(wsId: string, slug: string, path: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, { method: "DELETE" });
   }
 
-  async batchReadWikiPages(slug: string, data: BatchReadWikiPagesRequest): Promise<{ pages: WikiPageDetail[] }> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/batch`, { method: "POST", body: JSON.stringify(data) });
+  async batchReadWikiPages(wsId: string, slug: string, data: BatchReadWikiPagesRequest): Promise<{ pages: WikiPageDetail[] }> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/batch`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async batchWriteWikiPages(slug: string, data: BatchWriteWikiPagesRequest): Promise<{ pages: WikiPage[] }> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/batch-write`, { method: "POST", body: JSON.stringify(data) });
+  async batchWriteWikiPages(wsId: string, slug: string, data: BatchWriteWikiPagesRequest): Promise<{ pages: WikiPage[] }> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/batch-write`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async listWikiPageRevisions(slug: string, path: string): Promise<unknown[]> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}/revisions`);
+  async listWikiPageRevisions(wsId: string, slug: string, path: string): Promise<unknown[]> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}/revisions`);
   }
 
-  async listWikiSources(slug: string): Promise<WikiSource[]> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources`);
+  async listWikiSources(wsId: string, slug: string): Promise<WikiSource[]> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/sources`);
   }
 
-  async createWikiSource(slug: string, data: CreateWikiSourceRequest): Promise<WikiSource> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources`, { method: "POST", body: JSON.stringify(data) });
+  async createWikiSource(wsId: string, slug: string, data: CreateWikiSourceRequest): Promise<WikiSource> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/sources`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async getWikiSource(slug: string, id: string): Promise<WikiSource> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`);
+  async getWikiSource(wsId: string, slug: string, id: string): Promise<WikiSource> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`);
   }
 
-  async deleteWikiSource(slug: string, id: string): Promise<void> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`, { method: "DELETE" });
+  async deleteWikiSource(wsId: string, slug: string, id: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`, { method: "DELETE" });
   }
 
-  async listWikiOperations(slug: string, params?: ListWikiOperationsParams): Promise<WikiOperation[]> {
+  async listWikiOperations(wsId: string, slug: string, params?: ListWikiOperationsParams): Promise<WikiOperation[]> {
     const search = new URLSearchParams();
     if (params?.limit) search.set("limit", String(params.limit));
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations?${search}`);
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/operations?${search}`);
   }
 
-  async createWikiOperation(slug: string, data: CreateWikiOperationRequest): Promise<WikiOperation> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations`, { method: "POST", body: JSON.stringify(data) });
+  async createWikiOperation(wsId: string, slug: string, data: CreateWikiOperationRequest): Promise<WikiOperation> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/operations`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async getWikiOperation(slug: string, id: string): Promise<WikiOperation> {
-    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations/${id}`);
+  async getWikiOperation(wsId: string, slug: string, id: string): Promise<WikiOperation> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/operations/${id}`);
   }
 }

@@ -643,41 +643,32 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// terminal failure.
 					r.Post("/lark/install/begin", h.BeginLarkInstall)
 					r.Get("/lark/install/{sessionId}/status", h.GetLarkInstallStatus)
+
+				// Wiki knowledge base
+				r.Route("/wiki", func(r chi.Router) {
+					r.Get("/spaces", h.ListWikiSpaces)
+					r.Post("/spaces", h.CreateWikiSpace)
+					r.Get("/spaces/{slug}/overview", h.GetWikiSpaceOverview)
+					r.Get("/spaces/{slug}", h.GetWikiSpace)
+					r.Patch("/spaces/{slug}", h.UpdateWikiSpace)
+					r.Delete("/spaces/{slug}", h.ArchiveWikiSpace)
+					r.Get("/spaces/{slug}/pages", h.ListWikiPages)
+					r.Post("/spaces/{slug}/pages/batch", h.BatchReadWikiPages)
+					r.Post("/spaces/{slug}/pages/batch-write", h.BatchWriteWikiPages)
+					r.Get("/spaces/{slug}/pages/*", h.GetWikiPage)
+					r.Put("/spaces/{slug}/pages/*", h.UpsertWikiPage)
+					r.Delete("/spaces/{slug}/pages/*", h.DeleteWikiPage)
+					r.Get("/spaces/{slug}/page-revisions/*", h.ListWikiPageRevisions)
+					r.Get("/spaces/{slug}/sources", h.ListWikiSources)
+					r.Post("/spaces/{slug}/sources", h.CreateWikiSource)
+					r.Get("/spaces/{slug}/sources/{id}", h.GetWikiSource)
+					r.Delete("/spaces/{slug}/sources/{id}", h.DeleteWikiSource)
+					r.Get("/spaces/{slug}/operations", h.ListWikiOperations)
+					r.Post("/spaces/{slug}/operations", h.CreateWikiOperation)
+					r.Get("/spaces/{slug}/operations/{id}", h.GetWikiOperation)
+				})
 				})
 			})
-		})
-
-		// Wiki knowledge base. All routes are member-visible.
-		r.Route("/api/wiki", func(r chi.Router) {
-			// Spaces
-			r.Get("/spaces", h.ListWikiSpaces)
-			r.Post("/spaces", h.CreateWikiSpace)
-			r.Get("/spaces/{slug}/overview", h.GetWikiSpaceOverview)
-			r.Get("/spaces/{slug}", h.GetWikiSpace)
-			r.Patch("/spaces/{slug}", h.UpdateWikiSpace)
-			r.Delete("/spaces/{slug}", h.ArchiveWikiSpace)
-
-			// Pages
-			r.Get("/spaces/{slug}/pages", h.ListWikiPages)
-			r.Post("/spaces/{slug}/pages/batch", h.BatchReadWikiPages)
-			r.Post("/spaces/{slug}/pages/batch-write", h.BatchWriteWikiPages)
-			r.Get("/spaces/{slug}/pages/*", h.GetWikiPage)
-			r.Put("/spaces/{slug}/pages/*", h.UpsertWikiPage)
-			r.Delete("/spaces/{slug}/pages/*", h.DeleteWikiPage)
-			// Revisions use a query param on the page endpoint instead:
-			// GET /spaces/{slug}/pages/{path}?revisions=true
-			r.Get("/spaces/{slug}/page-revisions/*", h.ListWikiPageRevisions)
-
-			// Sources
-			r.Get("/spaces/{slug}/sources", h.ListWikiSources)
-			r.Post("/spaces/{slug}/sources", h.CreateWikiSource)
-			r.Get("/spaces/{slug}/sources/{id}", h.GetWikiSource)
-			r.Delete("/spaces/{slug}/sources/{id}", h.DeleteWikiSource)
-
-			// Operations
-			r.Get("/spaces/{slug}/operations", h.ListWikiOperations)
-			r.Post("/spaces/{slug}/operations", h.CreateWikiOperation)
-			r.Get("/spaces/{slug}/operations/{id}", h.GetWikiOperation)
 		})
 
 		// Lark binding-token redemption. NOT workspace-scoped because

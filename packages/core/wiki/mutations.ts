@@ -12,7 +12,7 @@ import type {
 export function useCreateWikiSpace(wsId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateWikiSpaceRequest) => api.createWikiSpace(data),
+    mutationFn: (data: CreateWikiSpaceRequest) => api.createWikiSpace(wsId, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: wikiKeys.spaces(wsId) }); },
   });
 }
@@ -21,7 +21,7 @@ export function useUpdateWikiSpace(wsId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ slug, data }: { slug: string; data: UpdateWikiSpaceRequest }) =>
-      api.updateWikiSpace(slug, data),
+      api.updateWikiSpace(wsId, slug, data),
     onSuccess: (_, { slug }) => {
       qc.invalidateQueries({ queryKey: wikiKeys.spaceDetail(wsId, slug) });
     },
@@ -32,7 +32,7 @@ export function useUpsertWikiPage(wsId: string, slug: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ path, data }: { path: string; data: WriteWikiPageRequest }) =>
-      api.upsertWikiPage(slug, path, data),
+      api.upsertWikiPage(wsId, slug, path, data),
     onSuccess: (_, { path }) => {
       qc.invalidateQueries({ queryKey: wikiKeys.pages(wsId, slug) });
       qc.invalidateQueries({ queryKey: wikiKeys.pageDetail(wsId, slug, path) });
@@ -43,7 +43,7 @@ export function useUpsertWikiPage(wsId: string, slug: string) {
 export function useDeleteWikiPage(wsId: string, slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (path: string) => api.deleteWikiPage(slug, path),
+    mutationFn: (path: string) => api.deleteWikiPage(wsId, slug, path),
     onSuccess: () => { qc.invalidateQueries({ queryKey: wikiKeys.pages(wsId, slug) }); },
   });
 }
@@ -51,7 +51,7 @@ export function useDeleteWikiPage(wsId: string, slug: string) {
 export function useCreateWikiSource(wsId: string, slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateWikiSourceRequest) => api.createWikiSource(slug, data),
+    mutationFn: (data: CreateWikiSourceRequest) => api.createWikiSource(wsId, slug, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: wikiKeys.sources(wsId, slug) }); },
   });
 }
@@ -59,7 +59,7 @@ export function useCreateWikiSource(wsId: string, slug: string) {
 export function useCreateWikiOperation(wsId: string, slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateWikiOperationRequest) => api.createWikiOperation(slug, data),
+    mutationFn: (data: CreateWikiOperationRequest) => api.createWikiOperation(wsId, slug, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: wikiKeys.operations(wsId, slug) }); },
   });
 }
