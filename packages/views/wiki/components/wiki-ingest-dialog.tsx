@@ -29,23 +29,29 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   const { data: inboxItems, isLoading: inboxLoading } = useQuery(inboxListOptions(wsId));
 
-  const clear = () => { setBusy(false); setError(""); onOpenChange(false); };
+  const done = () => { setBusy(false); setError(""); onOpenChange(false); };
+  const fail = (msg: string) => { setError(msg); setBusy(false); };
 
-  const handleInbox = async () => {
+  const handleInbox = () => {
     if (selected.size === 0) return;
     setBusy(true); setError("");
-    try {
-      for (const id of selected) {
-        const item = inboxItems?.find((i) => i.id === id);
-        await createSource.mutateAsync({
+    const ids = Array.from(selected);
+    let remaining = ids.length;
+    ids.forEach((id) => {
+      const item = inboxItems?.find((i) => i.id === id);
+      createSource.mutate(
+        {
           title: item?.title || `Inbox ${id}`,
           content: `# ${item?.title || "Inbox item"}\n\n${item?.body || ""}`,
           source_type: "inbox",
           raw_path: `raw/inbox-${Date.now()}.md`,
-        });
-      }
-      setSelected(new Set()); clear();
-    } catch (e: any) { setError(e?.message || "Import failed"); setBusy(false); }
+        },
+        {
+          onSuccess: () => { remaining--; if (remaining === 0) { setSelected(new Set()); done(); } },
+          onError: (e: any) => { fail(e?.message || "Import failed"); },
+        },
+      );
+    });
   };
 
   const handleCrawl = async () => {
@@ -54,63 +60,47 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
     try {
       const resp = await fetch(url.startsWith("http") ? url : `https://${url}`);
       const text = await resp.text();
-      // Strip HTML tags for basic preview
       const stripped = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 3000);
       setUrlPreview(`# URL Source: ${url}\n\n${stripped}...`);
     } catch (e: any) {
-      setUrlPreview(`# URL Source: ${url}\n\n> Crawl failed: ${e?.message || "unknown error"}\n> URL saved as reference.`);
+      setUrlPreview(`# URL Source: ${url}\n\n> Crawl failed: ${e?.message || "unknown error"}`);
     }
     setBusy(false);
   };
 
-  const handleUrl = async () => {
+  const handleUrl = () => {
     if (!url) return;
     setBusy(true); setError("");
-    try {
-      await createSource.mutateAsync({
-        title: url,
-        content: urlPreview || `# URL Source\n\n${url}\n\n> Pending crawl.`,
-        url,
-        source_type: "url",
-        raw_path: `raw/url-${Date.now()}.md`,
-      });
-      setUrl(""); setUrlPreview(""); clear();
-    } catch (e: any) { setError(e?.message || "Failed"); setBusy(false); }
+    createSource.mutate(
+      { title: url, content: urlPreview || `# URL Source\n\n${url}`, url, source_type: "url", raw_path: `raw/url-${Date.now()}.md` },
+      { onSuccess: () => { setUrl(""); setUrlPreview(""); done(); }, onError: (e: any) => fail(e?.message || "Failed") },
+    );
   };
 
-  const handleFile = async () => {
+  const handleFile = () => {
     if (!file) return;
     setBusy(true); setError("");
-    try {
-      let content = "";
-      if (file.name.endsWith(".md") || file.name.endsWith(".txt")) {
-        content = await file.text();
-      } else {
-        content = `# ${file.name}\n\n> Binary file uploaded as reference.\n> Type: ${file.type || "unknown"}\n> Size: ${(file.size / 1024).toFixed(1)} KB`;
-      }
-      await createSource.mutateAsync({
-        title: file.name,
-        content,
-        source_type: "file",
-        raw_path: `raw/${file.name}`,
-      });
-      setFile(null); clear();
-    } catch (e: any) { setError(e?.message || "Upload failed"); setBusy(false); }
+    const isText = file.name.endsWith(".md") || file.name.endsWith(".txt");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = isText ? (reader.result as string) : `# ${file.name}\n\n> Binary file.\n> Size: ${(file.size / 1024).toFixed(1)} KB`;
+      createSource.mutate(
+        { title: file.name, content, source_type: "file", raw_path: `raw/${file.name}` },
+        { onSuccess: () => { setFile(null); done(); }, onError: (e: any) => fail(e?.message || "Upload failed") },
+      );
+    };
+    reader.onerror = () => fail("Failed to read file");
+    if (isText) reader.readAsText(file); else reader.readAsDataURL(file);
   };
 
-  const handleMd = async () => {
+  const handleMd = () => {
     if (!md.trim()) return;
     setBusy(true); setError("");
-    try {
-      const firstLine = md.trim().split("\n")[0]?.replace(/^#\s*/, "") || "Manual entry";
-      await createSource.mutateAsync({
-        title: firstLine,
-        content: md,
-        source_type: "manual",
-        raw_path: `raw/manual-${Date.now()}.md`,
-      });
-      setMd(""); clear();
-    } catch (e: any) { setError(e?.message || "Save failed"); setBusy(false); }
+    const firstLine = md.trim().split("\n")[0]?.replace(/^#\s*/, "") || "Manual entry";
+    createSource.mutate(
+      { title: firstLine, content: md, source_type: "manual", raw_path: `raw/manual-${Date.now()}.md` },
+      { onSuccess: () => { setMd(""); done(); }, onError: (e: any) => fail(e?.message || "Save failed") },
+    );
   };
 
   const toggle = (id: string) => {
