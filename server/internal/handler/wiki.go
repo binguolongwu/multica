@@ -165,6 +165,13 @@ func (h *Handler) ListWikiSpaces(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list wiki spaces")
 		return
 	}
+	// Auto-bootstrap default space on first visit
+	if len(spaces) == 0 {
+		defaultSpace, err := h.WikiService.EnsureDefaultSpace(r.Context(), parseUUID(workspaceID))
+		if err == nil {
+			spaces = []db.WikiSpace{defaultSpace}
+		}
+	}
 	if spaces == nil {
 		spaces = []db.WikiSpace{}
 	}

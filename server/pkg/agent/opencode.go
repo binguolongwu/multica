@@ -49,7 +49,14 @@ func (b *opencodeBackend) Execute(ctx context.Context, prompt string, opts ExecO
 	timeout := opts.Timeout
 	runCtx, cancel := runContext(ctx, timeout)
 
-	args := []string{"run", "--format", "json", "--dangerously-skip-permissions"}
+	args := []string{"run", "--format", "json"}
+	// --dangerously-skip-permissions is blocked by OpenCode when the process
+	// runs as root (same class of CLI root-guard as Claude Code). When the
+	// daemon runs as root, skip it and rely on the daemon-managed permission
+	// prompts through the protocol.
+	if os.Getuid() != 0 {
+		args = append(args, "--dangerously-skip-permissions")
+	}
 	// Anchor OpenCode's project discovery (AGENTS.md walk-up + .opencode/skills/
 	// project config scan) at the task workdir. Without this, OpenCode falls
 	// back to PWD (inherited from the daemon process) or process.cwd(), which

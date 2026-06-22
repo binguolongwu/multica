@@ -240,7 +240,12 @@ var antigravityBlockedArgs = map[string]blockedArgMode{
 func buildAntigravityArgs(prompt, logPath string, timeout time.Duration, opts ExecOptions, logger *slog.Logger) []string {
 	args := []string{
 		"-p", prompt,
-		"--dangerously-skip-permissions",
+	}
+	// --dangerously-skip-permissions is blocked by agy when the process runs
+	// as root (same CLI root-guard as Claude Code). Skip it on root and rely
+	// on the daemon-managed permission flow.
+	if os.Getuid() != 0 {
+		args = append(args, "--dangerously-skip-permissions")
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)

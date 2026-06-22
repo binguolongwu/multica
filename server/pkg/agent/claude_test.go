@@ -317,8 +317,8 @@ func TestBuildClaudeArgsIncludesStrictMCPConfig(t *testing.T) {
 		"--input-format", "stream-json",
 		"--verbose",
 		"--strict-mcp-config",
-		"--permission-mode", "bypassPermissions",
 		"--disallowedTools", "AskUserQuestion",
+		"--permission-mode", "bypassPermissions",
 	}
 
 	if len(args) != len(expected) {

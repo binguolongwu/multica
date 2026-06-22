@@ -566,7 +566,6 @@ func buildClaudeArgs(opts ExecOptions, logger *slog.Logger) []string {
 		"--input-format", "stream-json",
 		"--verbose",
 		"--strict-mcp-config",
-		"--permission-mode", "bypassPermissions",
 		// AskUserQuestion is Claude Code's built-in interactive question tool.
 		// The daemon runs Claude in non-interactive stream-json mode and has
 		// no UI for the prompt to render in, so a call returns an empty
@@ -574,6 +573,14 @@ func buildClaudeArgs(opts ExecOptions, logger *slog.Logger) []string {
 		// never sees the question (see GitHub #2588). User-facing
 		// clarification belongs in an issue comment instead.
 		"--disallowedTools", "AskUserQuestion",
+	}
+	// --permission-mode bypassPermissions is blocked by Claude Code when the
+	// process runs as root (the CLI refuses with "--dangerously-skip-permissions
+	// cannot be used with root/sudo privileges"). In that case we rely on the
+	// stream-json control_request / control_response protocol to auto-approve
+	// tool uses — the daemon already handles those in handleControlRequest.
+	if os.Getuid() != 0 {
+		args = append(args, "--permission-mode", "bypassPermissions")
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
