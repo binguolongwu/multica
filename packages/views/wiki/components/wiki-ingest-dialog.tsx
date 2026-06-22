@@ -70,14 +70,14 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full">
-            <TabsTrigger value="inbox" className="flex-1"><Inbox className="mr-1 h-3.5 w-3.5" />Inbox</TabsTrigger>
-            <TabsTrigger value="url" className="flex-1"><Globe className="mr-1 h-3.5 w-3.5" />URL</TabsTrigger>
-            <TabsTrigger value="file" className="flex-1"><FileUp className="mr-1 h-3.5 w-3.5" />File</TabsTrigger>
-            <TabsTrigger value="markdown" className="flex-1"><PenLine className="mr-1 h-3.5 w-3.5" />Write</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="inbox"><Inbox className="mr-1 h-3.5 w-3.5" />Inbox</TabsTrigger>
+            <TabsTrigger value="url"><Globe className="mr-1 h-3.5 w-3.5" />URL</TabsTrigger>
+            <TabsTrigger value="file"><FileUp className="mr-1 h-3.5 w-3.5" />File</TabsTrigger>
+            <TabsTrigger value="markdown"><PenLine className="mr-1 h-3.5 w-3.5" />Write</TabsTrigger>
           </TabsList>
 
           <TabsContent value="inbox" className="space-y-4 pt-4">
