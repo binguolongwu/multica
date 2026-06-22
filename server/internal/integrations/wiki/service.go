@@ -121,13 +121,15 @@ func (s *Service) EnsureDefaultSpace(ctx context.Context, workspaceID pgtype.UUI
 }
 
 // EnsureBootstrap ensures a space has all initial pages. Idempotent — skips existing pages.
-func (s *Service) EnsureBootstrap(ctx context.Context, spaceID pgtype.UUID, slug string) error {
-	return s.bootstrapPages(ctx, spaceID, slug)
+func (s *Service) EnsureBootstrap(ctx context.Context, spaceID pgtype.UUID, slug string, workspaceID pgtype.UUID) error {
+	if err := s.bootstrapPages(ctx, spaceID, slug); err != nil {
+		return err
+	}
+	return s.SeedWorkspaceSkills(ctx, workspaceID)
 }
 
-// BootstrapSpace creates the initial wiki pages for a new space (alias for EnsureBootstrap).
-func (s *Service) BootstrapSpace(ctx context.Context, spaceID pgtype.UUID, slug string) error {
-	return s.bootstrapPages(ctx, spaceID, slug)
+func (s *Service) BootstrapSpace(ctx context.Context, spaceID pgtype.UUID, slug string, workspaceID pgtype.UUID) error {
+	return s.EnsureBootstrap(ctx, spaceID, slug, workspaceID)
 }
 
 func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug string) error {
@@ -299,6 +301,52 @@ structured, human-readable knowledge — not raw chunks.
 - Karpathy's original gist: https://gist.github.com/karpathy
 - AGENTS.md in this wiki root: the operational schema derived from this pattern.
 `
+
+// SeedWorkspaceSkills creates the 5 system-level wiki skills in the workspace.
+// Idempotent — uses ON CONFLICT DO NOTHING via the unique constraint.
+func (s *Service) SeedWorkspaceSkills(ctx context.Context, workspaceID pgtype.UUID) error {
+	type skillSpec struct {
+		name        string
+		description string
+		content     string
+	}
+	skills := []skillSpec{
+		{"multica-wiki-ingest", "Ingest raw sources into the wiki — read, summarize, cross-link, and log.", wikiIngestSkill},
+		{"multica-wiki-maintain", "Maintain wiki quality — resolve contradictions, merge duplicates, restructure, curate.", wikiMaintainSkill},
+		{"multica-wiki-query", "Query the wiki — search, read, synthesize answers with citations, file findings.", wikiQuerySkill},
+		{"multica-wiki-lint", "Audit the wiki — find contradictions, orphans, broken links. Read-only triage.", wikiLintSkill},
+		{"multica-wiki-index-refresh", "Rebuild wiki/index.md from the current page catalog.", wikiIndexRefreshSkill},
+	}
+	for _, sk := range skills {
+		_, err := s.Queries.CreateSkill(ctx, db.CreateSkillParams{
+			WorkspaceID: workspaceID,
+			Name:        sk.name,
+			Description: sk.description,
+			Content:     sk.content,
+			Config:      []byte("{}"),
+		})
+		if err != nil {
+			// ON CONFLICT (workspace_id, name) DO NOTHING — skip if exists
+			continue
+		}
+	}
+	return nil
+}
+
+// wikiIngestSkill is the skill content for multica-wiki-ingest.
+const wikiIngestSkill = "---\nname: multica-wiki-ingest\ndescription: \"Use when asked to ingest a source from raw/ into the wiki.\"\nuser-invocable: false\nallowed-tools: Bash(multica *)\n---\n\n# Wiki Ingest\n\nTurn a source document into durable, interlinked wiki knowledge.\n\n## Domain-driven layout\nsources/, projects/, areas/, entities/, concepts/, synthesis/.\n\n## Workflow\n1. Read wiki/index.md and tail wiki/log.md for context.\n2. Read source with multica wiki read-source --id <id>.\n3. Plan 3-5 takeaways.\n4. Write wiki/sources/<slug>.md (~300-800 words, frontmatter).\n5. Update/create downstream pages in areas/, entities/, concepts/, synthesis/.\n6. Wire [[wiki-links]] — every claim cites its source.\n7. Flag contradictions: > cross-mark contradicted by [[...]] (YYYY-MM-DD).\n8. Refresh wiki/index.md.\n9. Append to wiki/log.md.\n"
+
+// wikiMaintainSkill is the skill content for multica-wiki-maintain.
+const wikiMaintainSkill = "---\nname: multica-wiki-maintain\ndescription: \"Maintain wiki quality — resolve contradictions, merge duplicates, restructure.\"\nuser-invocable: false\nallowed-tools: Bash(multica *)\n---\n\n# Wiki Maintain\n\nCurate, correct, restructure, and evolve the wiki.\n\n## Responsibilities\n- Resolve contradictions: read both claims, determine truth, update, log.\n- Merge duplicates: merge into stronger page, replace weaker with redirect.\n- Restructure: rename/move pages, update [[links]], delete old, refresh index.\n- Curate stale content: review pages 90+ days untouched, flag stale_since.\n- Evolve schema: propose new categories, update AGENTS.md, log the change.\n"
+
+// wikiQuerySkill is the skill content for multica-wiki-query.
+const wikiQuerySkill = "---\nname: multica-wiki-query\ndescription: \"Query the wiki — search, read, synthesize answers with citations.\"\nuser-invocable: false\nallowed-tools: Bash(multica *)\n---\n\n# Wiki Query\n\nAnswer questions from wiki content. File substantial answers.\n\n## Workflow\n1. Read wiki/index.md for candidate pages.\n2. Search: multica wiki search --query \"<keywords>\".\n3. Batch-read relevant pages. Follow links.\n4. Synthesize with citations: (see [[wiki/sources/foo]]).\n5. Offer to file at wiki/synthesis/<slug>.md.\n\nSearch priority: concepts/ > areas/ > entities/ > sources/ > synthesis/.\nIf the wiki lacks information, say so plainly.\n"
+
+// wikiLintSkill is the skill content for multica-wiki-lint.
+const wikiLintSkill = "---\nname: multica-wiki-lint\ndescription: \"Audit the wiki — find contradictions, orphans, broken links. Read-only.\"\nuser-invocable: false\nallowed-tools: Bash(multica *)\n---\n\n# Wiki Lint\n\nAudit, do not edit. Return findings grouped by severity.\n\n## Seven checks\n1. Contradictions — incompatible claims, quote evidence.\n2. Stale claims — superseded by newer source.\n3. Orphan pages — no inbound links.\n4. Concept gaps — term on 3+ pages, no dedicated page.\n5. Broken [[wiki-links]] — target does not exist.\n6. Weak provenance — uncited or circular citations.\n7. Index/log drift — missing/phantom entries.\n\nOutput: triage list (Critical/Medium/Low). Each: file + evidence + fix.\nOnly write to wiki/log.md.\n"
+
+// wikiIndexRefreshSkill is the skill content for multica-wiki-index-refresh.
+const wikiIndexRefreshSkill = "---\nname: multica-wiki-index-refresh\ndescription: \"Rebuild wiki/index.md from the current page catalog.\"\nuser-invocable: false\nallowed-tools: Bash(multica *)\n---\n\n# Wiki Index Refresh\n\nRebuild the primary navigation aid.\n\n## Workflow\n1. List pages: multica wiki list-pages.\n2. Group by: sources/, projects/, areas/, entities/, concepts/, synthesis/.\n3. Write: - [[path]] — one-line summary.\n4. Write index: multica wiki write-page --path wiki/index.md.\n5. Append log entry.\n\nValidate: every listed page exists, every existing page is listed.\n"
 
 // BacklinksToJSON marshals a string slice to a JSON array for the backlinks column.
 func BacklinksToJSON(links []string) []byte {

@@ -224,7 +224,7 @@ func (h *Handler) CreateWikiSpace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Bootstrap initial wiki pages
-	if err := h.WikiService.BootstrapSpace(r.Context(), space.ID, req.Slug); err != nil {
+	if err := h.WikiService.BootstrapSpace(r.Context(), space.ID, req.Slug, parseUUID(workspaceID)); err != nil {
 		// Log but don't fail — the space was created successfully
 		slog.Warn("wiki: failed to bootstrap space", "space_id", uuidToString(space.ID), "error", err)
 	}
@@ -397,8 +397,8 @@ func (h *Handler) ListWikiPages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ensure bootstrap pages exist (idempotent — skips existing)
-	_ = h.WikiService.EnsureBootstrap(r.Context(), space.ID, slug)
+	// Ensure bootstrap pages + system skills exist (idempotent)
+	_ = h.WikiService.EnsureBootstrap(r.Context(), space.ID, slug, parseUUID(workspaceID))
 	pages, err = h.Queries.ListWikiPages(r.Context(), space.ID)
 	if err != nil {
 		pages = nil
