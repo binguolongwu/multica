@@ -198,6 +198,10 @@ Rules:
 - E2E tests should use `TestApiClient` for setup/teardown.
 - Prefer writing the failing test in the correct package before implementation when the change is behavioral.
 
+## Screenshots
+
+Browser QA and testing screenshots go under `docs/screenshot/`, never in the repo root.
+
 ## Verification
 
 For code changes, run the narrowest useful checks while iterating, then run broader verification when risk justifies it or when asked.
