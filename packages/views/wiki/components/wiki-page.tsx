@@ -10,6 +10,7 @@ import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@multica/ui/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/ui/tooltip";
+import { ActorAvatar } from "../../common/actor-avatar";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
@@ -85,11 +86,12 @@ export function WikiPage() {
         <div className="flex-1" />
         <Popover open={agentOpen} onOpenChange={setAgentOpen}>
           <PopoverTrigger>
-            <Button variant="outline" size="sm" className="h-8 w-56 justify-between text-xs font-normal">
+            <Button variant="outline" size="sm" className="h-8 w-64 justify-between text-xs font-normal">
               {selectedAgent ? (
                 <span className="flex items-center gap-1.5 truncate">
-                  <span className={`size-1.5 rounded-full ${selectedAgent.status === "idle" ? "bg-emerald-500" : selectedAgent.status === "working" ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                  <ActorAvatar actorType="agent" actorId={selectedAgent.id} size={18} showStatusDot />
                   {selectedAgent.name}
+                  <span className="text-muted-foreground">({selectedAgent.runtime_mode || "cloud"})</span>
                 </span>
               ) : <span className="text-muted-foreground">Wiki agent</span>}
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -114,9 +116,9 @@ export function WikiPage() {
                       className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${a.id === wikiAgentId ? "bg-accent" : ""}`}
                       onClick={() => { setWikiAgentId(a.id); setAgentOpen(false); setAgentSearch(""); }}
                     >
-                      <span className={`size-2 shrink-0 rounded-full ${a.status === "idle" ? "bg-emerald-500" : a.status === "working" ? "bg-amber-500" : a.status === "offline" ? "bg-muted-foreground" : "bg-muted-foreground"}`} />
+                      <ActorAvatar actorType="agent" actorId={a.id} size={20} showStatusDot />
                       <span className="flex-1 truncate font-medium">{a.name}</span>
-                      <span className="text-xs text-muted-foreground">{a.runtime_mode || "cloud"}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">({a.runtime_mode || "cloud"})</span>
                       {a.id === wikiAgentId && <Check className="h-4 w-4 shrink-0" />}
                     </button>
                   </TooltipTrigger>
