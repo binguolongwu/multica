@@ -362,6 +362,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// Wiki is a core feature gated by workspace settings.
 	{
 		h.WikiService = wiki.New(queries)
+		wikiIngestion := wiki.NewIngestionListener(queries, h.WikiService)
+		bus.SubscribeAll(wikiIngestion.HandleEvent)
 		slog.Info("wiki integration enabled")
 	}
 	if opts.HeartbeatScheduler != nil {
