@@ -42,7 +42,8 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
   const wsId = useWorkspaceId();
   const { t } = useT("layout");
   const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState(page.content);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
   const upsert = useUpsertWikiPage(wsId, spaceSlug);
 
   const { body, fm } = useMemo(() => parseFrontmatter(page.content), [page.content]);
@@ -53,8 +54,13 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
   const displayTitle = fm.title || page.title || page.path;
 
   const handleSave = () => {
+    // Rebuild content with frontmatter
+    const fmLines: string[] = ["---", `title: ${editTitle}`];
+    Object.entries(fm).filter(([k]) => k !== "title").forEach(([k, v]) => fmLines.push(`${k}: ${v}`));
+    fmLines.push("---");
+    const fullContent = fmLines.join("\n") + "\n\n" + editContent;
     upsert.mutate(
-      { path: page.path, data: { content: editContent, summary: "Manual edit" } },
+      { path: page.path, data: { content: fullContent, summary: "Manual edit" } },
       { onSuccess: () => setEditing(false) },
     );
   };
@@ -66,7 +72,7 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
           <div className="mb-6 flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
             {!editing && (
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Button variant="outline" size="sm" onClick={() => { setEditTitle(displayTitle); setEditContent(body); setEditing(true); }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.edit)}
               </Button>
             )}
@@ -90,10 +96,16 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
           )}
           {editing ? (
             <div className="space-y-4">
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Page title"
+              />
               <textarea className="min-h-[400px] w-full resize-y rounded-md border bg-background p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary" value={editContent} onChange={(e) => setEditContent(e.target.value)} />
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleSave} disabled={upsert.isPending}>{upsert.isPending ? t(($) => $.wiki_page.saving) : <><Check className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.save)}</>}</Button>
-                <Button size="sm" variant="outline" onClick={() => { setEditContent(page.content); setEditing(false); }}><X className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.cancel)}</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditTitle(displayTitle); setEditContent(body); setEditing(false); }}><X className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.cancel)}</Button>
               </div>
             </div>
           ) : (

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Globe, FileUp, PenLine, Inbox, Loader2 } from "lucide-react";
+import { Globe, FileUp, PenLine, Inbox, Loader2, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
 import { useCreateWikiSource, useCreateWikiOperation, wikiPagesOptions } from "@multica/core/wiki";
 import { useT } from "../../i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@multica/ui/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@multica/ui/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
@@ -30,6 +31,8 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [targetDir, setTargetDir] = useState("raw");
+  const [dirOpen, setDirOpen] = useState(false);
+  const [newDirName, setNewDirName] = useState("");
 
   const { data: inboxItems, isLoading: inboxLoading } = useQuery(inboxListOptions(wsId));
   const { data: pages } = useQuery(wikiPagesOptions(wsId, spaceSlug));
@@ -115,19 +118,36 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-[60vw] flex h-[80vh] flex-col overflow-hidden">
         <DialogHeader className="shrink-0"><DialogTitle>{t(($) => $.wiki_page.ingest_title)}</DialogTitle></DialogHeader>
-        {/* Target directory selector */}
+        {/* Target directory picker */}
         <div className="flex items-center gap-2 border-b pb-2">
-          <span className="shrink-0 text-xs text-muted-foreground">Import to:</span>
-          <select
-            className="h-7 flex-1 rounded border bg-background px-2 text-xs"
-            value={targetDir}
-            onChange={(e) => setTargetDir(e.target.value)}
-          >
-            {!rawDirs.includes("raw") && <option value="raw">raw/</option>}
-            {rawDirs.map((d) => (
-              <option key={d} value={d}>{d}/</option>
-            ))}
-          </select>
+          <span className="shrink-0 text-xs text-muted-foreground">{targetDir}/</span>
+          <Popover open={dirOpen} onOpenChange={setDirOpen}>
+            <PopoverTrigger>
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"><FolderOpen className="h-3.5 w-3.5" />Browse</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="start">
+              <div className="mb-2 flex gap-1">
+                <Input className="h-7 flex-1 text-xs" placeholder="New folder name" value={newDirName} onChange={(e) => setNewDirName(e.target.value)} />
+                <Button size="sm" className="h-7 px-2" variant="outline" onClick={() => {
+                  if (!newDirName.trim()) return;
+                  const newPath = `${targetDir}/${newDirName.trim()}`;
+                  createSource.mutate({ title: ".gitkeep", content: "", source_type: "meta", raw_path: `${newPath}/.gitkeep` }, {
+                    onSuccess: () => { setNewDirName(""); setTargetDir(newPath); },
+                  });
+                }}><Plus className="h-3.5 w-3.5" /></Button>
+              </div>
+              <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                <button className={`flex w-full items-center rounded px-2 py-1 text-xs hover:bg-accent ${targetDir === "raw" ? "bg-accent font-medium" : ""}`}
+                  onClick={() => { setTargetDir("raw"); setDirOpen(false); }}>raw/ (root)</button>
+                {rawDirs.map((d) => (
+                  <button key={d} className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs hover:bg-accent ${targetDir === d ? "bg-accent font-medium" : ""}`}
+                    onClick={() => { setTargetDir(d); setDirOpen(false); }}>
+                    <span className="truncate">{d}/</span>
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TabsList className="grid w-full shrink-0 grid-cols-4">
