@@ -109,6 +109,20 @@ import type {
   BeginLarkInstallResponse,
   LarkInstallStatusResponse,
   RedeemLarkBindingTokenResponse,
+  WikiSpace,
+  WikiPage,
+  WikiPageDetail,
+  WikiSource,
+  WikiOperation,
+  CreateWikiSpaceRequest,
+  UpdateWikiSpaceRequest,
+  WriteWikiPageRequest,
+  BatchReadWikiPagesRequest,
+  BatchWriteWikiPagesRequest,
+  CreateWikiSourceRequest,
+  CreateWikiOperationRequest,
+  ListWikiPagesParams,
+  ListWikiOperationsParams,
   Squad,
   SquadMember,
   SquadMemberStatusListResponse,
@@ -2216,5 +2230,90 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ token }),
     });
+  }
+
+  // ── Wiki integration ──
+
+  async listWikiSpaces(): Promise<WikiSpace[]> {
+    return this.fetch("/api/wiki/spaces");
+  }
+
+  async createWikiSpace(data: CreateWikiSpaceRequest): Promise<WikiSpace> {
+    return this.fetch("/api/wiki/spaces", { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async getWikiSpace(slug: string): Promise<WikiSpace> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`);
+  }
+
+  async updateWikiSpace(slug: string, data: UpdateWikiSpaceRequest): Promise<WikiSpace> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async deleteWikiSpace(slug: string): Promise<void> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}`, { method: "DELETE" });
+  }
+
+  async listWikiPages(slug: string, params?: ListWikiPagesParams): Promise<WikiPage[]> {
+    const search = new URLSearchParams();
+    if (params?.search) search.set("search", params.search);
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages?${search}`);
+  }
+
+  async getWikiPage(slug: string, path: string): Promise<WikiPageDetail> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`);
+  }
+
+  async upsertWikiPage(slug: string, path: string, data: WriteWikiPageRequest): Promise<WikiPage> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWikiPage(slug: string, path: string): Promise<void> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, { method: "DELETE" });
+  }
+
+  async batchReadWikiPages(slug: string, data: BatchReadWikiPagesRequest): Promise<{ pages: WikiPageDetail[] }> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/batch`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async batchWriteWikiPages(slug: string, data: BatchWriteWikiPagesRequest): Promise<{ pages: WikiPage[] }> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/batch-write`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async listWikiPageRevisions(slug: string, path: string): Promise<unknown[]> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}/revisions`);
+  }
+
+  async listWikiSources(slug: string): Promise<WikiSource[]> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources`);
+  }
+
+  async createWikiSource(slug: string, data: CreateWikiSourceRequest): Promise<WikiSource> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async getWikiSource(slug: string, id: string): Promise<WikiSource> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`);
+  }
+
+  async deleteWikiSource(slug: string, id: string): Promise<void> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/sources/${id}`, { method: "DELETE" });
+  }
+
+  async listWikiOperations(slug: string, params?: ListWikiOperationsParams): Promise<WikiOperation[]> {
+    const search = new URLSearchParams();
+    if (params?.limit) search.set("limit", String(params.limit));
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations?${search}`);
+  }
+
+  async createWikiOperation(slug: string, data: CreateWikiOperationRequest): Promise<WikiOperation> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async getWikiOperation(slug: string, id: string): Promise<WikiOperation> {
+    return this.fetch(`/api/wiki/spaces/${encodeURIComponent(slug)}/operations/${id}`);
   }
 }

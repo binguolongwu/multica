@@ -120,6 +120,27 @@ export type {
   RedeemLarkBindingTokenResponse,
 } from "./lark";
 export type {
+  WikiSpace,
+  WikiPage,
+  WikiPageDetail,
+  LinkInfo,
+  BacklinkInfo,
+  WikiSource,
+  WikiOperation,
+} from "../wiki/types";
+export type {
+  CreateWikiSpaceRequest,
+  UpdateWikiSpaceRequest,
+  WriteWikiPageRequest,
+  BatchReadWikiPagesRequest,
+  BatchWriteWikiPageRequest,
+  BatchWriteWikiPagesRequest,
+  CreateWikiSourceRequest,
+  CreateWikiOperationRequest,
+  ListWikiPagesParams,
+  ListWikiOperationsParams,
+} from "../wiki/types";
+export type {
   Autopilot,
   AutopilotStatus,
   AutopilotExecutionMode,

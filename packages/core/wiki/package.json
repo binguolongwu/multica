@@ -1,0 +1,10 @@
+{
+  "name": "@multica/wiki",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@multica/core": "workspace:*",
+    "@tanstack/react-query": "catalog:"
+  }
+}
