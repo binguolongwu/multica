@@ -2,13 +2,14 @@
 
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, BookOpen, Search, Loader2, Download } from "lucide-react";
+import { FileText, BookOpen, Search, Loader2, Download, ChevronDown, Check } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace } from "@multica/core/wiki";
 import { agentListOptions } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@multica/ui/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@multica/ui/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/ui/tooltip";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
@@ -25,6 +26,12 @@ export function WikiPage() {
   const [wikiAgentId, setWikiAgentId] = useState<string>("");
 
   const { data: agents } = useQuery(agentListOptions(wsId));
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentSearch, setAgentSearch] = useState("");
+  const filteredAgents = (agents || []).filter((a) =>
+    !agentSearch || a.name.toLowerCase().includes(agentSearch.toLowerCase()),
+  );
+  const selectedAgent = agents?.find((a) => a.id === wikiAgentId);
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
   const createSpace = useCreateWikiSpace(wsId);
@@ -76,16 +83,49 @@ export function WikiPage() {
         <BookOpen className="h-5 w-5 text-muted-foreground" />
         <h1 className="text-sm font-semibold">Wiki</h1>
         <div className="flex-1" />
-        <Select value={wikiAgentId} onValueChange={(v) => setWikiAgentId(v || "")}>
-          <SelectTrigger className="h-8 w-44 text-xs">
-            <SelectValue placeholder="Wiki agent" />
-          </SelectTrigger>
-          <SelectContent className="z-50">
-            {(agents || []).map((a) => (
-              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={agentOpen} onOpenChange={setAgentOpen}>
+          <PopoverTrigger>
+            <Button variant="outline" size="sm" className="h-8 w-56 justify-between text-xs font-normal">
+              {selectedAgent ? (
+                <span className="flex items-center gap-1.5 truncate">
+                  <span className={`size-1.5 rounded-full ${selectedAgent.status === "idle" ? "bg-emerald-500" : selectedAgent.status === "working" ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                  {selectedAgent.name}
+                </span>
+              ) : <span className="text-muted-foreground">Wiki agent</span>}
+              <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="start">
+            <div className="border-b px-3 py-2">
+              <input
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder="Search agents..."
+                value={agentSearch}
+                onChange={(e) => setAgentSearch(e.target.value)}
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1">
+              {filteredAgents.length === 0 ? (
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground">No agents found</p>
+              ) : filteredAgents.map((a) => (
+                <Tooltip key={a.id}>
+                  <TooltipTrigger>
+                    <button
+                      className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${a.id === wikiAgentId ? "bg-accent" : ""}`}
+                      onClick={() => { setWikiAgentId(a.id); setAgentOpen(false); setAgentSearch(""); }}
+                    >
+                      <span className={`size-2 shrink-0 rounded-full ${a.status === "idle" ? "bg-emerald-500" : a.status === "working" ? "bg-amber-500" : a.status === "offline" ? "bg-muted-foreground" : "bg-muted-foreground"}`} />
+                      <span className="flex-1 truncate font-medium">{a.name}</span>
+                      <span className="text-xs text-muted-foreground">{a.runtime_mode || "cloud"}</span>
+                      {a.id === wikiAgentId && <Check className="h-4 w-4 shrink-0" />}
+                    </button>
+                  </TooltipTrigger>
+                  {a.description && <TooltipContent side="right" className="max-w-xs">{a.description}</TooltipContent>}
+                </Tooltip>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
           <Download className="mr-1 h-4 w-4" />
           Ingest
