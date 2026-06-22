@@ -70,8 +70,9 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-[60vw] max-h-[80vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
+      <DialogContent className="!max-w-[60vw] flex max-h-[80vh] flex-col overflow-hidden">
+        <DialogHeader className="shrink-0"><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="inbox"><Inbox className="mr-1 h-3.5 w-3.5" />Inbox</TabsTrigger>
@@ -116,6 +117,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
             <Button onClick={handleMd} disabled={!md.trim() || busy} className="w-full"><PenLine className="mr-2 h-4 w-4" />Save to Wiki</Button>
           </TabsContent>
         </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
