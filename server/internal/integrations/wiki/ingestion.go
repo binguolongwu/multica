@@ -19,12 +19,14 @@ type IngestionListener struct {
 	settings IngestionSettings
 }
 
-// IngestionSettings controls which events are captured.
+// IngestionSettings controls which events are captured as wiki sources.
 type IngestionSettings struct {
-	Enabled          bool `json:"enabled"`
-	CaptureIssues    bool `json:"capture_issues"`
-	CaptureComments  bool `json:"capture_comments"`
-	MaxCharsPerEvent int  `json:"max_chars_per_event"`
+	Enabled          bool   `json:"enabled"`
+	CaptureIssues    bool   `json:"capture_issues"`
+	CaptureComments  bool   `json:"capture_comments"`
+	CaptureTasks     bool   `json:"capture_tasks"`
+	AutoCapture      string `json:"auto_capture"` // off, review, on
+	MaxCharsPerEvent int    `json:"max_chars_per_event"`
 }
 
 // DefaultIngestionSettings returns the default (disabled) settings.
@@ -33,6 +35,8 @@ func DefaultIngestionSettings() IngestionSettings {
 		Enabled:          false,
 		CaptureIssues:    true,
 		CaptureComments:  false,
+		CaptureTasks:     true,
+		AutoCapture:      "off",
 		MaxCharsPerEvent: 12000,
 	}
 }
@@ -66,6 +70,11 @@ func (l *IngestionListener) HandleEvent(e events.Event) {
 			return
 		}
 		l.captureCommentEvent(e)
+	case "task:completed":
+		if !l.settings.CaptureTasks || l.settings.AutoCapture == "off" {
+			return
+		}
+		l.captureTaskCompleted(e)
 	}
 }
 
@@ -147,4 +156,31 @@ func (l *IngestionListener) createSource(workspaceID, title, content, sourceType
 	}
 
 	slog.Info("wiki ingestion: captured source", "wid", workspaceID, "title", title)
+}
+
+func (l *IngestionListener) captureTaskCompleted(e events.Event) {
+	payload, ok := e.Payload.(map[string]any)
+	if !ok {
+		return
+	}
+	taskID, _ := payload["task_id"].(string)
+	agentName, _ := payload["agent_name"].(string)
+	issueTitle, _ := payload["issue_title"].(string)
+	if taskID == "" {
+		return
+	}
+
+	title := fmt.Sprintf("Task completed: %s", issueTitle)
+	if agentName != "" {
+		title = fmt.Sprintf("[%s] %s", agentName, title)
+	}
+
+	content := fmt.Sprintf("# Task Completed\n\n- **Task ID**: %s\n- **Agent**: %s\n- **Issue**: %s\n\nSee task details in Multica for the full result.",
+		taskID, agentName, issueTitle)
+
+	if l.settings.AutoCapture == "review" {
+		content += "\n\n> ⚠ Auto-captured — pending review before ingestion."
+	}
+
+	l.createSource(e.WorkspaceID, title, content, "task", taskID)
 }
