@@ -86,8 +86,8 @@ func InferPageType(path string) string {
 		return "concept"
 	case strings.HasPrefix(path, "wiki/synthesis/"):
 		return "synthesis"
-	case strings.HasPrefix(path, "wiki/learnings/"):
-		return "learning"
+	case strings.HasPrefix(path, "wiki/areas/"):
+		return "area"
 	case strings.HasPrefix(path, "wiki/retrospectives/"):
 		return "retrospective"
 	case path == "wiki/index.md":
@@ -140,7 +140,7 @@ func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug 
 		{
 			path:     "wiki/index.md",
 			title:    "Wiki Index",
-			content:  `# Wiki Index\n\n## Sources\n\n*(none yet)*\n\n## Projects\n\n*(none yet)*\n\n## Entities\n\n*(none yet)*\n\n## Concepts\n\n*(none yet)*\n\n## Synthesis\n\n*(none yet)*\n\n## Learnings\n\n*(none yet)*\n`,
+			content:  `# Wiki Index\n\n## Sources\n\n*(none yet)*\n\n## Projects\n\n*(none yet)*\n\n## Entities\n\n*(none yet)*\n\n## Concepts\n\n*(none yet)*\n\n## Synthesis\n\n*(none yet)*\n\n## Areas\n\n*(none yet)*\n`,
 			pageType: "index",
 		},
 		{
@@ -169,7 +169,7 @@ func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug 
 		{path: "wiki/entities/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 		{path: "wiki/concepts/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 		{path: "wiki/synthesis/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/learnings/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/areas/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 	}
 
 	for _, p := range pages {
@@ -215,7 +215,7 @@ the bookkeeping.
 │   ├── entities/     # people, organizations, products, places
 │   ├── concepts/     # ideas, frameworks, definitions
 │   ├── synthesis/    # cross-cutting analysis, comparisons, theses
-│   └── learnings/    # agent experience reports and reusable patterns
+│   └── areas/        # domain areas (PARA-style knowledge mapping)
 ` + "`" + "`" + "`" + `
 
 ## Page conventions

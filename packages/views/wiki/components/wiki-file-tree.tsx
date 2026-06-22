@@ -45,7 +45,7 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
   }
 
   // Ensure known directories appear even when empty
-  const knownDirs = ["raw", "wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/learnings"];
+  const knownDirs = ["raw", "wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/areas"];
   for (const dir of knownDirs) {
     if (pathMap.has(dir)) continue;
     const parts = dir.split("/");
