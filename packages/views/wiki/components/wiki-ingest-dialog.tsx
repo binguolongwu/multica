@@ -6,6 +6,7 @@ import { Globe, FileUp, PenLine, Inbox, Loader2 } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
 import { useCreateWikiSource } from "@multica/core/wiki";
+import { useT } from "../../i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@multica/ui/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
 import { Button } from "@multica/ui/components/ui/button";
@@ -17,6 +18,7 @@ interface Props { open: boolean; onOpenChange: (v: boolean) => void; spaceSlug: 
 
 export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
   const wsId = useWorkspaceId();
+  const { t } = useT("layout");
   const createSource = useCreateWikiSource(wsId, spaceSlug);
   const [tab, setTab] = useState("inbox");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -97,13 +99,13 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-[60vw] flex h-[80vh] flex-col overflow-hidden">
-        <DialogHeader className="shrink-0"><DialogTitle>Ingest Knowledge</DialogTitle></DialogHeader>
+        <DialogHeader className="shrink-0"><DialogTitle>{t(($) => $.wiki_page.ingest_title)}</DialogTitle></DialogHeader>
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TabsList className="grid w-full shrink-0 grid-cols-4">
-            <TabsTrigger value="inbox"><Inbox className="mr-1 h-3.5 w-3.5" />Inbox</TabsTrigger>
-            <TabsTrigger value="url"><Globe className="mr-1 h-3.5 w-3.5" />URL</TabsTrigger>
-            <TabsTrigger value="file"><FileUp className="mr-1 h-3.5 w-3.5" />File</TabsTrigger>
-            <TabsTrigger value="markdown"><PenLine className="mr-1 h-3.5 w-3.5" />Write</TabsTrigger>
+            <TabsTrigger value="inbox"><Inbox className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.ingest_inbox)}</TabsTrigger>
+            <TabsTrigger value="url"><Globe className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.ingest_url)}</TabsTrigger>
+            <TabsTrigger value="file"><FileUp className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.ingest_file)}</TabsTrigger>
+            <TabsTrigger value="markdown"><PenLine className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.ingest_write)}</TabsTrigger>
           </TabsList>
 
           {/* Inbox */}

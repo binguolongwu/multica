@@ -769,6 +769,20 @@ func (h *Handler) CreateWikiSource(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create wiki source")
 		return
 	}
+
+	// Also create a wiki page so the source appears in the raw/ tree
+	sourcePT := "source"
+	_, _ = h.Queries.UpsertWikiPage(r.Context(), db.UpsertWikiPageParams{
+		SpaceID:     space.ID,
+		Path:        rawPath,
+		Title:       pgtype.Text{String: req.Title, Valid: true},
+		PageType:    pgtype.Text{String: sourcePT, Valid: true},
+		Content:     req.Content,
+		Frontmatter: []byte("{}"),
+		Backlinks:   []byte("[]"),
+		ContentHash: contentHash,
+	})
+
 	writeJSON(w, http.StatusCreated, wikiSourceToResponse(source))
 }
 
