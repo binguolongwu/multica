@@ -277,6 +277,12 @@ export class PreviewUnsupportedError extends Error {
   }
 }
 
+// encodePathKeepSlash encodes URI components but preserves forward slashes,
+// so wiki page paths like "wiki/concepts/foo.md" stay as URL path segments.
+function encodePathKeepSlash(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
 export class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -2261,17 +2267,17 @@ export class ApiClient {
   }
 
   async getWikiPage(wsId: string, slug: string, path: string): Promise<WikiPageDetail> {
-    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`);
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodePathKeepSlash(path)}`);
   }
 
   async upsertWikiPage(wsId: string, slug: string, path: string, data: WriteWikiPageRequest): Promise<WikiPage> {
-    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodePathKeepSlash(path)}`, {
       method: "PUT", body: JSON.stringify(data),
     });
   }
 
   async deleteWikiPage(wsId: string, slug: string, path: string): Promise<void> {
-    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}`, { method: "DELETE" });
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodePathKeepSlash(path)}`, { method: "DELETE" });
   }
 
   async batchReadWikiPages(wsId: string, slug: string, data: BatchReadWikiPagesRequest): Promise<{ pages: WikiPageDetail[] }> {
@@ -2283,7 +2289,7 @@ export class ApiClient {
   }
 
   async listWikiPageRevisions(wsId: string, slug: string, path: string): Promise<unknown[]> {
-    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodeURIComponent(path)}/revisions`);
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/pages/${encodePathKeepSlash(path)}/revisions`);
   }
 
   async listWikiSources(wsId: string, slug: string): Promise<WikiSource[]> {

@@ -18,12 +18,12 @@ interface TreeNode {
 }
 
 function buildTree(pages: WikiPage[]): TreeNode[] {
-  const root: TreeNode = { name: "wiki", path: "wiki", isDir: true, children: [] };
+  // Use empty string as root so all top-level entries (AGENTS.md, IDEA.md, raw/, wiki/) are siblings
+  const root: TreeNode = { name: "", path: "", isDir: true, children: [] };
   const pathMap = new Map<string, TreeNode>();
-  pathMap.set("wiki", root);
+  pathMap.set("", root);
 
   for (const page of pages) {
-    // Skip gitkeep markers from display
     if (page.path.endsWith("/.gitkeep")) continue;
 
     const parts = page.path.split("/");
@@ -35,27 +35,26 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
       const prevPath = currentPath;
       currentPath = currentPath ? `${currentPath}/${part}` : part;
 
-      if (!pathMap.has(currentPath)) {
-        const node: TreeNode = { name: part, path: currentPath, isDir: !isLast, children: [] };
-        pathMap.set(currentPath, node);
-        const parent = pathMap.get(prevPath);
-        if (parent) parent.children.push(node);
-      }
+      if (pathMap.has(currentPath)) continue;
+
+      const node: TreeNode = { name: part, path: currentPath, isDir: !isLast, children: [] };
+      pathMap.set(currentPath, node);
+      const parent = pathMap.get(prevPath);
+      if (parent) parent.children.push(node);
     }
   }
 
-  // Ensure known top-level and wiki directories appear even if .gitkeep is the only child
+  // Ensure known directories appear even when empty
   const knownDirs = ["raw", "wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/learnings"];
   for (const dir of knownDirs) {
-    if (!pathMap.has(dir)) {
-      const parts = dir.split("/");
-      const name = parts[parts.length - 1] || dir;
-      const parentPath = parts.slice(0, -1).join("/");
-      const node: TreeNode = { name, path: dir, isDir: true, children: [] };
-      pathMap.set(dir, node);
-      const parent = pathMap.get(parentPath);
-      if (parent) parent.children.push(node);
-    }
+    if (pathMap.has(dir)) continue;
+    const parts = dir.split("/");
+    const name = parts[parts.length - 1] || dir;
+    const parentPath = parts.slice(0, -1).join("/");
+    const node: TreeNode = { name, path: dir, isDir: true, children: [] };
+    pathMap.set(dir, node);
+    const parent = pathMap.get(parentPath);
+    if (parent) parent.children.push(node);
   }
 
   const sortNode = (node: TreeNode) => {
