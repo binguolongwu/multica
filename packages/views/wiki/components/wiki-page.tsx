@@ -5,8 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2, Download } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace } from "@multica/core/wiki";
+import { agentListOptions } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@multica/ui/components/ui/select";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
@@ -20,6 +22,9 @@ export function WikiPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [spaceSlug] = useState(DEFAULT_SPACE);
   const [ingestOpen, setIngestOpen] = useState(false);
+  const [wikiAgentId, setWikiAgentId] = useState<string>("");
+
+  const { data: agents } = useQuery(agentListOptions(wsId));
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
   const createSpace = useCreateWikiSpace(wsId);
@@ -71,6 +76,16 @@ export function WikiPage() {
         <BookOpen className="h-5 w-5 text-muted-foreground" />
         <h1 className="text-sm font-semibold">Wiki</h1>
         <div className="flex-1" />
+        <Select value={wikiAgentId} onValueChange={(v) => setWikiAgentId(v || "")}>
+          <SelectTrigger className="h-8 w-44 text-xs">
+            <SelectValue placeholder="Wiki agent" />
+          </SelectTrigger>
+          <SelectContent className="z-50">
+            {(agents || []).map((a) => (
+              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
           <Download className="mr-1 h-4 w-4" />
           Ingest
