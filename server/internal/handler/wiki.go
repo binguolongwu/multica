@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -976,7 +978,18 @@ func (h *Handler) CrawlURL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	httpClient := &http.Client{Timeout: 15 * time.Second}
+	// Validate URL: only http/https, reject loopback/private/multicast
+	if err := validateCrawlURL(req.URL); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid URL: %s", err.Error()))
+		return
+	}
+
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	resp, err := httpClient.Get(req.URL)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -992,6 +1005,27 @@ func (h *Handler) CrawlURL(w http.ResponseWriter, r *http.Request) {
 		text = text[:10000]
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"content": text, "url": req.URL})
+}
+
+func validateCrawlURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http/https allowed")
+	}
+	host := u.Hostname()
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return nil // Allow if DNS fails — the HTTP client will surface the error
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("internal/private IP not allowed")
+		}
+	}
+	return nil
 }
 
 func htmlToText(s string) string {
