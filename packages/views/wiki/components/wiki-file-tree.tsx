@@ -23,6 +23,9 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
   pathMap.set("wiki", root);
 
   for (const page of pages) {
+    // Skip gitkeep markers from display
+    if (page.path.endsWith("/.gitkeep")) continue;
+
     const parts = page.path.split("/");
     let currentPath = "";
     for (let i = 0; i < parts.length; i++) {
@@ -38,6 +41,20 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
         const parent = pathMap.get(prevPath);
         if (parent) parent.children.push(node);
       }
+    }
+  }
+
+  // Ensure known wiki directories appear even if .gitkeep is the only child
+  const knownDirs = ["wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/learnings"];
+  for (const dir of knownDirs) {
+    if (!pathMap.has(dir)) {
+      const parts = dir.split("/");
+      const name = parts[parts.length - 1] || dir;
+      const parentPath = parts.slice(0, -1).join("/");
+      const node: TreeNode = { name, path: dir, isDir: true, children: [] };
+      pathMap.set(dir, node);
+      const parent = pathMap.get(parentPath);
+      if (parent) parent.children.push(node);
     }
   }
 

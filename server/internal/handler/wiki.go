@@ -397,15 +397,11 @@ func (h *Handler) ListWikiPages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-bootstrap initial pages if space is empty
-	if len(pages) == 0 {
-		if err := h.WikiService.BootstrapSpace(r.Context(), space.ID, slug); err != nil {
-			slog.Warn("wiki: auto-bootstrap pages failed", "space_id", uuidToString(space.ID), "error", err)
-		}
-		pages, err = h.Queries.ListWikiPages(r.Context(), space.ID)
-		if err != nil {
-			pages = nil
-		}
+	// Ensure bootstrap pages exist (idempotent — skips existing)
+	_ = h.WikiService.EnsureBootstrap(r.Context(), space.ID, slug)
+	pages, err = h.Queries.ListWikiPages(r.Context(), space.ID)
+	if err != nil {
+		pages = nil
 	}
 	if pages == nil {
 		pages = []db.WikiPage{}

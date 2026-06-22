@@ -107,7 +107,7 @@ export function WikiPage() {
               <Skeleton className="h-4 w-5/6" />
             </div>
           ) : pageDetail ? (
-            <WikiPageViewer page={pageDetail} />
+            <WikiPageViewer page={pageDetail} spaceSlug={spaceSlug} />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Page not found

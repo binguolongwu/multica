@@ -120,8 +120,17 @@ func (s *Service) EnsureDefaultSpace(ctx context.Context, workspaceID pgtype.UUI
 	return space, nil
 }
 
-// BootstrapSpace creates the initial wiki pages for a new space.
+// EnsureBootstrap ensures a space has all initial pages. Idempotent — skips existing pages.
+func (s *Service) EnsureBootstrap(ctx context.Context, spaceID pgtype.UUID, slug string) error {
+	return s.bootstrapPages(ctx, spaceID, slug)
+}
+
+// BootstrapSpace creates the initial wiki pages for a new space (alias for EnsureBootstrap).
 func (s *Service) BootstrapSpace(ctx context.Context, spaceID pgtype.UUID, slug string) error {
+	return s.bootstrapPages(ctx, spaceID, slug)
+}
+
+func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug string) error {
 	pages := []struct {
 		path     string
 		title    string
@@ -152,6 +161,13 @@ func (s *Service) BootstrapSpace(ctx context.Context, spaceID pgtype.UUID, slug 
 			content:  ideaMdTemplate,
 			pageType: "meta",
 		},
+		// Directory markers — ensure empty dirs appear in tree
+		{path: "wiki/sources/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/projects/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/entities/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/concepts/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/synthesis/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		{path: "wiki/learnings/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 	}
 
 	for _, p := range pages {
