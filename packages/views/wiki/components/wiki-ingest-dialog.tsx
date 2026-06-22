@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Globe, FileUp, PenLine, Inbox, Loader2, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { Globe, FileUp, PenLine, Inbox, Loader2, FolderOpen, Plus, Trash2, ChevronRight, ChevronDown, Folder } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
 import { useCreateWikiSource, useCreateWikiOperation, wikiPagesOptions } from "@multica/core/wiki";
@@ -118,34 +118,25 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-[60vw] flex h-[80vh] flex-col overflow-hidden">
         <DialogHeader className="shrink-0"><DialogTitle>{t(($) => $.wiki_page.ingest_title)}</DialogTitle></DialogHeader>
-        {/* Target directory picker */}
+        {/* Directory tree picker */}
         <div className="flex items-center gap-2 border-b pb-2">
-          <span className="shrink-0 text-xs text-muted-foreground">{targetDir}/</span>
+          <span className="shrink-0 text-xs text-muted-foreground">Import to: {targetDir}/</span>
           <Popover open={dirOpen} onOpenChange={setDirOpen}>
             <PopoverTrigger>
               <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"><FolderOpen className="h-3.5 w-3.5" />Browse</Button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-              <div className="mb-2 flex gap-1">
-                <Input className="h-7 flex-1 text-xs" placeholder="New folder name" value={newDirName} onChange={(e) => setNewDirName(e.target.value)} />
-                <Button size="sm" className="h-7 px-2" variant="outline" onClick={() => {
-                  if (!newDirName.trim()) return;
-                  const newPath = `${targetDir}/${newDirName.trim()}`;
-                  createSource.mutate({ title: ".gitkeep", content: "", source_type: "meta", raw_path: `${newPath}/.gitkeep` }, {
-                    onSuccess: () => { setNewDirName(""); setTargetDir(newPath); },
+            <PopoverContent className="w-72 p-0" align="start">
+              <DirTree
+                dirs={["raw", ...rawDirs]}
+                selected={targetDir}
+                onSelect={(d) => { setTargetDir(d); setDirOpen(false); }}
+                onCreateDir={(parent, name) => {
+                  const np = `${parent}/${name}`;
+                  createSource.mutate({ title: ".gitkeep", content: "", source_type: "meta", raw_path: `${np}/.gitkeep` }, {
+                    onSuccess: () => setTargetDir(np),
                   });
-                }}><Plus className="h-3.5 w-3.5" /></Button>
-              </div>
-              <div className="max-h-48 space-y-0.5 overflow-y-auto">
-                <button className={`flex w-full items-center rounded px-2 py-1 text-xs hover:bg-accent ${targetDir === "raw" ? "bg-accent font-medium" : ""}`}
-                  onClick={() => { setTargetDir("raw"); setDirOpen(false); }}>raw/ (root)</button>
-                {rawDirs.map((d) => (
-                  <button key={d} className={`flex w-full items-center justify-between rounded px-2 py-1 text-xs hover:bg-accent ${targetDir === d ? "bg-accent font-medium" : ""}`}
-                    onClick={() => { setTargetDir(d); setDirOpen(false); }}>
-                    <span className="truncate">{d}/</span>
-                  </button>
-                ))}
-              </div>
+                }}
+              />
             </PopoverContent>
           </Popover>
         </div>
@@ -220,5 +211,84 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// DirTree builds a tree of directory paths and renders with expand/collapse,
+// folder creation, and selection.
+function DirTree({ dirs, selected, onSelect, onCreateDir }: {
+  dirs: string[];
+  selected: string;
+  onSelect: (d: string) => void;
+  onCreateDir: (parent: string, name: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(["raw"]));
+  const [newName, setNewName] = useState("");
+  const [addTo, setAddTo] = useState<string | null>(null);
+
+  // Build tree from flat dir list
+  const tree = useMemo(() => {
+    const root: Record<string, any> = { name: "raw", path: "raw", children: {} };
+    for (const d of dirs) {
+      if (d === "raw") continue;
+      const parts = d.split("/");
+      let node = root;
+      for (const p of parts.slice(1)) {
+        if (!node.children[p]) node.children[p] = { name: p, path: node.path + "/" + p, children: {} };
+        node = node.children[p];
+      }
+    }
+    return root;
+  }, [dirs]);
+
+  const toggle = (p: string) => { const s = new Set(expanded); s.has(p) ? s.delete(p) : s.add(p); setExpanded(s); };
+
+  const renderNode = (node: any, depth: number) => {
+    const isOpen = expanded.has(node.path);
+    const children = Object.values(node.children) as any[];
+    return (
+      <div key={node.path}>
+        <div className={`flex items-center gap-1 rounded px-1 py-0.5 hover:bg-accent ${selected === node.path ? "bg-accent" : ""}`}
+          style={{ paddingLeft: 8 + depth * 16 }}>
+          <button className="flex h-5 w-5 items-center justify-center shrink-0" onClick={() => toggle(node.path)}>
+            {children.length > 0 ? (isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />) : <span className="w-3" />}
+          </button>
+          <button className="flex-1 text-left text-xs flex items-center gap-1" onClick={() => onSelect(node.path)}>
+            {isOpen ? <FolderOpen className="h-3.5 w-3.5 text-amber-500" /> : <Folder className="h-3.5 w-3.5 text-amber-500" />}
+            <span className="truncate">{node.name}</span>
+          </button>
+          <button className="shrink-0 rounded p-0.5 hover:bg-muted" title="New folder"
+            onClick={(e) => { e.stopPropagation(); setAddTo(node.path); setNewName(""); }}>
+            <Plus className="h-3 w-3" />
+          </button>
+        </div>
+        {isOpen && children.map((c: any) => renderNode(c, depth + 1))}
+        {addTo === node.path && (
+          <div className="flex gap-1 px-1 py-0.5" style={{ paddingLeft: 24 + (depth + 1) * 16 }}>
+            <Input className="h-6 flex-1 text-xs" autoFocus placeholder="name" value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) { onCreateDir(node.path, newName.trim()); setAddTo(null); } if (e.key === "Escape") setAddTo(null); }} />
+            <Button size="sm" className="h-6 px-2 text-xs" variant="outline"
+              onClick={() => { if (newName.trim()) { onCreateDir(node.path, newName.trim()); setAddTo(null); } }}>
+              OK
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div className="border-b px-2 py-1.5 text-xs font-medium text-muted-foreground">Select target directory</div>
+      <div className="max-h-64 overflow-y-auto p-1">
+        {renderNode(tree, 0)}
+      </div>
+      <div className="border-t px-2 py-1.5">
+        <Button size="sm" className="h-7 w-full text-xs" variant="outline" onClick={() => onSelect(selected)}>
+          Confirm: {selected}/
+        </Button>
+      </div>
+    </div>
   );
 }
