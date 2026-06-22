@@ -663,6 +663,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/spaces/{slug}/sources", h.CreateWikiSource)
 					r.Get("/spaces/{slug}/sources/{id}", h.GetWikiSource)
 					r.Delete("/spaces/{slug}/sources/{id}", h.DeleteWikiSource)
+					r.Post("/spaces/{slug}/crawl", h.CrawlURL)
 					r.Get("/spaces/{slug}/operations", h.ListWikiOperations)
 					r.Post("/spaces/{slug}/operations", h.CreateWikiOperation)
 					r.Get("/spaces/{slug}/operations/{id}", h.GetWikiOperation)

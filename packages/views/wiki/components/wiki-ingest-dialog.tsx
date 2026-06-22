@@ -70,9 +70,14 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     if (!url) return;
     setBusy("url"); setError("");
     try {
-      const resp = await fetch(url.startsWith("http") ? url : `https://${url}`);
-      const text = await resp.text();
-      setUrlPreview(text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 5000));
+      const token = localStorage.getItem("multica_token") || "";
+      const resp = await fetch(`/api/workspaces/${wsId}/wiki/spaces/${spaceSlug}/crawl`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ url: url.startsWith("http") ? url : `https://${url}` }),
+      });
+      const data = await resp.json();
+      setUrlPreview(data.content || "No content fetched");
     } catch (e: any) { setUrlPreview(`Crawl failed: ${e?.message || "unknown error"}`); }
     setBusy("");
   };

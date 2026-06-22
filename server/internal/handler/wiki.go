@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -957,6 +960,49 @@ func (h *Handler) GetWikiOperation(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── Response converters ──
+
+// CrawlURL handles POST /wiki/spaces/{slug}/crawl — server-side URL fetch
+func (h *Handler) CrawlURL(w http.ResponseWriter, r *http.Request) {
+	if !h.hasWiki() {
+		writeError(w, http.StatusServiceUnavailable, "wiki is not configured")
+		return
+	}
+	_, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	var req struct{ URL string `json:"url"` }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	resp, err := httpClient.Get(req.URL)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"content": fmt.Sprintf("Failed to fetch URL: %s", err.Error()),
+			"url":     req.URL,
+		})
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	text := htmlToText(string(body))
+	if len(text) > 10000 {
+		text = text[:10000]
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"content": text, "url": req.URL})
+}
+
+func htmlToText(s string) string {
+	re := regexp.MustCompile(`(?is)<(script|style|noscript)[^>]*>.*?</(script|style|noscript)>`)
+	s = re.ReplaceAllString(s, "")
+	re2 := regexp.MustCompile(`<[^>]*>`)
+	s = re2.ReplaceAllString(s, " ")
+	re3 := regexp.MustCompile(`\s+`)
+	s = re3.ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
+}
 
 func wikiSpaceToResponse(s db.WikiSpace) wikiSpaceResponse {
 	return wikiSpaceResponse{
