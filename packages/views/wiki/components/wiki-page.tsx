@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, BookOpen, Search, Loader2 } from "lucide-react";
+import { FileText, BookOpen, Search, Loader2, Download } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace } from "@multica/core/wiki";
 import { Button } from "@multica/ui/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@multica/ui/components/ui/input";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
+import { WikiIngestDialog } from "./wiki-ingest-dialog";
 
 const DEFAULT_SPACE = "default";
 
@@ -18,6 +19,7 @@ export function WikiPage() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [spaceSlug] = useState(DEFAULT_SPACE);
+  const [ingestOpen, setIngestOpen] = useState(false);
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
   const createSpace = useCreateWikiSpace(wsId);
@@ -69,6 +71,10 @@ export function WikiPage() {
         <BookOpen className="h-5 w-5 text-muted-foreground" />
         <h1 className="text-sm font-semibold">Wiki</h1>
         <div className="flex-1" />
+        <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
+          <Download className="mr-1 h-4 w-4" />
+          Ingest
+        </Button>
         <div className="relative w-64">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -115,6 +121,8 @@ export function WikiPage() {
           )}
         </div>
       </div>
+
+      <WikiIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} spaceSlug={spaceSlug} />
     </div>
   );
 }
