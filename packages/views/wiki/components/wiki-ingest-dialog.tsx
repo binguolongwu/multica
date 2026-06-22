@@ -28,7 +28,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
   const [urlPreview, setUrlPreview] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [md, setMd] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [targetDir, setTargetDir] = useState("raw");
   const [dirOpen, setDirOpen] = useState(false);
@@ -44,17 +44,17 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
   )].sort();
 
   const done = () => {
-    setBusy(false); setError(""); onOpenChange(false);
+    setBusy(""); setError(""); onOpenChange(false);
     // Trigger wiki maintainer agent to organize ingested content
     if (wikiAgentId) {
       createOp.mutate({ operation_type: "ingest", title: "Process new raw sources", prompt: "Review raw/ for new sources and ingest them into wiki/." });
     }
   };
-  const fail = (msg: string) => { setError(msg); setBusy(false); };
+  const fail = (msg: string) => { setError(msg); setBusy(""); };
 
   const handleInbox = () => {
     if (selected.size === 0) return;
-    setBusy(true); setError("");
+    setBusy("inbox"); setError("");
     const ids = Array.from(selected);
     let remaining = ids.length;
     ids.forEach((id) => {
@@ -68,18 +68,18 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
 
   const handleCrawl = async () => {
     if (!url) return;
-    setBusy(true); setError("");
+    setBusy("url"); setError("");
     try {
       const resp = await fetch(url.startsWith("http") ? url : `https://${url}`);
       const text = await resp.text();
       setUrlPreview(text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 5000));
     } catch (e: any) { setUrlPreview(`Crawl failed: ${e?.message || "unknown error"}`); }
-    setBusy(false);
+    setBusy("");
   };
 
   const handleUrl = () => {
     if (!url) return;
-    setBusy(true); setError("");
+    setBusy("url"); setError("");
     createSource.mutate(
       { title: url, content: urlPreview || `# URL Source\n\n${url}`, url, source_type: "url", raw_path: `${targetDir}/url-${Date.now()}.md` },
       { onSuccess: () => { setUrl(""); setUrlPreview(""); done(); }, onError: (e: any) => fail(e?.message || "Failed") },
@@ -88,7 +88,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
 
   const handleFile = () => {
     if (!file) return;
-    setBusy(true); setError("");
+    setBusy("file"); setError("");
     const isText = file.name.endsWith(".md") || file.name.endsWith(".txt");
     const reader = new FileReader();
     reader.onload = () => {
@@ -104,7 +104,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
 
   const handleMd = () => {
     if (!md.trim()) return;
-    setBusy(true); setError("");
+    setBusy("markdown"); setError("");
     const firstLine = md.trim().split("\n")[0]?.replace(/^#\s*/, "") || "Manual entry";
     createSource.mutate(
       { title: firstLine, content: md, source_type: "manual", raw_path: `${targetDir}/manual-${Date.now()}.md` },
@@ -163,8 +163,8 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
               </div>
             )}
             {error && <p className="shrink-0 text-xs text-destructive">{error}</p>}
-            <Button onClick={handleInbox} disabled={selected.size === 0 || busy} className="shrink-0">
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Ingest{selected.size > 0 ? ` (${selected.size})` : ""}
+            <Button onClick={handleInbox} disabled={selected.size === 0 || busy === "inbox"} className="shrink-0">
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t(($) => $.wiki_page.ingest)}{selected.size > 0 ? ` (${selected.size})` : ""}
             </Button>
           </TabsContent>
 
@@ -172,7 +172,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
           <TabsContent value="url" className="flex min-h-0 flex-1 flex-col space-y-2 pt-2 data-[state=inactive]:hidden">
             <div className="flex shrink-0 gap-2">
               <Input placeholder="https://example.com/article" value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1" />
-              <Button variant="outline" onClick={handleCrawl} disabled={!url || busy}>
+              <Button variant="outline" onClick={handleCrawl} disabled={!url || busy === "url"}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="mr-1 h-4 w-4" />}Crawl
               </Button>
             </div>
@@ -184,8 +184,8 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
               )}
             </div>
             {error && <p className="shrink-0 text-xs text-destructive">{error}</p>}
-            <Button onClick={handleUrl} disabled={!url || busy} className="shrink-0">
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Ingest
+            <Button onClick={handleUrl} disabled={!url || busy === "url"} className="shrink-0">
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t(($) => $.wiki_page.ingest)}
             </Button>
           </TabsContent>
 
@@ -195,8 +195,8 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
             {file && <p className="shrink-0 text-xs text-muted-foreground">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>}
             <div className="flex-1" />
             {error && <p className="shrink-0 text-xs text-destructive">{error}</p>}
-            <Button onClick={handleFile} disabled={!file || busy} className="shrink-0">
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Ingest
+            <Button onClick={handleFile} disabled={!file || busy === "file"} className="shrink-0">
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t(($) => $.wiki_page.ingest)}
             </Button>
           </TabsContent>
 
@@ -204,8 +204,8 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
           <TabsContent value="markdown" className="flex min-h-0 flex-1 flex-col space-y-2 pt-2 data-[state=inactive]:hidden">
             <Textarea className="min-h-0 flex-1 resize-none font-mono text-sm" placeholder="# Title\n\nWrite here..." value={md} onChange={(e) => setMd(e.target.value)} />
             {error && <p className="shrink-0 text-xs text-destructive">{error}</p>}
-            <Button onClick={handleMd} disabled={!md.trim() || busy} className="shrink-0">
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Ingest
+            <Button onClick={handleMd} disabled={!md.trim() || busy === "markdown"} className="shrink-0">
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t(($) => $.wiki_page.ingest)}
             </Button>
           </TabsContent>
         </Tabs>
