@@ -1,6 +1,7 @@
 "use client";
 
 import { LarkTab } from "./lark-tab";
+import { WikiSettingsTab } from "../../wiki/components/wiki-settings-tab";
 import { useT } from "../../i18n";
 
 // Integrations is the umbrella tab for third-party platform connections.
@@ -13,6 +14,11 @@ export function IntegrationsTab() {
   const { t } = useT("settings");
   return (
     <div className="space-y-10">
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold">Wiki</h2>
+        <WikiSettingsTab />
+      </section>
+
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">{t(($) => $.lark.section_title)}</h2>
         <LarkTab />
