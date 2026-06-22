@@ -44,8 +44,8 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
     }
   }
 
-  // Ensure known wiki directories appear even if .gitkeep is the only child
-  const knownDirs = ["wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/learnings"];
+  // Ensure known top-level and wiki directories appear even if .gitkeep is the only child
+  const knownDirs = ["raw", "wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/learnings"];
   for (const dir of knownDirs) {
     if (!pathMap.has(dir)) {
       const parts = dir.split("/");

@@ -161,7 +161,9 @@ func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug 
 			content:  ideaMdTemplate,
 			pageType: "meta",
 		},
-		// Directory markers — ensure empty dirs appear in tree
+		// raw/ directory — imported raw documents
+		{path: "raw/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
+		// wiki/ directory markers — ensure empty dirs appear in tree
 		{path: "wiki/sources/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 		{path: "wiki/projects/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
 		{path: "wiki/entities/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
@@ -204,6 +206,7 @@ the bookkeeping.
 .
 ├── AGENTS.md         # this file — operating instructions
 ├── IDEA.md           # the pattern this wiki follows
+├── raw/              # imported raw documents (read-only)
 ├── wiki/
 │   ├── index.md      # catalog of all pages
 │   ├── log.md        # append-only timeline of operations
