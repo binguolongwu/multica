@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Globe, FileUp, PenLine, Inbox, Loader2 } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
-import { useCreateWikiSource, useCreateWikiOperation } from "@multica/core/wiki";
+import { useCreateWikiSource, useCreateWikiOperation, wikiPagesOptions } from "@multica/core/wiki";
 import { useT } from "../../i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@multica/ui/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
@@ -29,8 +29,16 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
   const [md, setMd] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [targetDir, setTargetDir] = useState("raw");
 
   const { data: inboxItems, isLoading: inboxLoading } = useQuery(inboxListOptions(wsId));
+  const { data: pages } = useQuery(wikiPagesOptions(wsId, spaceSlug));
+
+  // Build available directories under raw/ from existing pages
+  const rawDirs = [...new Set((pages || [])
+    .filter((p) => p.path.startsWith("raw/"))
+    .map((p) => { const parts = p.path.split("/"); parts.pop(); return parts.join("/"); })
+  )].sort();
 
   const done = () => {
     setBusy(false); setError(""); onOpenChange(false);
@@ -49,7 +57,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     ids.forEach((id) => {
       const item = inboxItems?.find((i) => i.id === id);
       createSource.mutate(
-        { title: item?.title || `Inbox ${id}`, content: `# ${item?.title || "Inbox item"}\n\n${item?.body || ""}`, source_type: "inbox", raw_path: `raw/inbox-${Date.now()}.md` },
+        { title: item?.title || `Inbox ${id}`, content: `# ${item?.title || "Inbox item"}\n\n${item?.body || ""}`, source_type: "inbox", raw_path: `${targetDir}/inbox-${Date.now()}.md` },
         { onSuccess: () => { if (--remaining === 0) { setSelected(new Set()); done(); } }, onError: (e: any) => fail(e?.message || "Import failed") },
       );
     });
@@ -70,7 +78,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     if (!url) return;
     setBusy(true); setError("");
     createSource.mutate(
-      { title: url, content: urlPreview || `# URL Source\n\n${url}`, url, source_type: "url", raw_path: `raw/url-${Date.now()}.md` },
+      { title: url, content: urlPreview || `# URL Source\n\n${url}`, url, source_type: "url", raw_path: `${targetDir}/url-${Date.now()}.md` },
       { onSuccess: () => { setUrl(""); setUrlPreview(""); done(); }, onError: (e: any) => fail(e?.message || "Failed") },
     );
   };
@@ -83,7 +91,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     reader.onload = () => {
       const content = isText ? (reader.result as string) : `# ${file.name}\n\n> Binary file.\n> Size: ${(file.size / 1024).toFixed(1)} KB`;
       createSource.mutate(
-        { title: file.name, content, source_type: "file", raw_path: `raw/${file.name}` },
+        { title: file.name, content, source_type: "file", raw_path: `${targetDir}/${file.name}` },
         { onSuccess: () => { setFile(null); done(); }, onError: (e: any) => fail(e?.message || "Upload failed") },
       );
     };
@@ -96,7 +104,7 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     setBusy(true); setError("");
     const firstLine = md.trim().split("\n")[0]?.replace(/^#\s*/, "") || "Manual entry";
     createSource.mutate(
-      { title: firstLine, content: md, source_type: "manual", raw_path: `raw/manual-${Date.now()}.md` },
+      { title: firstLine, content: md, source_type: "manual", raw_path: `${targetDir}/manual-${Date.now()}.md` },
       { onSuccess: () => { setMd(""); done(); }, onError: (e: any) => fail(e?.message || "Save failed") },
     );
   };
@@ -107,6 +115,20 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-[60vw] flex h-[80vh] flex-col overflow-hidden">
         <DialogHeader className="shrink-0"><DialogTitle>{t(($) => $.wiki_page.ingest_title)}</DialogTitle></DialogHeader>
+        {/* Target directory selector */}
+        <div className="flex items-center gap-2 border-b pb-2">
+          <span className="shrink-0 text-xs text-muted-foreground">Import to:</span>
+          <select
+            className="h-7 flex-1 rounded border bg-background px-2 text-xs"
+            value={targetDir}
+            onChange={(e) => setTargetDir(e.target.value)}
+          >
+            {!rawDirs.includes("raw") && <option value="raw">raw/</option>}
+            {rawDirs.map((d) => (
+              <option key={d} value={d}>{d}/</option>
+            ))}
+          </select>
+        </div>
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TabsList className="grid w-full shrink-0 grid-cols-4">
             <TabsTrigger value="inbox"><Inbox className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.ingest_inbox)}</TabsTrigger>
