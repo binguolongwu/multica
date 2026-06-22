@@ -664,7 +664,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Get("/spaces/{slug}/pages/*", h.GetWikiPage)
 			r.Put("/spaces/{slug}/pages/*", h.UpsertWikiPage)
 			r.Delete("/spaces/{slug}/pages/*", h.DeleteWikiPage)
-			r.Get("/spaces/{slug}/pages/*/revisions", h.ListWikiPageRevisions)
+			// Revisions use a query param on the page endpoint instead:
+			// GET /spaces/{slug}/pages/{path}?revisions=true
+			r.Get("/spaces/{slug}/page-revisions/*", h.ListWikiPageRevisions)
 
 			// Sources
 			r.Get("/spaces/{slug}/sources", h.ListWikiSources)
