@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/
 import { ActorAvatar } from "../../common/actor-avatar";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { useT } from "../../i18n";
+import { toast } from "sonner";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
 import { WikiIngestDialog } from "./wiki-ingest-dialog";
@@ -69,7 +70,10 @@ export function WikiPage() {
   );
 
   const handleSelectPage = useCallback((path: string) => {
-    setSelectedPath(path);
+    // Append .md to paths without an extension so [[wiki/entities/foo]] resolves.
+    const last = path.split("/").pop() || "";
+    const resolved = last.includes(".") ? path : `${path}.md`;
+    setSelectedPath(resolved);
     setSearchQuery("");
   }, []);
 
@@ -195,7 +199,7 @@ export function WikiPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => { if (!wikiAgentId) { toast.error(t(($) => $.wiki_page.ingest_need_agent)); return; } setIngestOpen(true); }}>
           <Download className="mr-1 h-4 w-4" />
           {t(($) => $.wiki_page.ingest)}
         </Button>

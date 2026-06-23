@@ -39,9 +39,10 @@ function extractHeadings(content: string): { id: string; text: string; level: nu
 }
 
 function resolveWikilinks(content: string): string {
+  // Convert [[path/to/page]] → [display](#wiki-path--encoded)
   return content.replace(/\[\[([^\]]+)\]\]/g, (_m, path: string) => {
     const display = path.split("/").pop() || path;
-    return `<a class="wiki-link" data-wiki-path="${path}" href="#">${display}</a>`;
+    return `[${display}](#wiki-path--${encodeURIComponent(path)})`;
   });
 }
 
@@ -119,11 +120,15 @@ export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page
           ) : (
             <div
             className="prose prose-sm max-w-none dark:prose-invert"
-            onClick={(e) => {
-              const anchor = (e.target as HTMLElement).closest("a.wiki-link");
+            onClickCapture={(e) => {
+              const target = e.target as HTMLElement;
+              const anchor = target.closest<HTMLAnchorElement>("a[href]");
               if (!anchor) return;
+              const href = anchor.getAttribute("href") || "";
+              if (!href.startsWith("#wiki-path--")) return;
               e.preventDefault();
-              const path = anchor.getAttribute("data-wiki-path");
+              e.stopPropagation();
+              const path = decodeURIComponent(href.slice("#wiki-path--".length));
               if (path && onSelect) onSelect(path);
             }}
           >

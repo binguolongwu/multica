@@ -21,7 +21,7 @@
     "feedback": "Feedback"
   },
   "wiki_page": {
-    "title": "Wiki", "ingest": "Ingest", "wiki_agent": "Wiki agent", "search": "Search wiki...",
+    "title": "Wiki", "ingest": "Ingest", "ingest_need_agent": "Please select a Wiki admin agent first", "wiki_agent": "Wiki agent", "search": "Search wiki...",
     "edit": "Edit", "save": "Save", "cancel": "Cancel", "saving": "Saving...",
     "links": "Links", "backlinks": "Backlinks", "properties": "Properties", "on_this_page": "On this page",
     "no_pages": "No pages yet", "select_page": "Select a page from the tree to read",
