@@ -1888,6 +1888,36 @@ func (q *Queries) ListActiveTasksByIssue(ctx context.Context, issueID pgtype.UUI
 	return items, nil
 }
 
+const listAgentRuntimeProviders = `-- name: ListAgentRuntimeProviders :many
+SELECT ar.id, ar.provider FROM agent_runtime ar
+WHERE ar.id = ANY($1::uuid[])
+`
+
+type ListAgentRuntimeProvidersRow struct {
+	ID       pgtype.UUID `json:"id"`
+	Provider string      `json:"provider"`
+}
+
+func (q *Queries) ListAgentRuntimeProviders(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAgentRuntimeProvidersRow, error) {
+	rows, err := q.db.Query(ctx, listAgentRuntimeProviders, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAgentRuntimeProvidersRow{}
+	for rows.Next() {
+		var i ListAgentRuntimeProvidersRow
+		if err := rows.Scan(&i.ID, &i.Provider); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentTasks = `-- name: ListAgentTasks :many
 SELECT id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id FROM agent_task_queue
 WHERE agent_id = $1

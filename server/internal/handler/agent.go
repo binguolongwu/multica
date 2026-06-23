@@ -60,8 +60,9 @@ type AgentResponse struct {
 	// ThinkingLevel is the runtime-native reasoning/effort token persisted
 	// for this agent (empty = use runtime default). The picker is per-runtime
 	// per-model; the API never normalizes across providers. See MUL-2339.
-	ThinkingLevel string              `json:"thinking_level"`
-	OwnerID       *string             `json:"owner_id"`
+	ThinkingLevel   string              `json:"thinking_level"`
+	RuntimeProvider string              `json:"runtime_provider,omitempty"`
+	OwnerID         *string             `json:"owner_id"`
 	Skills        []AgentSkillSummary `json:"skills"`
 	CreatedAt     string              `json:"created_at"`
 	UpdatedAt     string              `json:"updated_at"`
@@ -550,7 +551,27 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Batch-load skills for all agents to avoid N+1.
+	// Batch-load runtime providers for all agents to avoid N+1.
+runtimeIDs := make([]pgtype.UUID, 0, len(agents))
+seen := map[string]bool{}
+for _, a := range agents {
+	if !seen[uuidToString(a.RuntimeID)] {
+		runtimeIDs = append(runtimeIDs, a.RuntimeID)
+		seen[uuidToString(a.RuntimeID)] = true
+	}
+}
+providerMap := map[string]string{}
+if len(runtimeIDs) > 0 {
+	rtRows, err := h.Queries.ListAgentRuntimeProviders(r.Context(), runtimeIDs)
+	if err != nil {
+		slog.Warn("failed to batch-load runtime providers", "error", err)
+	}
+	for _, row := range rtRows {
+		providerMap[uuidToString(row.ID)] = row.Provider
+	}
+}
+
+// Batch-load skills for all agents to avoid N+1.
 	skillRows, err := h.Queries.ListAgentSkillsByWorkspace(r.Context(), parseUUID(workspaceID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load agent skills")
@@ -591,6 +612,7 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		resp := agentToResponse(a)
+			resp.RuntimeProvider = providerMap[uuidToString(a.RuntimeID)]
 		if skills, ok := skillMap[resp.ID]; ok {
 			resp.Skills = skills
 		}
