@@ -145,7 +145,7 @@ RETURNING *;
 UPDATE wiki_operation SET
     hidden_issue_id = $2,
     updated_at = now()
-WHERE id = $1
+WHERE id = $1 AND space_id = $3
 RETURNING *;
 
 -- name: CompleteWikiOperation :exec

@@ -1017,6 +1017,7 @@ func (h *Handler) CreateWikiOperation(w http.ResponseWriter, r *http.Request) {
 			op, err = h.Queries.SetWikiOperationHiddenIssue(r.Context(), db.SetWikiOperationHiddenIssueParams{
 				ID:             op.ID,
 				HiddenIssueID:  result.Issue.ID,
+				SpaceID:        space.ID,
 			})
 			if err != nil {
 				slog.Warn("wiki: failed to set hidden issue for operation", "op_id", op.ID, "err", err)
