@@ -386,8 +386,14 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		}
 		ossSvc := oss.New(queries, ossSecBox)
 		// Register built-in S3-compatible driver (covers MinIO, S3, R2, B2, etc.)
-		ossSvc.RegisterDriver("s3_compatible", &oss.S3Driver{})
+		ossSvc.RegisterDriver("s3_compatible", &oss.S3Driver{}) // MinIO / R2 / B2 / generic
+		ossSvc.RegisterDriver("minio", &oss.S3Driver{})
 		ossSvc.RegisterDriver("qiniu", &oss.QiniuDriver{})
+		ossSvc.RegisterDriver("aliyun_oss", &oss.AliyunDriver{})
+		ossSvc.RegisterDriver("tencent_cos", &oss.TencentCOSDriver{})
+		ossSvc.RegisterDriver("huawei_obs", &oss.S3Driver{}) // OBS supports S3 API
+		ossSvc.RegisterDriver("baidu_bos", &oss.S3Driver{})  // BOS supports S3 API
+		ossSvc.RegisterDriver("volcengine_tos", &oss.S3Driver{}) // TOS supports S3 API
 		h.OssService = ossSvc
 		slog.Info("oss integration enabled")
 	}
