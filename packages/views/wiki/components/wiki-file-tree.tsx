@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { FileText, FolderOpen, Folder, ChevronRight, ChevronDown, FolderPlus, Trash2 } from "lucide-react";
 import type { WikiPage } from "@multica/core/wiki";
 import { useT } from "../../i18n";
@@ -76,10 +76,20 @@ function buildTree(pages: WikiPage[], enabledDirs: string[], titleMap: Map<strin
   return root.children;
 }
 
-function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir, titleMap }: {
+function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir, titleMap, creating, newNameInput, onNewNameChange, onCreateSubmit }: {
   node: TreeNode; depth: number; selectedPath: string | null; selectedDir: string; onSelect: (path: string) => void; onSelectDir: (dir: string) => void; titleMap: Map<string, string>;
+  creating: boolean; newNameInput: string; onNewNameChange: (v: string) => void; onCreateSubmit: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (creating && selectedDir === node.path) {
+      setExpanded(true);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [creating, selectedDir, node.path]);
+
   if (node.isDir) {
     const isSelected = selectedDir === node.path;
     return (
@@ -99,9 +109,27 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
           {expanded ? <FolderOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" /> : <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
           <span className={`truncate text-xs ${isSelected ? "font-medium" : "text-muted-foreground"}`}>{node.name}</span>
         </button>
-        {expanded && node.children.map((c) => (
-          <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} />
-        ))}
+        {expanded && (
+          <>
+            {node.children.map((c) => (
+              <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} creating={creating} newNameInput={newNameInput} onNewNameChange={onNewNameChange} onCreateSubmit={onCreateSubmit} />
+            ))}
+            {creating && isSelected && (
+              <div className="flex items-center gap-1 rounded px-2 py-0.5" style={{ paddingLeft: 12 + (depth + 1) * 16 }}>
+                <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground opacity-50" />
+                <input
+                  ref={inputRef}
+                  className="h-6 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus:border-primary"
+                  placeholder="folder name"
+                  value={newNameInput}
+                  onChange={(e) => onNewNameChange(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") onCreateSubmit(); if (e.key === "Escape") onNewNameChange(""); }}
+                  onBlur={() => { if (!newNameInput.trim()) onNewNameChange(""); }}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -125,17 +153,16 @@ export function WikiFileTree({ pages, selectedPath, selectedDir, onSelect, onSel
     return { tree: t, titleMap: m };
   }, [pages, enabledDirs]);
   const [newNameInput, setNewNameInput] = useState("");
-  const [showNewInput, setShowNewInput] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [creating, setCreating] = useState(false);
 
-  const handleNewClick = () => { setShowNewInput(true); setNewNameInput(""); setTimeout(() => inputRef.current?.focus(), 50); };
+  const handleNewClick = () => { setCreating(true); setNewNameInput(""); };
 
   const handleCreate = () => {
     const name = newNameInput.trim();
-    if (!name) return;
+    if (!name) { setCreating(false); return; }
     onCreateDir(selectedDir, name);
-    setShowNewInput(false);
     setNewNameInput("");
+    setCreating(false);
   };
 
   const handleDelete = () => {
@@ -172,25 +199,10 @@ export function WikiFileTree({ pages, selectedPath, selectedDir, onSelect, onSel
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
           <span>{t(($) => $.wiki_page.ingest_dir_delete)}</span>
         </button>
-        {showNewInput && (
-          <div className="flex flex-1 items-center gap-1">
-            <input
-              ref={inputRef}
-              className="h-6 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus:border-primary"
-              placeholder={t(($) => $.wiki_page.ingest_dir_name)}
-              value={newNameInput}
-              onChange={(e) => setNewNameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowNewInput(false); }}
-            />
-            <button className="shrink-0 rounded px-1.5 py-0.5 text-xs hover:bg-accent" onClick={handleCreate}>
-              {t(($) => $.wiki_page.ingest_dir_create)}
-            </button>
-          </div>
-        )}
       </div>
       {/* Tree */}
       <div className="flex-1 overflow-y-auto py-1">
-        {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} />)}
+        {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} creating={creating} newNameInput={newNameInput} onNewNameChange={setNewNameInput} onCreateSubmit={handleCreate} />)}
       </div>
     </div>
   );
