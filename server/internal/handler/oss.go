@@ -131,7 +131,8 @@ func (h *Handler) TestOSSConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.OssService.TestConnection(r.Context(), req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "ok": "false"})
+		slog.Warn("oss: connection test failed", "error", err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false"})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
