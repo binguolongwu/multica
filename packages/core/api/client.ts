@@ -2350,4 +2350,8 @@ export class ApiClient {
   async deleteOssConfig(id: string): Promise<void> {
     return this.fetch(`/api/oss/configs/${id}`, { method: "DELETE" });
   }
+
+  async testOssConnection(data: CreateOssConfigRequest): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/test`, { method: "POST", body: JSON.stringify(data) });
+  }
 }

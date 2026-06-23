@@ -114,6 +114,29 @@ func (h *Handler) DeleteOSSConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNoContent, nil)
 }
 
+// TestOSSConnection handles POST /api/oss/configs/test — validates OSS credentials.
+func (h *Handler) TestOSSConnection(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil {
+		writeError(w, http.StatusServiceUnavailable, "oss integration is not configured")
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	if !ok {
+		return
+	}
+	var req oss.CreateConfigParams
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.OssService.TestConnection(r.Context(), req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "ok": "false"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
 // ── File Operations ──────────────────────────────────────────────────────────
 
 // UploadOSSFile handles POST /api/workspaces/{id}/oss/configs/{configId}/files/upload

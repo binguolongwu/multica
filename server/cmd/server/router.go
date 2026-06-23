@@ -1057,6 +1057,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Route("/api/oss", func(r chi.Router) {
 			r.Get("/configs", h.ListOSSConfigs)
 			r.Post("/configs", h.CreateOSSConfig)
+			r.Post("/configs/test", h.TestOSSConnection)
 			r.Get("/configs/{configId}", h.ListOSSConfigs)
 			r.Patch("/configs/{configId}", h.UpdateOSSConfig)
 			r.Delete("/configs/{configId}", h.DeleteOSSConfig)

@@ -172,6 +172,28 @@ func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.U
 	return obj, nil
 }
 
+// TestConnection validates an OSS provider configuration by attempting to
+// list objects (limit 1). Returns an error if the credentials or bucket
+// are invalid.
+func (s *Service) TestConnection(ctx context.Context, params CreateConfigParams) error {
+	pc := ProviderConfig{
+		Provider:     params.Provider,
+		Bucket:       params.Bucket,
+		Region:       params.Region,
+		Endpoint:     params.Endpoint,
+		AccessKey:    params.AccessKey,
+		SecretKey:    params.SecretKey,
+		CustomDomain: params.CustomDomain,
+		FolderPrefix: params.FolderPrefix,
+	}
+	d, err := s.driverFor(pc.Provider)
+	if err != nil {
+		return err
+	}
+	_, err = d.ListKeys(ctx, pc, "", 1)
+	return err
+}
+
 // ListFiles returns object metadata for a config.
 func (s *Service) ListFiles(ctx context.Context, configID pgtype.UUID, prefix string) ([]db.OssObject, error) {
 	if prefix != "" {

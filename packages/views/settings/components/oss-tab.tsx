@@ -33,6 +33,7 @@ export function OssSettingsTab() {
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<OssProviderConfig | null>(null);
+  const [testing, setTesting] = useState(false);
   const [form, setForm] = useState<CreateOssConfigRequest>({ name: "", provider: "s3_compatible", bucket: "", region: "", endpoint: "", access_key: "", secret_key: "", custom_domain: "", folder_prefix: "" });
 
   const { data: configs, isLoading } = useQuery<OssProviderConfig[]>({
@@ -109,7 +110,18 @@ export function OssSettingsTab() {
             <div><Label>自定义域名 (可选)</Label><Input value={form.custom_domain} onChange={e => setForm({...form, custom_domain: e.target.value})} placeholder="cdn.example.com" /></div>
             <div><Label>目录前缀 (可选)</Label><Input value={form.folder_prefix} onChange={e => setForm({...form, folder_prefix: e.target.value})} placeholder="multica/" /></div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={async () => {
+              setTesting(true);
+              try {
+                await api.testOssConnection(form);
+                toast.success("连接测试成功");
+              } catch { toast.error("连接测试失败，请检查参数"); }
+              setTesting(false);
+            }} disabled={!form.bucket || !form.access_key || testing}>
+              {testing ? "测试中..." : "测试连接"}
+            </Button>
+            <div className="flex-1" />
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
             <Button onClick={handleSave} disabled={!form.name || !form.bucket || !form.access_key}>保存</Button>
           </DialogFooter>
