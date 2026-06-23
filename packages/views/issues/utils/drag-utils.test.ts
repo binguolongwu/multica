@@ -11,6 +11,7 @@ function mk(id: string, position: number): Issue {
     title: id,
     description: null,
     status: "todo",
+    stage: null,
     priority: "none",
     assignee_type: null,
     assignee_id: null,

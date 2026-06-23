@@ -7,6 +7,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { inboxListOptions } from "@multica/core/inbox";
 import { useCreateWikiSource, useCreateWikiOperation } from "@multica/core/wiki";
 import { useT } from "../../i18n";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@multica/ui/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
 import { Button } from "@multica/ui/components/ui/button";
@@ -35,12 +36,14 @@ export function WikiIngestDialog({ open, onOpenChange, spaceSlug, wikiAgentId, d
 
   const done = () => {
     setBusy(""); setError(""); onOpenChange(false);
+    const msg = wikiAgentId ? "Source saved. Wiki agent has been notified to process it." : "Source saved to raw/.";
+    toast.success(msg);
     // Trigger wiki maintainer agent to organize ingested content
     if (wikiAgentId) {
       createOp.mutate({ operation_type: "ingest", title: "Process new raw sources", prompt: "Review raw/ for new sources and ingest them into wiki/." });
     }
   };
-  const fail = (msg: string) => { setError(msg); setBusy(""); };
+  const fail = (msg: string) => { setError(msg); setBusy(""); toast.error(msg); };
 
   const handleInbox = () => {
     if (selected.size === 0) return;
