@@ -234,6 +234,7 @@ export interface Agent {
   avatar_url: string | null;
   runtime_mode: AgentRuntimeMode;
   runtime_provider?: string;
+  runtime_name?: string;
   runtime_config: Record<string, unknown>;
   custom_args: string[];
   /**

@@ -62,6 +62,7 @@ type AgentResponse struct {
 	// per-model; the API never normalizes across providers. See MUL-2339.
 	ThinkingLevel   string              `json:"thinking_level"`
 	RuntimeProvider string              `json:"runtime_provider,omitempty"`
+	RuntimeName     string              `json:"runtime_name,omitempty"`
 	OwnerID         *string             `json:"owner_id"`
 	Skills        []AgentSkillSummary `json:"skills"`
 	CreatedAt     string              `json:"created_at"`
@@ -551,7 +552,7 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Batch-load runtime providers for all agents to avoid N+1.
+	// Batch-load runtime provider + name for all agents to avoid N+1.
 runtimeIDs := make([]pgtype.UUID, 0, len(agents))
 seen := map[string]bool{}
 for _, a := range agents {
@@ -560,14 +561,17 @@ for _, a := range agents {
 		seen[uuidToString(a.RuntimeID)] = true
 	}
 }
-providerMap := map[string]string{}
+runtimeProviderMap := map[string]string{}
+runtimeNameMap := map[string]string{}
 if len(runtimeIDs) > 0 {
-	rtRows, err := h.Queries.ListAgentRuntimeProviders(r.Context(), runtimeIDs)
+	rtRows, err := h.Queries.ListAgentRuntimeInfos(r.Context(), runtimeIDs)
 	if err != nil {
-		slog.Warn("failed to batch-load runtime providers", "error", err)
+		slog.Warn("failed to batch-load runtime infos", "error", err)
 	}
 	for _, row := range rtRows {
-		providerMap[uuidToString(row.ID)] = row.Provider
+		id := uuidToString(row.ID)
+		runtimeProviderMap[id] = row.Provider
+		runtimeNameMap[id] = row.Name
 	}
 }
 
@@ -612,7 +616,8 @@ if len(runtimeIDs) > 0 {
 			}
 		}
 		resp := agentToResponse(a)
-			resp.RuntimeProvider = providerMap[uuidToString(a.RuntimeID)]
+			resp.RuntimeProvider = runtimeProviderMap[uuidToString(a.RuntimeID)]
+resp.RuntimeName = runtimeNameMap[uuidToString(a.RuntimeID)]
 		if skills, ok := skillMap[resp.ID]; ok {
 			resp.Skills = skills
 		}

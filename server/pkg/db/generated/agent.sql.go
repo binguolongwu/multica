@@ -1888,26 +1888,27 @@ func (q *Queries) ListActiveTasksByIssue(ctx context.Context, issueID pgtype.UUI
 	return items, nil
 }
 
-const listAgentRuntimeProviders = `-- name: ListAgentRuntimeProviders :many
-SELECT ar.id, ar.provider FROM agent_runtime ar
+const listAgentRuntimeInfos = `-- name: ListAgentRuntimeInfos :many
+SELECT ar.id, ar.provider, ar.name FROM agent_runtime ar
 WHERE ar.id = ANY($1::uuid[])
 `
 
-type ListAgentRuntimeProvidersRow struct {
+type ListAgentRuntimeInfosRow struct {
 	ID       pgtype.UUID `json:"id"`
 	Provider string      `json:"provider"`
+	Name     string      `json:"name"`
 }
 
-func (q *Queries) ListAgentRuntimeProviders(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAgentRuntimeProvidersRow, error) {
-	rows, err := q.db.Query(ctx, listAgentRuntimeProviders, dollar_1)
+func (q *Queries) ListAgentRuntimeInfos(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAgentRuntimeInfosRow, error) {
+	rows, err := q.db.Query(ctx, listAgentRuntimeInfos, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListAgentRuntimeProvidersRow{}
+	items := []ListAgentRuntimeInfosRow{}
 	for rows.Next() {
-		var i ListAgentRuntimeProvidersRow
-		if err := rows.Scan(&i.ID, &i.Provider); err != nil {
+		var i ListAgentRuntimeInfosRow
+		if err := rows.Scan(&i.ID, &i.Provider, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

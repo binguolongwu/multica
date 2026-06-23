@@ -155,7 +155,7 @@ export function WikiPage() {
                 <span className="flex items-center gap-1.5 truncate">
                   <ActorAvatar actorType="agent" actorId={selectedAgent.id} size={18} showStatusDot />
                   {selectedAgent.name}
-                  <span className="text-muted-foreground">{selectedAgent.runtime_provider ? ` ${capitalize(selectedAgent.runtime_provider)}` : ""}({selectedAgent.runtime_mode || "cloud"})</span>
+                  <span className="text-muted-foreground">{selectedAgent.runtime_provider ? ` ${capitalize(selectedAgent.runtime_provider)}` : ""}({selectedAgent.runtime_name || selectedAgent.runtime_mode || "cloud"})</span>
                 </span>
               ) : <span className="text-muted-foreground">{t(($) => $.wiki_page.wiki_agent)}</span>}
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -187,7 +187,7 @@ export function WikiPage() {
                     >
                       <ActorAvatar actorType="agent" actorId={a.id} size={20} showStatusDot />
                       <span className="flex-1 truncate font-medium">{a.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{a.runtime_provider ? ` ${capitalize(a.runtime_provider)}` : ""}({a.runtime_mode || "cloud"})</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{a.runtime_provider ? ` ${capitalize(a.runtime_provider)}` : ""}({a.runtime_name || a.runtime_mode || "cloud"})</span>
                       {a.id === wikiAgentId && <Check className="h-4 w-4 shrink-0" />}
                     </button>
                   </TooltipTrigger>
