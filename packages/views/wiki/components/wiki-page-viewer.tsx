@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { Markdown } from "@multica/views/common/markdown";
 import { useUpsertWikiPage } from "@multica/core/wiki";
@@ -46,7 +46,30 @@ function resolveWikilinks(content: string): string {
   });
 }
 
+const WIKI_LINK_PREFIX = "#wiki-path--";
+
 export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page: WikiPageDetail; spaceSlug?: string; onSelect?: (path: string) => void }) {
+  const proseRef = useRef<HTMLDivElement>(null);
+
+  // Use native DOM click listener to intercept wikilink clicks BEFORE
+  // the Markdown component's React synthetic onClick handler fires.
+  useEffect(() => {
+    const el = proseRef.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") || "";
+      if (!href.startsWith(WIKI_LINK_PREFIX)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const path = decodeURIComponent(href.slice(WIKI_LINK_PREFIX.length));
+      if (path && onSelect) onSelect(path);
+    };
+    el.addEventListener("click", handler, true);
+    return () => el.removeEventListener("click", handler, true);
+  }, [onSelect]);
   const wsId = useWorkspaceId();
   const { t } = useT("layout");
   const [editing, setEditing] = useState(false);
@@ -118,20 +141,7 @@ export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page
               </div>
             </div>
           ) : (
-            <div
-            className="prose prose-sm max-w-none dark:prose-invert"
-            onClickCapture={(e) => {
-              const target = e.target as HTMLElement;
-              const anchor = target.closest<HTMLAnchorElement>("a[href]");
-              if (!anchor) return;
-              const href = anchor.getAttribute("href") || "";
-              if (!href.startsWith("#wiki-path--")) return;
-              e.preventDefault();
-              e.stopPropagation();
-              const path = decodeURIComponent(href.slice("#wiki-path--".length));
-              if (path && onSelect) onSelect(path);
-            }}
-          >
+            <div ref={proseRef} className="prose prose-sm max-w-none dark:prose-invert">
               <Markdown>{safeBody}</Markdown>
             </div>
           )}
