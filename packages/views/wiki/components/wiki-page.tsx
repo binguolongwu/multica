@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2, Download, ChevronDown, Check } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
@@ -29,29 +29,15 @@ export function WikiPage() {
   const [wikiAgentId, setWikiAgentId] = useState<string>("");
   const [selectedDir, setSelectedDir] = useState<string>("");
   const updateSpace = useUpdateWikiSpace(wsId);
-  const initialRender = useRef(true);
-
-  // Save agent selection to wiki_space
-  useEffect(() => {
-    if (initialRender.current) {
-      initialRender.current = false;
-      return;
-    }
-    if (wikiAgentId) {
-      updateSpace.mutate({ slug: spaceSlug, data: { default_agent_id: wikiAgentId } });
-    }
-  }, [wikiAgentId, spaceSlug, updateSpace]);
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
 
-  // Load saved agent from wiki_space on mount
-  const agentLoaded = useRef(false);
+  // Load saved agent from wiki_space on mount.
   useEffect(() => {
-    if (!agentLoaded.current && spaces?.[0]?.default_agent_id) {
+    if (!wikiAgentId && spaces?.[0]?.default_agent_id) {
       setWikiAgentId(spaces[0].default_agent_id);
-      agentLoaded.current = true;
     }
-  }, [spaces]);
+  }, [spaces, wikiAgentId]);
 
   const enabledDirs = useMemo(() => {
     const defaultDirs = ["raw", "wiki/entities", "wiki/intents", "wiki/knowledge", "wiki/policies", "wiki/procedures", "wiki/insights", "wiki/summaries"];
@@ -190,7 +176,12 @@ export function WikiPage() {
                   <TooltipTrigger>
                     <button
                       className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${a.id === wikiAgentId ? "bg-accent" : ""}`}
-                      onClick={() => { setWikiAgentId(a.id); setAgentOpen(false); setAgentSearch(""); }}
+                      onClick={() => {
+                        setWikiAgentId(a.id);
+                        updateSpace.mutate({ slug: spaceSlug, data: { default_agent_id: a.id } });
+                        setAgentOpen(false);
+                        setAgentSearch("");
+                      }}
                     >
                       <ActorAvatar actorType="agent" actorId={a.id} size={20} showStatusDot />
                       <span className="flex-1 truncate font-medium">{a.name}</span>
