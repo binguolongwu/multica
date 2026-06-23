@@ -38,7 +38,14 @@ function extractHeadings(content: string): { id: string; text: string; level: nu
   return headings;
 }
 
-export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPageDetail; spaceSlug?: string }) {
+function resolveWikilinks(content: string): string {
+  return content.replace(/\[\[([^\]]+)\]\]/g, (_m, path: string) => {
+    const display = path.split("/").pop() || path;
+    return `<a class="wiki-link" data-wiki-path="${path}" href="#">${display}</a>`;
+  });
+}
+
+export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page: WikiPageDetail; spaceSlug?: string; onSelect?: (path: string) => void }) {
   const wsId = useWorkspaceId();
   const { t } = useT("layout");
   const [editing, setEditing] = useState(false);
@@ -50,7 +57,8 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
   const headings = useMemo(() => extractHeadings(body), [body]);
   // Escape HTML in content before rendering to prevent tags from being
   // interpreted as raw HTML by the markdown renderer's rehype-raw pass.
-  const safeBody = body.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Then resolve [[wikilinks]] to clickable <a> tags.
+  const safeBody = resolveWikilinks(body.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
   const displayTitle = fm.title || page.title || page.path;
 
   const handleSave = () => {
@@ -109,7 +117,16 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
               </div>
             </div>
           ) : (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
+            <div
+            className="prose prose-sm max-w-none dark:prose-invert"
+            onClick={(e) => {
+              const anchor = (e.target as HTMLElement).closest("a.wiki-link");
+              if (!anchor) return;
+              e.preventDefault();
+              const path = anchor.getAttribute("data-wiki-path");
+              if (path && onSelect) onSelect(path);
+            }}
+          >
               <Markdown>{safeBody}</Markdown>
             </div>
           )}
