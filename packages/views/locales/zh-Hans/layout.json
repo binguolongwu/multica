@@ -21,7 +21,7 @@
     "feedback": "反馈"
   },
   "wiki_page": {
-    "title": "知识库", "ingest": "摄取", "ingest_need_agent": "请先在右侧选择一位 Wiki 管理员", "wiki_agent": "Wiki 智能体", "search": "搜索...",
+    "title": "知识库", "ingest": "摄取", "ingest_need_agent": "请选择一位知识库管理员", "wiki_agent": "Wiki 智能体", "search": "搜索...",
     "edit": "编辑", "save": "保存", "cancel": "取消", "saving": "保存中...",
     "links": "链接", "backlinks": "反向链接", "properties": "属性", "on_this_page": "本页导航",
     "no_pages": "暂无页面", "select_page": "从左侧目录选择页面阅读",
