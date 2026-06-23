@@ -538,6 +538,34 @@ type NotificationPreference struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OssObject struct {
+	ID          pgtype.UUID        `json:"id"`
+	ConfigID    pgtype.UUID        `json:"config_id"`
+	Key         string             `json:"key"`
+	Filename    string             `json:"filename"`
+	SizeBytes   int64              `json:"size_bytes"`
+	ContentType string             `json:"content_type"`
+	UploadedBy  pgtype.UUID        `json:"uploaded_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type OssProviderConfig struct {
+	ID                 pgtype.UUID        `json:"id"`
+	WorkspaceID        pgtype.UUID        `json:"workspace_id"`
+	Name               string             `json:"name"`
+	Provider           string             `json:"provider"`
+	Bucket             string             `json:"bucket"`
+	Region             string             `json:"region"`
+	Endpoint           string             `json:"endpoint"`
+	AccessKey          string             `json:"access_key"`
+	SecretKeyEncrypted []byte             `json:"secret_key_encrypted"`
+	CustomDomain       string             `json:"custom_domain"`
+	FolderPrefix       string             `json:"folder_prefix"`
+	IsDefault          bool               `json:"is_default"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
 type PersonalAccessToken struct {
 	ID          pgtype.UUID        `json:"id"`
 	UserID      pgtype.UUID        `json:"user_id"`

@@ -21,6 +21,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
+	"github.com/multica-ai/multica/server/internal/integrations/oss"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
@@ -164,7 +165,11 @@ type Handler struct {
 	// WikiService is the wiki knowledge base service. Nil when wiki is not
 	// configured; handlers return 503 in that case.
 	WikiService *wiki.Service
-	cfg         Config
+	// OssService is the OSS (Object Storage) integration service.
+	// Always enabled — no secret key required. Workspace admins configure
+	// their own OSS providers via the integrations settings page.
+	OssService *oss.Service
+	cfg        Config
 }
 
 func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *events.Bus, emailService *service.EmailService, store storage.Storage, cfSigner *auth.CloudFrontSigner, analyticsClient analytics.Client, cfg Config, daemonHubs ...*daemonws.Hub) *Handler {

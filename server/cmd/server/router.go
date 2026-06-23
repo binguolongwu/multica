@@ -23,7 +23,8 @@ import (
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/handler"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
-	"github.com/multica-ai/multica/server/internal/integrations/wiki"
+	"github.com/multica-ai/multica/server/internal/integrations/oss"
+"github.com/multica-ai/multica/server/internal/integrations/wiki"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
 	"github.com/multica-ai/multica/server/internal/realtime"
@@ -365,6 +366,30 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		wikiIngestion := wiki.NewIngestionListener(queries, h.WikiService)
 		bus.SubscribeAll(wikiIngestion.HandleEvent)
 		slog.Info("wiki integration enabled")
+	}
+	// OSS integration. Always enabled — no secret key required.
+	// Workspace admins configure their own OSS providers via
+	// the integrations settings page.
+	{
+		ossBox, err := secretbox.LoadKey("MULTICA_OSS_SECRET_KEY")
+		var ossSecBox *secretbox.Box
+		if err != nil {
+			slog.Warn("oss: MULTICA_OSS_SECRET_KEY not set, secret_key will be stored in plaintext",
+				"error", err)
+		} else {
+			var boxErr error
+			ossSecBox, boxErr = secretbox.New(ossBox)
+			if boxErr != nil {
+				slog.Warn("oss: failed to create SecretBox, secret_key will be stored in plaintext",
+					"error", boxErr)
+			}
+		}
+		ossSvc := oss.New(queries, ossSecBox)
+		// Register built-in S3-compatible driver (covers MinIO, S3, R2, B2, etc.)
+		ossSvc.RegisterDriver("s3_compatible", &oss.S3Driver{})
+		ossSvc.RegisterDriver("qiniu", &oss.QiniuDriver{})
+		h.OssService = ossSvc
+		slog.Info("oss integration enabled")
 	}
 	if opts.HeartbeatScheduler != nil {
 		h.HeartbeatScheduler = opts.HeartbeatScheduler
@@ -1021,7 +1046,21 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// can use /api/wiki/... paths. The URL-based routes under
 			// /api/workspaces/{id}/wiki remain for web/desktop which
 			// embed workspace in the URL path.
-			r.Route("/api/wiki", func(r chi.Router) {
+			// OSS object storage integration — header-based workspace resolution
+		// so CLI (multica oss upload/download/list) can use /api/oss/... paths.
+		r.Route("/api/oss", func(r chi.Router) {
+			r.Get("/configs", h.ListOSSConfigs)
+			r.Post("/configs", h.CreateOSSConfig)
+			r.Get("/configs/{configId}", h.ListOSSConfigs)
+			r.Patch("/configs/{configId}", h.UpdateOSSConfig)
+			r.Delete("/configs/{configId}", h.DeleteOSSConfig)
+			r.Post("/configs/{configId}/files/upload", h.UploadOSSFile)
+			r.Get("/configs/{configId}/files", h.ListOSSFiles)
+			r.Get("/configs/{configId}/files/{fileId}", h.GetOSSFileDownloadURL)
+			r.Delete("/configs/{configId}/files/{fileId}", h.DeleteOSSFile)
+		})
+
+		r.Route("/api/wiki", func(r chi.Router) {
 				r.Get("/spaces", h.ListWikiSpaces)
 				r.Post("/spaces", h.CreateWikiSpace)
 				r.Get("/spaces/{slug}/overview", h.GetWikiSpaceOverview)
