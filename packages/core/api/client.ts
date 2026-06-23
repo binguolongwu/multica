@@ -138,6 +138,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
+import type { OssProviderConfig, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
   CloudRuntimeNode,
@@ -2330,5 +2331,23 @@ export class ApiClient {
 
   async crawlWikiURL(wsId: string, slug: string, data: CrawlURLRequest): Promise<CrawlURLResponse> {
     return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/crawl`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  // ── OSS (Object Storage) ──────────────────────────────────────────────
+
+  async listOssConfigs(): Promise<OssProviderConfig[]> {
+    return this.fetch("/api/oss/configs");
+  }
+
+  async createOssConfig(data: CreateOssConfigRequest): Promise<OssProviderConfig> {
+    return this.fetch(`/api/oss/configs`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async updateOssConfig(id: string, data: UpdateOssConfigRequest): Promise<OssProviderConfig> {
+    return this.fetch(`/api/oss/configs/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async deleteOssConfig(id: string): Promise<void> {
+    return this.fetch(`/api/oss/configs/${id}`, { method: "DELETE" });
   }
 }

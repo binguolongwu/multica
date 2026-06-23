@@ -2,6 +2,7 @@
 
 import { LarkTab } from "./lark-tab";
 import { WikiSettingsTab } from "../../wiki/components/wiki-settings-tab";
+import { OssSettingsTab } from "./oss-tab";
 import { useT } from "../../i18n";
 
 // Integrations is the umbrella tab for third-party platform connections.
@@ -17,6 +18,11 @@ export function IntegrationsTab() {
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Wiki</h2>
         <WikiSettingsTab />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold">OSS · 对象存储</h2>
+        <OssSettingsTab />
       </section>
 
       <section className="space-y-4">
