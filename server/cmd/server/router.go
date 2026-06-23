@@ -1016,6 +1016,35 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			})
 			r.Get("/api/chat/pending-tasks", h.ListPendingChatTasks)
 
+			// Wiki knowledge base — header-based workspace resolution
+			// so CLI (multica wiki read-page/write-page/list-pages/search)
+			// can use /api/wiki/... paths. The URL-based routes under
+			// /api/workspaces/{id}/wiki remain for web/desktop which
+			// embed workspace in the URL path.
+			r.Route("/api/wiki", func(r chi.Router) {
+				r.Get("/spaces", h.ListWikiSpaces)
+				r.Post("/spaces", h.CreateWikiSpace)
+				r.Get("/spaces/{slug}/overview", h.GetWikiSpaceOverview)
+				r.Get("/spaces/{slug}", h.GetWikiSpace)
+				r.Patch("/spaces/{slug}", h.UpdateWikiSpace)
+				r.Delete("/spaces/{slug}", h.ArchiveWikiSpace)
+				r.Get("/spaces/{slug}/pages", h.ListWikiPages)
+				r.Post("/spaces/{slug}/pages/batch", h.BatchReadWikiPages)
+				r.Post("/spaces/{slug}/pages/batch-write", h.BatchWriteWikiPages)
+				r.Get("/spaces/{slug}/pages/*", h.GetWikiPage)
+				r.Put("/spaces/{slug}/pages/*", h.UpsertWikiPage)
+				r.Delete("/spaces/{slug}/pages/*", h.DeleteWikiPage)
+				r.Get("/spaces/{slug}/page-revisions/*", h.ListWikiPageRevisions)
+				r.Get("/spaces/{slug}/sources", h.ListWikiSources)
+				r.Post("/spaces/{slug}/sources", h.CreateWikiSource)
+				r.Get("/spaces/{slug}/sources/{id}", h.GetWikiSource)
+				r.Delete("/spaces/{slug}/sources/{id}", h.DeleteWikiSource)
+				r.Post("/spaces/{slug}/crawl", h.CrawlURL)
+				r.Get("/spaces/{slug}/operations", h.ListWikiOperations)
+				r.Post("/spaces/{slug}/operations", h.CreateWikiOperation)
+				r.Get("/spaces/{slug}/operations/{id}", h.GetWikiOperation)
+			})
+
 			// Inbox
 			r.Route("/api/inbox", func(r chi.Router) {
 				r.Get("/", h.ListInbox)

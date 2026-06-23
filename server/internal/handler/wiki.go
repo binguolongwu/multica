@@ -1014,7 +1014,13 @@ func (h *Handler) CreateWikiOperation(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("wiki: failed to create hidden issue for operation", "op_id", op.ID, "err", createErr)
 		} else {
 			// Link operation to hidden issue and enqueue for daemon
-			op.HiddenIssueID = result.Issue.ID
+			op, err = h.Queries.SetWikiOperationHiddenIssue(r.Context(), db.SetWikiOperationHiddenIssueParams{
+				ID:             op.ID,
+				HiddenIssueID:  result.Issue.ID,
+			})
+			if err != nil {
+				slog.Warn("wiki: failed to set hidden issue for operation", "op_id", op.ID, "err", err)
+			}
 			if _, eqErr := h.TaskService.EnqueueTaskForIssue(r.Context(), result.Issue); eqErr != nil {
 				slog.Warn("wiki: failed to enqueue task for operation", "op_id", op.ID, "err", eqErr)
 			}
