@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
+	"github.com/multica-ai/multica/server/internal/service"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -992,6 +993,34 @@ func (h *Handler) CreateWikiOperation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create wiki operation")
 		return
 	}
+
+	// Bridge: create hidden issue + enqueue agent task
+	agentID, agentOk := h.resolveWikiAgent(r.Context(), workspaceID, space)
+	if agentOk {
+		prompt := h.buildWikiIngestPrompt(r.Context(), space.ID)
+		result, createErr := h.IssueService.Create(r.Context(), service.IssueCreateParams{
+			WorkspaceID:  parseUUID(workspaceID),
+			Title:        "Wiki ingest: Process raw/ sources into wiki/",
+			Description:  pgtype.Text{String: prompt, Valid: true},
+			Status:       "todo",
+			Priority:     "none",
+			AssigneeType: pgtype.Text{String: "agent", Valid: true},
+			AssigneeID:   agentID,
+			CreatorType:  "agent",
+			CreatorID:    agentID,
+		}, service.IssueCreateOpts{})
+		if createErr != nil {
+			slog.Warn("wiki: failed to create hidden issue for operation", "op_id", op.ID, "err", createErr)
+		} else {
+			// Link operation to hidden issue and enqueue for daemon
+			op.HiddenIssueID = result.Issue.ID
+			if _, eqErr := h.TaskService.EnqueueTaskForIssue(r.Context(), result.Issue); eqErr != nil {
+				slog.Warn("wiki: failed to enqueue task for operation", "op_id", op.ID, "err", eqErr)
+			}
+		}
+	}
+	// If no agent available, op stays as pending — future cron/retry can pick it up
+
 	writeJSON(w, http.StatusCreated, wikiOperationToResponse(op))
 }
 
@@ -1250,4 +1279,108 @@ func parseStringArray(data []byte) []string {
 		return []string{}
 	}
 	return arr
+}
+
+// buildWikiIngestPrompt builds an agent prompt for the ingest operation.
+// It reads the wiki index, schema rules, and captured sources, then assembles
+// them into a markdown description capped at 6000 chars.
+func (h *Handler) buildWikiIngestPrompt(ctx context.Context, spaceID pgtype.UUID) string {
+	var b strings.Builder
+
+	// ---- instructions ----
+	b.WriteString("# Wiki Ingest Operation\n\n")
+	b.WriteString("Read raw/ sources below and extract structured knowledge:\n\n")
+	b.WriteString("1. **Entities** (customers, products, projects, members) → wiki/entities/*.md\n")
+	b.WriteString("2. **Intents** (requests, problems, goals) → wiki/intents/*.md\n")
+	b.WriteString("3. **Knowledge** (facts, docs, answers) → wiki/knowledge/*.md\n")
+	b.WriteString("4. Link entities ↔ intents ↔ procedures with [[wikilinks]]\n")
+	b.WriteString("5. Update wiki/index.md with new/changed pages\n")
+	b.WriteString("6. After extraction, run lint: check backlinks, validation_warnings, index\n")
+	b.WriteString("7. Log all changes to system/update_log.md\n")
+	b.WriteString("8. Do not ask for confirmation — execute directly\n\n")
+
+	// ---- wiki index ----
+	p, err := h.Queries.GetWikiPageByPath(ctx, db.GetWikiPageByPathParams{
+		SpaceID: spaceID, Path: "wiki/index.md",
+	})
+	if err == nil && p.Content != "" {
+		b.WriteString("## Wiki Index\n\n")
+		b.WriteString(truncateStr(p.Content, 2000))
+		b.WriteString("\n\n")
+	}
+
+	// ---- schema rules ----
+	b.WriteString("## Schema Rules\n\n")
+	for _, path := range []string{"schema/linking_rules.md", "schema/entity_rules.md"} {
+		p, err := h.Queries.GetWikiPageByPath(ctx, db.GetWikiPageByPathParams{
+			SpaceID: spaceID, Path: path,
+		})
+		if err == nil && p.Content != "" {
+			b.WriteString(truncateStr(p.Content, 800))
+			b.WriteString("\n")
+		}
+	}
+
+	// ---- captured sources ----
+	sources, err := h.Queries.ListWikiSources(ctx, spaceID)
+	if err == nil {
+		var captured int
+		for _, src := range sources {
+			if src.Status != "captured" {
+				continue
+			}
+			if captured >= 10 {
+				b.WriteString(fmt.Sprintf("\n(additional %d sources not shown — process these first)\n",
+					len(sources)-captured))
+				break
+			}
+			b.WriteString(fmt.Sprintf("## Source: %s\nPath: %s\n```\n%s\n```\n\n",
+				src.Title, src.RawPath, truncateStr(src.Content, 2000)))
+			captured++
+		}
+		if captured == 0 {
+			b.WriteString("(no captured sources — nothing to process)\n")
+		}
+	}
+
+	// ---- CLI reference ----
+	b.WriteString("## CLI Reference\n")
+	b.WriteString("- `multica wiki read-page --path <path>` — read a wiki page\n")
+	b.WriteString("- `multica wiki write-page --path <path>` — create/update a wiki page\n")
+	b.WriteString("- `multica wiki search --query <query>` — full-text search\n")
+	b.WriteString("- `multica wiki list-pages` — list all wiki pages\n")
+
+	return truncateStr(b.String(), 6000)
+}
+
+// truncateStr truncates s to maxLen characters, adding "..." when truncated.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// resolveWikiAgent returns the agent ID to use for wiki operations.
+// Priority: space.default_agent_id → any idle agent in workspace → invalid UUID.
+func (h *Handler) resolveWikiAgent(ctx context.Context, workspaceID string, space db.WikiSpace) (pgtype.UUID, bool) {
+	wsUUID := parseUUID(workspaceID)
+
+	// 1. Use the space's default agent
+	if space.DefaultAgentID.Valid {
+		return space.DefaultAgentID, true
+	}
+
+	// 2. Fall back to any idle agent in the workspace
+	agents, err := h.Queries.ListAgents(ctx, wsUUID)
+	if err != nil || len(agents) == 0 {
+		return pgtype.UUID{}, false
+	}
+	for _, a := range agents {
+		if a.Status == "idle" {
+			return a.ID, true
+		}
+	}
+
+	return pgtype.UUID{}, false
 }
