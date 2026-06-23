@@ -140,7 +140,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
-import type { OssProviderConfig, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
+import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
   CloudRuntimeNode,
@@ -2376,5 +2376,14 @@ export class ApiClient {
 
   async testOssConnection(data: CreateOssConfigRequest): Promise<{ ok: string }> {
     return this.fetch(`/api/oss/configs/test`, { method: "POST", body: JSON.stringify(data) });
+  }
+  async listOssFiles(configId: string, qs?: string): Promise<OssObject[]> {
+    return this.fetch(`/api/oss/configs/${configId}/files${qs ? `?${qs}` : ""}`);
+  }
+  async getOssFileDownloadUrl(configId: string, fileId: string): Promise<OssObjectWithUrl> {
+    return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`);
+  }
+  async deleteOssFile(configId: string, fileId: string): Promise<void> {
+    return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`, { method: "DELETE" });
   }
 }

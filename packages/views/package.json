@@ -21,6 +21,7 @@
     "./projects/components": "./projects/components/index.ts",
     "./autopilots/components": "./autopilots/components/index.ts",
     "./wiki/components": "./wiki/components/index.ts",
+    "./oss/components": "./oss/components/index.ts",
     "./modals/registry": "./modals/registry.tsx",
     "./modals/create-issue": "./modals/create-issue.tsx",
     "./my-issues": "./my-issues/index.ts",
