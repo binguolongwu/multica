@@ -3,6 +3,8 @@ dist
 *.log
 .DS_Store
 .envrc
+.playwright-mcp/
+docs/screenshot/
 
 # build outputs
 .turbo
