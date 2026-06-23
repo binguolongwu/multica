@@ -88,6 +88,10 @@ var ossDownloadCmd = &cobra.Command{
 		if outputPath == "" {
 			outputPath = filepath.Base(ossKey)
 		}
+		outputPath = filepath.Clean(outputPath)
+		if filepath.IsAbs(outputPath) || filepath.Dir(outputPath) != "." {
+			outputPath = filepath.Base(ossKey)
+		}
 
 		u := fmt.Sprintf("/api/oss/configs/default/files?key=%s&redirect=true", ossKey)
 		var result map[string]any

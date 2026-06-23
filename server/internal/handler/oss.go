@@ -160,14 +160,14 @@ func (h *Handler) UploadOSSFile(w http.ResponseWriter, r *http.Request) {
 		uploadedBy = member.UserID
 	}
 
-	obj, err := h.OssService.UploadFile(r.Context(), configID, key, header.Filename, file, header.Size, contentType, uploadedBy)
+	obj, err := h.OssService.UploadFile(r.Context(), configID, parseUUID(workspaceID), key, header.Filename, file, header.Size, contentType, uploadedBy)
 	if err != nil {
 		slog.Warn("oss: failed to upload file", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to upload file")
 		return
 	}
 
-	url, _ := h.OssService.GetFileDownloadURL(r.Context(), obj.ID, configID)
+	url, _ := h.OssService.GetFileDownloadURL(r.Context(), obj.ID, configID, parseUUID(workspaceID))
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":           obj.ID,
 		"key":          obj.Key,
@@ -223,12 +223,12 @@ func (h *Handler) GetOSSFileDownloadURL(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	obj, err := h.OssService.GetFile(r.Context(), fileID, configID)
+	obj, err := h.OssService.GetFile(r.Context(), fileID, configID, parseUUID(workspaceID))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "file not found")
 		return
 	}
-	url, err := h.OssService.GetFileDownloadURL(r.Context(), fileID, configID)
+	url, err := h.OssService.GetFileDownloadURL(r.Context(), fileID, configID, parseUUID(workspaceID))
 	if err != nil {
 		slog.Warn("oss: failed to get download url", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to get download url")
@@ -270,7 +270,7 @@ func (h *Handler) DeleteOSSFile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.OssService.DeleteFile(r.Context(), fileID, configID); err != nil {
+	if err := h.OssService.DeleteFile(r.Context(), fileID, configID, parseUUID(workspaceID)); err != nil {
 		slog.Warn("oss: failed to delete file", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to delete file")
 		return

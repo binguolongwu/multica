@@ -136,9 +136,10 @@ func (s *Service) DeleteConfig(ctx context.Context, id, workspaceID pgtype.UUID)
 // --- File Operations ---
 
 // UploadFile stores a file via the driver and records metadata in oss_object.
-func (s *Service) UploadFile(ctx context.Context, configID pgtype.UUID, key, filename string, body io.Reader, size int64, contentType string, uploadedBy pgtype.UUID) (db.OssObject, error) {
+// workspaceID gates access to the config — prevents cross-workspace IDOR.
+func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.UUID, key, filename string, body io.Reader, size int64, contentType string, uploadedBy pgtype.UUID) (db.OssObject, error) {
 	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
-		ID: configID, WorkspaceID: pgtype.UUID{Valid: false},
+		ID: configID, WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		return db.OssObject{}, fmt.Errorf("get oss config: %w", err)
@@ -183,13 +184,19 @@ func (s *Service) ListFiles(ctx context.Context, configID pgtype.UUID, prefix st
 }
 
 // GetFile returns a single object record.
-func (s *Service) GetFile(ctx context.Context, id, configID pgtype.UUID) (db.OssObject, error) {
+func (s *Service) GetFile(ctx context.Context, id, configID, workspaceID pgtype.UUID) (db.OssObject, error) {
+	// Verify config belongs to workspace
+	if _, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
+		ID: configID, WorkspaceID: workspaceID,
+	}); err != nil {
+		return db.OssObject{}, fmt.Errorf("oss config not found in workspace: %w", err)
+	}
 	return s.Queries.GetOSSObject(ctx, db.GetOSSObjectParams{ID: id, ConfigID: configID})
 }
 
 // GetFileDownloadURL returns the public URL for a stored object.
-func (s *Service) GetFileDownloadURL(ctx context.Context, id, configID pgtype.UUID) (string, error) {
-	obj, err := s.GetFile(ctx, id, configID)
+func (s *Service) GetFileDownloadURL(ctx context.Context, id, configID, workspaceID pgtype.UUID) (string, error) {
+	obj, err := s.GetFile(ctx, id, configID, workspaceID)
 	if err != nil {
 		return "", err
 	}
@@ -207,8 +214,8 @@ func (s *Service) GetFileDownloadURL(ctx context.Context, id, configID pgtype.UU
 }
 
 // DeleteFile removes both the object record and the cloud object.
-func (s *Service) DeleteFile(ctx context.Context, id, configID pgtype.UUID) error {
-	obj, err := s.GetFile(ctx, id, configID)
+func (s *Service) DeleteFile(ctx context.Context, id, configID, workspaceID pgtype.UUID) error {
+	obj, err := s.GetFile(ctx, id, configID, workspaceID)
 	if err != nil {
 		return err
 	}
