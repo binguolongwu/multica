@@ -48,7 +48,7 @@ function resolveWikilinks(content: string): string {
 
 const WIKI_LINK_PREFIX = "#wiki-path--";
 
-export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page: WikiPageDetail; spaceSlug?: string; onSelect?: (path: string) => void }) {
+export function WikiPageViewer({ page, spaceSlug = "default", onSelect, editable = true }: { page: WikiPageDetail; spaceSlug?: string; onSelect?: (path: string) => void; editable?: boolean }) {
   const proseRef = useRef<HTMLDivElement>(null);
 
   // Use native DOM click listener to intercept wikilink clicks BEFORE
@@ -103,7 +103,7 @@ export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page
         <div className="mx-auto max-w-3xl">
           <div className="mb-6 flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
-            {!editing && (
+            {editable && !editing && (
               <Button variant="outline" size="sm" onClick={() => { setEditTitle(displayTitle); setEditContent(body); setEditing(true); }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.edit)}
               </Button>

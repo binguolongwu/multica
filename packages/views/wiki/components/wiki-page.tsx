@@ -82,21 +82,24 @@ export function WikiPage() {
     upsertPage.mutate({
       path: `${dirPath}/.gitkeep`,
       data: { content: "" },
+    }, {
+      onSuccess: () => { setSelectedDir(dirPath); },
+      onError: () => toast.error("Failed to create directory"),
     });
   }, [upsertPage]);
 
   // Protected paths: schema rules, system logs, templates, index, AGENTS, IDEA
+  // Protected from deletion: schema, system, templates, index, AGENTS, IDEA
   const isProtectedPath = useCallback((path: string) => {
-    const protectedPatterns = [
-      /^schema\//,
-      /^system\//,
-      /\/_TEMPLATE\.md$/,
-      /^wiki\/index\.md$/,
-      /^wiki\/log\.md$/,
-      /^AGENTS\.md$/,
-      /^IDEA\.md$/,
-    ];
-    return protectedPatterns.some((p) => p.test(path));
+    const del = [/^schema\//, /^system\//, /\/_TEMPLATE\.md$/, /^wiki\/index\.md$/, /^wiki\/log\.md$/, /^AGENTS\.md$/, /^IDEA\.md$/];
+    return del.some((p) => p.test(path));
+  }, []);
+
+  // Read-only (not editable): raw/, schema/, system/, AGENTS.md, IDEA.md
+  // system/update_log.md is editable (append-only), wiki/* is editable
+  const isPageEditable = useCallback((path: string) => {
+    const ro = [/^raw\//, /^schema\//, /^system\/(?!update_log\.md)/, /^AGENTS\.md$/, /^IDEA\.md$/];
+    return !ro.some((p) => p.test(path));
   }, []);
 
   const handleDelete = useCallback((targetPath: string, isFile: boolean) => {
@@ -273,7 +276,7 @@ export function WikiPage() {
               <Skeleton className="h-4 w-5/6" />
             </div>
           ) : pageDetail ? (
-            <WikiPageViewer page={pageDetail} spaceSlug={spaceSlug} onSelect={handleSelectPage} />
+            <WikiPageViewer page={pageDetail} spaceSlug={spaceSlug} onSelect={handleSelectPage} editable={isPageEditable(pageDetail.path)} />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Page not found
