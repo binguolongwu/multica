@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/url"
 	"sort"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -135,14 +138,15 @@ func (s *Service) DeleteConfig(ctx context.Context, id, workspaceID pgtype.UUID)
 
 // --- File Operations ---
 
-// UploadFile stores a file via the driver and records metadata in oss_object.
-// workspaceID gates access to the config — prevents cross-workspace IDOR.
 func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.UUID, key, filename string, body io.Reader, size int64, contentType string, uploadedBy pgtype.UUID) (db.OssObject, error) {
 	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
 		ID: configID, WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		return db.OssObject{}, fmt.Errorf("get oss config: %w", err)
+	}
+	if err := validateEndpoint(cfgRow.Endpoint); err != nil {
+		return db.OssObject{}, fmt.Errorf("invalid endpoint: %w", err)
 	}
 
 	d, err := s.driverFor(cfgRow.Provider)
@@ -176,6 +180,9 @@ func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.U
 // list objects (limit 1). Returns an error if the credentials or bucket
 // are invalid.
 func (s *Service) TestConnection(ctx context.Context, params CreateConfigParams) error {
+	if err := validateEndpoint(params.Endpoint); err != nil {
+		return fmt.Errorf("invalid endpoint: %w", err)
+	}
 	pc := ProviderConfig{
 		Provider:     params.Provider,
 		Bucket:       params.Bucket,
@@ -282,6 +289,37 @@ func (s *Service) toProviderConfig(cfg db.OssProviderConfig) ProviderConfig {
 		CustomDomain: cfg.CustomDomain,
 		FolderPrefix: cfg.FolderPrefix,
 	}
+}
+
+// validateEndpoint rejects private/loopback/link-local endpoints to prevent SSRF.
+func validateEndpoint(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid endpoint URL: %w", err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("unsupported endpoint scheme: %s", u.Scheme)
+	}
+	host := u.Hostname()
+	// Allow well-known cloud domains
+	for _, safe := range []string{".aliyuncs.com", ".myqcloud.com", ".qcloud.com", ".amazonaws.com", ".clouddn.com", ".bcebos.com", ".obs.cn-", ".volces.com"} {
+		if strings.HasSuffix(host, safe) {
+			return nil
+		}
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve endpoint host: %w", err)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() || ip.IsUnspecified() {
+			return fmt.Errorf("endpoint resolves to restricted IP: %s", ip)
+		}
+	}
+	return nil
 }
 
 func resolveKey(prefix, key string) string {
