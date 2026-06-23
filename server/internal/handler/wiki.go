@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"unicode/utf8"
 	"net"
 	"net/http"
 	"net/url"
@@ -1000,7 +1001,7 @@ func (h *Handler) CreateWikiOperation(w http.ResponseWriter, r *http.Request) {
 		prompt := h.buildWikiIngestPrompt(r.Context(), space.ID)
 		result, createErr := h.IssueService.Create(r.Context(), service.IssueCreateParams{
 			WorkspaceID:  parseUUID(workspaceID),
-			Title:        "Wiki ingest: Process raw/ sources into wiki/",
+			Title:        fmt.Sprintf("Wiki ingest %s", uuidToString(op.ID)),
 			Description:  pgtype.Text{String: prompt, Valid: true},
 			Status:       "todo",
 			Priority:     "none",
@@ -1353,12 +1354,25 @@ func (h *Handler) buildWikiIngestPrompt(ctx context.Context, spaceID pgtype.UUID
 	return truncateStr(b.String(), 6000)
 }
 
-// truncateStr truncates s to maxLen characters, adding "..." when truncated.
+// truncateStr truncates s to at most maxLen bytes without splitting a UTF-8
+// character, adding "..." when truncated.
 func truncateStr(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	// Walk backward from maxLen to find the last valid UTF-8 boundary.
+	cut := maxLen
+	for cut > 0 && cut < len(s) {
+		r, _ := utf8.DecodeLastRuneInString(s[:cut+1])
+		if r != utf8.RuneError {
+			break
+		}
+		cut--
+	}
+	if cut == 0 {
+		cut = maxLen
+	}
+	return s[:cut] + "..."
 }
 
 // resolveWikiAgent returns the agent ID to use for wiki operations.
