@@ -58,7 +58,7 @@
     "ingest_dir_confirm": "确认",
     "ingest_import_to": "导入至:",
     "ingest_browse": "浏览",
-    "tree_cannot_delete": "目录下有文件或子目录，请先清空后再删除。"
+    "tree_cannot_delete": "目录下有文件或子目录，请先清空后再删除。", "tree_protected": "系统页面受保护，不可删除"
   },
   "workspace_loader": {
     "loading_workspace": "正在加载工作区...",

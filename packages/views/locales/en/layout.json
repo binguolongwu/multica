@@ -58,7 +58,7 @@
     "ingest_dir_confirm": "Confirm",
     "ingest_import_to": "Import to:",
     "ingest_browse": "Browse",
-    "tree_cannot_delete": "Directory has files or subdirectories. Remove them first."
+    "tree_cannot_delete": "Directory has files or subdirectories. Remove them first.", "tree_protected": "System pages are protected and cannot be deleted"
   },
   "workspace_loader": {
     "loading_workspace": "Loading workspace…",

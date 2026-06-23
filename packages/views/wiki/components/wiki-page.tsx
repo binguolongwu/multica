@@ -85,8 +85,26 @@ export function WikiPage() {
     });
   }, [upsertPage]);
 
+  // Protected paths: schema rules, system logs, templates, index, AGENTS, IDEA
+  const isProtectedPath = useCallback((path: string) => {
+    const protectedPatterns = [
+      /^schema\//,
+      /^system\//,
+      /\/_TEMPLATE\.md$/,
+      /^wiki\/index\.md$/,
+      /^wiki\/log\.md$/,
+      /^AGENTS\.md$/,
+      /^IDEA\.md$/,
+    ];
+    return protectedPatterns.some((p) => p.test(path));
+  }, []);
+
   const handleDelete = useCallback((targetPath: string, isFile: boolean) => {
     if (isFile) {
+      if (isProtectedPath(targetPath)) {
+        toast.error(t(($) => $.wiki_page.tree_protected));
+        return;
+      }
       if (!confirm(`Delete "${targetPath}"? This cannot be undone.`)) return;
       deletePage.mutate(targetPath, {
         onSuccess: () => {
@@ -94,6 +112,11 @@ export function WikiPage() {
         },
       });
     } else {
+      // Protected directories: schema, system are undeletable
+      if (/^(schema|system)$/.test(targetPath)) {
+        toast.error(t(($) => $.wiki_page.tree_protected));
+        return;
+      }
       // Directory: check for children first
       const hasChildren = (pages || []).some((p) =>
         p.path.startsWith(`${targetPath}/`) && !p.path.endsWith("/.gitkeep"),
