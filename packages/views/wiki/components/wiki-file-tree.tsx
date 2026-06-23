@@ -23,7 +23,7 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-function buildTree(pages: WikiPage[], enabledDirs: string[]): TreeNode[] {
+function buildTree(pages: WikiPage[], enabledDirs: string[], titleMap: Map<string, string>): TreeNode[] {
   // Use empty string as root so all top-level entries (AGENTS.md, IDEA.md, raw/, wiki/) are siblings
   const root: TreeNode = { name: "", path: "", isDir: true, children: [] };
   const pathMap = new Map<string, TreeNode>();
@@ -31,6 +31,7 @@ function buildTree(pages: WikiPage[], enabledDirs: string[]): TreeNode[] {
 
   for (const page of pages) {
     if (page.path.endsWith("/.gitkeep")) continue;
+    if (page.title) titleMap.set(page.path, page.title);
 
     const parts = page.path.split("/");
     let currentPath = "";
@@ -75,8 +76,8 @@ function buildTree(pages: WikiPage[], enabledDirs: string[]): TreeNode[] {
   return root.children;
 }
 
-function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir }: {
-  node: TreeNode; depth: number; selectedPath: string | null; selectedDir: string; onSelect: (path: string) => void; onSelectDir: (dir: string) => void;
+function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir, titleMap }: {
+  node: TreeNode; depth: number; selectedPath: string | null; selectedDir: string; onSelect: (path: string) => void; onSelectDir: (dir: string) => void; titleMap: Map<string, string>;
 }) {
   const [expanded, setExpanded] = useState(true);
   if (node.isDir) {
@@ -99,7 +100,7 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
           <span className={`truncate text-xs ${isSelected ? "font-medium" : "text-muted-foreground"}`}>{node.name}</span>
         </button>
         {expanded && node.children.map((c) => (
-          <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} />
+          <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} />
         ))}
       </div>
     );
@@ -111,14 +112,18 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
       onClick={() => onSelect(node.path)}
     >
       <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-      <span className="truncate text-xs">{node.name}</span>
+      <span className="truncate text-xs">{titleMap.get(node.path) || node.name}</span>
     </button>
   );
 }
 
 export function WikiFileTree({ pages, selectedPath, selectedDir, onSelect, onSelectDir, onCreateDir, onDelete, enabledDirs }: WikiFileTreeProps) {
   const { t } = useT("layout");
-  const tree = useMemo(() => buildTree(pages, enabledDirs), [pages, enabledDirs]);
+  const { tree, titleMap } = useMemo(() => {
+    const m = new Map<string, string>();
+    const t = buildTree(pages, enabledDirs, m);
+    return { tree: t, titleMap: m };
+  }, [pages, enabledDirs]);
   const [newNameInput, setNewNameInput] = useState("");
   const [showNewInput, setShowNewInput] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -185,7 +190,7 @@ export function WikiFileTree({ pages, selectedPath, selectedDir, onSelect, onSel
       </div>
       {/* Tree */}
       <div className="flex-1 overflow-y-auto py-1">
-        {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} />)}
+        {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} />)}
       </div>
     </div>
   );
