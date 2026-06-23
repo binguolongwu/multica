@@ -148,13 +148,23 @@ export function WikiPageViewer({ page, spaceSlug = "default", onSelect }: { page
           {page.links && page.links.length > 0 && (
             <div className="mt-8 border-t pt-6">
               <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.links)}</h3>
-              <ul className="space-y-1">{page.links.map((l) => <li key={l.target} className="text-sm"><span className={l.exists ? "text-primary" : "text-muted-foreground line-through"}>{l.title || l.target}</span>{l.snippet && <span className="ml-2 text-xs text-muted-foreground">— {l.snippet}</span>}</li>)}</ul>
+              <ul className="space-y-1">{page.links.map((l) => (
+                <li key={l.target} className="text-sm">
+                  <a href="#" className={l.exists ? "text-primary hover:underline cursor-pointer" : "text-muted-foreground"} onClick={(e) => { e.preventDefault(); if (onSelect) onSelect(l.target); }}>{l.title || l.target}</a>
+                  {l.snippet && <span className="ml-2 text-xs text-muted-foreground">— {l.snippet}</span>}
+                </li>
+              ))}</ul>
             </div>
           )}
           {page.backlinks && page.backlinks.length > 0 && (
             <div className="mt-6 border-t pt-6">
               <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.backlinks)} ({page.backlinks.length})</h3>
-              <ul className="space-y-2">{page.backlinks.map((bl) => <li key={bl.source} className="text-sm"><span className="font-medium text-primary">{bl.title || bl.source}</span>{bl.context && <p className="mt-0.5 text-xs text-muted-foreground">{bl.context}</p>}</li>)}</ul>
+              <ul className="space-y-2">{page.backlinks.map((bl) => (
+                <li key={bl.source} className="text-sm">
+                  <a href="#" className="font-medium text-primary hover:underline cursor-pointer" onClick={(e) => { e.preventDefault(); if (onSelect) onSelect(bl.source); }}>{bl.title || bl.source}</a>
+                  {bl.context && <p className="mt-0.5 text-xs text-muted-foreground">{bl.context}</p>}
+                </li>
+              ))}</ul>
             </div>
           )}
         </div>
