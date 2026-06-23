@@ -139,6 +139,8 @@ export type {
   CreateWikiOperationRequest,
   ListWikiPagesParams,
   ListWikiOperationsParams,
+  CrawlURLRequest,
+  CrawlURLResponse,
 } from "../wiki/types";
 export type {
   Autopilot,

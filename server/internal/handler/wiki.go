@@ -22,13 +22,15 @@ import (
 // ── Request types ──
 
 type createWikiSpaceRequest struct {
-	Slug        string `json:"slug"`
-	DisplayName string `json:"display_name"`
-	AccessScope string `json:"access_scope"`
+	Slug        string  `json:"slug"`
+	DisplayName string  `json:"display_name"`
+	AccessScope string  `json:"access_scope"`
+	Template    *string `json:"template,omitempty"`
 }
 
 type updateWikiSpaceRequest struct {
-	DisplayName *string `json:"display_name,omitempty"`
+	DisplayName    *string `json:"display_name,omitempty"`
+	DefaultAgentID *string `json:"default_agent_id,omitempty"`
 }
 
 type writeWikiPageRequest struct {
@@ -69,26 +71,29 @@ type createWikiOperationRequest struct {
 // ── Response types ──
 
 type wikiSpaceResponse struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	Slug        string `json:"slug"`
-	DisplayName string `json:"display_name"`
-	AccessScope string `json:"access_scope"`
-	Status      string `json:"status"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID             string  `json:"id"`
+	WorkspaceID    string  `json:"workspace_id"`
+	Slug           string  `json:"slug"`
+	DisplayName    string  `json:"display_name"`
+	AccessScope    string  `json:"access_scope"`
+	Status         string  `json:"status"`
+	DefaultAgentID *string `json:"default_agent_id"`
+	Template       string  `json:"template"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 type wikiPageResponse struct {
-	ID          string  `json:"id"`
-	SpaceID     string  `json:"space_id"`
-	Path        string  `json:"path"`
-	Title       *string `json:"title"`
-	PageType    *string `json:"page_type"`
-	Content     string  `json:"content"`
-	ContentHash string  `json:"content_hash"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID                string   `json:"id"`
+	SpaceID           string   `json:"space_id"`
+	Path              string   `json:"path"`
+	Title             *string  `json:"title"`
+	PageType          *string  `json:"page_type"`
+	Content           string   `json:"content"`
+	ContentHash       string   `json:"content_hash"`
+	ValidationWarnings []string `json:"validation_warnings"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 type wikiPageDetailResponse struct {
@@ -216,12 +221,18 @@ func (h *Handler) CreateWikiSpace(w http.ResponseWriter, r *http.Request) {
 		req.AccessScope = "shared"
 	}
 
+	var template pgtype.Text
+	if req.Template != nil {
+		template = pgtype.Text{String: *req.Template, Valid: true}
+	}
+
 	space, err := h.Queries.CreateWikiSpace(r.Context(), db.CreateWikiSpaceParams{
 		WorkspaceID: parseUUID(workspaceID),
 		Slug:        req.Slug,
 		DisplayName: req.DisplayName,
 		AccessScope: req.AccessScope,
 		Settings:    []byte("{}"),
+		Template:    template,
 	})
 	if err != nil {
 		writeError(w, http.StatusConflict, "wiki space already exists or is invalid")
@@ -277,10 +288,16 @@ func (h *Handler) UpdateWikiSpace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var defaultAgentID pgtype.UUID
+	if req.DefaultAgentID != nil && *req.DefaultAgentID != "" {
+		defaultAgentID = parseUUID(*req.DefaultAgentID)
+	}
+
 	space, err := h.Queries.UpdateWikiSpace(r.Context(), db.UpdateWikiSpaceParams{
-		WorkspaceID: parseUUID(workspaceID),
-		Slug:        slug,
-		DisplayName: ptrToText(req.DisplayName),
+		WorkspaceID:    parseUUID(workspaceID),
+		Slug:           slug,
+		DisplayName:    ptrToText(req.DisplayName),
+		DefaultAgentID: defaultAgentID,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update wiki space")
@@ -479,7 +496,8 @@ func (h *Handler) UpsertWikiPage(w http.ResponseWriter, r *http.Request) {
 	contentHash := wiki.ContentHash(req.Content)
 	title := wiki.ExtractTitle(req.Content)
 	pageType := wiki.InferPageType(path)
-	backlinks := wiki.BacklinksToJSON(wiki.ExtractWikiLinks(req.Content))
+	links := wiki.ExtractWikiLinks(req.Content)
+	backlinks := wiki.BacklinksToJSON(links)
 
 	var titlePtr *string
 	if title != "" {
@@ -503,6 +521,50 @@ func (h *Handler) UpsertWikiPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to write page")
 		return
+	}
+
+	// Soft validation: check linking rules and store warnings
+	warnings := wiki.ValidateLinks(path, links)
+	var warningsJSON []byte
+	if len(warnings) > 0 {
+		warningsJSON, _ = json.Marshal(warnings)
+	}
+	_ = h.Queries.SetWikiPageValidationWarnings(r.Context(), db.SetWikiPageValidationWarningsParams{
+		SpaceID: space.ID,
+		Column2: warningsJSON,
+		Path:    path,
+	})
+
+	// If there are validation warnings, log them to system/conflict_log.md
+	if len(warnings) > 0 {
+		conflictPath := "system/conflict_log.md"
+		conflictContent := "# Conflict Log\n\n"
+		existingConflict, err := h.Queries.GetWikiPageByPath(r.Context(), db.GetWikiPageByPathParams{
+			SpaceID: space.ID,
+			Path:    conflictPath,
+		})
+		if err == nil {
+			conflictContent = existingConflict.Content
+		}
+		if !strings.HasSuffix(conflictContent, "\n") {
+			conflictContent += "\n"
+		}
+		now := time.Now().Format(time.RFC3339)
+		line := fmt.Sprintf("- %s — [%s]: %s\n", now, path, strings.Join(warnings, "; "))
+		conflictContent += line
+		conflictHash := wiki.ContentHash(conflictContent)
+		conflictLinks := wiki.ExtractWikiLinks(conflictContent)
+		conflictBacklinks := wiki.BacklinksToJSON(conflictLinks)
+		_, _ = h.Queries.UpsertWikiPage(r.Context(), db.UpsertWikiPageParams{
+			SpaceID:     space.ID,
+			Path:        conflictPath,
+			Title:       pgtype.Text{String: "Conflict Log", Valid: true},
+			PageType:    pgtype.Text{String: "meta", Valid: true},
+			Content:     conflictContent,
+			Frontmatter: []byte("{}"),
+			Backlinks:   conflictBacklinks,
+			ContentHash: conflictHash,
+		})
 	}
 
 	// Create revision
@@ -1039,29 +1101,37 @@ func htmlToText(s string) string {
 }
 
 func wikiSpaceToResponse(s db.WikiSpace) wikiSpaceResponse {
+	var defaultAgentID *string
+	if s.DefaultAgentID.Valid {
+		id := uuidToString(s.DefaultAgentID)
+		defaultAgentID = &id
+	}
 	return wikiSpaceResponse{
-		ID:          uuidToString(s.ID),
-		WorkspaceID: uuidToString(s.WorkspaceID),
-		Slug:        s.Slug,
-		DisplayName: s.DisplayName,
-		AccessScope: s.AccessScope,
-		Status:      s.Status,
-		CreatedAt:   timestampToString(s.CreatedAt),
-		UpdatedAt:   timestampToString(s.UpdatedAt),
+		ID:             uuidToString(s.ID),
+		WorkspaceID:    uuidToString(s.WorkspaceID),
+		Slug:           s.Slug,
+		DisplayName:    s.DisplayName,
+		AccessScope:    s.AccessScope,
+		Status:         s.Status,
+		DefaultAgentID: defaultAgentID,
+		Template:       s.Template,
+		CreatedAt:      timestampToString(s.CreatedAt),
+		UpdatedAt:      timestampToString(s.UpdatedAt),
 	}
 }
 
 func wikiPageToResponse(p db.WikiPage) wikiPageResponse {
 	return wikiPageResponse{
-		ID:          uuidToString(p.ID),
-		SpaceID:     uuidToString(p.SpaceID),
-		Path:        p.Path,
-		Title:       textToPtr(p.Title),
-		PageType:    textToPtr(p.PageType),
-		Content:     p.Content,
-		ContentHash: p.ContentHash,
-		CreatedAt:   timestampToString(p.CreatedAt),
-		UpdatedAt:   timestampToString(p.UpdatedAt),
+		ID:                 uuidToString(p.ID),
+		SpaceID:            uuidToString(p.SpaceID),
+		Path:               p.Path,
+		Title:              textToPtr(p.Title),
+		PageType:           textToPtr(p.PageType),
+		Content:            p.Content,
+		ContentHash:        p.ContentHash,
+		ValidationWarnings: parseStringArray(p.ValidationWarnings),
+		CreatedAt:          timestampToString(p.CreatedAt),
+		UpdatedAt:          timestampToString(p.UpdatedAt),
 	}
 }
 

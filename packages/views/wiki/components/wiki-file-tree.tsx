@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { FileText, FolderOpen, Folder, ChevronRight, ChevronDown } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { FileText, FolderOpen, Folder, ChevronRight, ChevronDown, FolderPlus, Trash2 } from "lucide-react";
 import type { WikiPage } from "@multica/core/wiki";
+import { useT } from "../../i18n";
 
 interface WikiFileTreeProps {
   pages: WikiPage[];
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  selectedDir: string;
+  onSelectDir: (dir: string) => void;
+  onCreateDir: (parentDir: string, name: string) => void;
+  onDelete: (targetPath: string, isFile: boolean) => void;
+  enabledDirs: string[];
 }
 
 interface TreeNode {
@@ -17,7 +23,7 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-function buildTree(pages: WikiPage[]): TreeNode[] {
+function buildTree(pages: WikiPage[], enabledDirs: string[]): TreeNode[] {
   // Use empty string as root so all top-level entries (AGENTS.md, IDEA.md, raw/, wiki/) are siblings
   const root: TreeNode = { name: "", path: "", isDir: true, children: [] };
   const pathMap = new Map<string, TreeNode>();
@@ -45,8 +51,8 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
   }
 
   // Ensure known directories appear even when empty
-  const knownDirs = ["raw", "wiki/sources", "wiki/projects", "wiki/entities", "wiki/concepts", "wiki/synthesis", "wiki/areas"];
-  for (const dir of knownDirs) {
+  const allDirs = enabledDirs.includes("raw") ? enabledDirs : ["raw", ...enabledDirs];
+  for (const dir of allDirs) {
     if (pathMap.has(dir)) continue;
     const parts = dir.split("/");
     const name = parts[parts.length - 1] || dir;
@@ -69,24 +75,31 @@ function buildTree(pages: WikiPage[]): TreeNode[] {
   return root.children;
 }
 
-function TreeItem({ node, depth, selectedPath, onSelect }: {
-  node: TreeNode; depth: number; selectedPath: string | null; onSelect: (path: string) => void;
+function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir }: {
+  node: TreeNode; depth: number; selectedPath: string | null; selectedDir: string; onSelect: (path: string) => void; onSelectDir: (dir: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   if (node.isDir) {
+    const isSelected = selectedDir === node.path;
     return (
       <div key={node.path}>
         <button
-          className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent"
+          className={`flex w-full items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent ${isSelected ? "bg-accent ring-1 ring-inset ring-border" : ""}`}
           style={{ paddingLeft: 12 + depth * 16 }}
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => { onSelectDir(node.path); if (!expanded) setExpanded(true); }}
         >
-          {expanded ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
+          {(node.children.length > 0 || !expanded) ? (
+            <span className="flex h-3.5 w-3.5 items-center justify-center flex-shrink-0" onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>
+              {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+            </span>
+          ) : (
+            <span className="w-3.5 flex-shrink-0" />
+          )}
           {expanded ? <FolderOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" /> : <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
-          <span className="truncate text-xs font-medium text-muted-foreground">{node.name}</span>
+          <span className={`truncate text-xs ${isSelected ? "font-medium" : "text-muted-foreground"}`}>{node.name}</span>
         </button>
         {expanded && node.children.map((c) => (
-          <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} />
+          <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} />
         ))}
       </div>
     );
@@ -103,14 +116,77 @@ function TreeItem({ node, depth, selectedPath, onSelect }: {
   );
 }
 
-export function WikiFileTree({ pages, selectedPath, onSelect }: WikiFileTreeProps) {
-  const tree = useMemo(() => buildTree(pages), [pages]);
+export function WikiFileTree({ pages, selectedPath, selectedDir, onSelect, onSelectDir, onCreateDir, onDelete, enabledDirs }: WikiFileTreeProps) {
+  const { t } = useT("layout");
+  const tree = useMemo(() => buildTree(pages, enabledDirs), [pages, enabledDirs]);
+  const [newNameInput, setNewNameInput] = useState("");
+  const [showNewInput, setShowNewInput] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleNewClick = () => { setShowNewInput(true); setNewNameInput(""); setTimeout(() => inputRef.current?.focus(), 50); };
+
+  const handleCreate = () => {
+    const name = newNameInput.trim();
+    if (!name) return;
+    onCreateDir(selectedDir, name);
+    setShowNewInput(false);
+    setNewNameInput("");
+  };
+
+  const handleDelete = () => {
+    // Prefer deleting the selected file; fall back to selected directory
+    if (selectedPath) {
+      onDelete(selectedPath, true);
+    } else if (selectedDir) {
+      onDelete(selectedDir, false);
+    }
+  };
+
   if (tree.length === 0) {
     return <div className="p-4 text-center text-xs text-muted-foreground">No pages yet</div>;
   }
+
   return (
-    <div className="py-1">
-      {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} onSelect={onSelect} />)}
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1">
+        <button
+          className="inline-flex h-7 items-center justify-center gap-1 rounded px-2 hover:bg-accent text-xs"
+          title={t(($) => $.wiki_page.ingest_dir_new_folder)}
+          onClick={handleNewClick}
+        >
+          <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>{t(($) => $.wiki_page.ingest_dir_new_folder)}</span>
+        </button>
+        <button
+          className="inline-flex h-7 items-center justify-center gap-1 rounded px-2 hover:bg-destructive/10 disabled:opacity-30 text-xs"
+          title={t(($) => $.wiki_page.ingest_dir_delete)}
+          onClick={handleDelete}
+          disabled={!selectedPath && !selectedDir}
+        >
+          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>{t(($) => $.wiki_page.ingest_dir_delete)}</span>
+        </button>
+        {showNewInput && (
+          <div className="flex flex-1 items-center gap-1">
+            <input
+              ref={inputRef}
+              className="h-6 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus:border-primary"
+              placeholder={t(($) => $.wiki_page.ingest_dir_name)}
+              value={newNameInput}
+              onChange={(e) => setNewNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowNewInput(false); }}
+            />
+            <button className="shrink-0 rounded px-1.5 py-0.5 text-xs hover:bg-accent" onClick={handleCreate}>
+              {t(($) => $.wiki_page.ingest_dir_create)}
+            </button>
+          </div>
+        )}
+      </div>
+      {/* Tree */}
+      <div className="flex-1 overflow-y-auto py-1">
+        {tree.map((n) => <TreeItem key={n.path} node={n} depth={0} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} />)}
+      </div>
     </div>
   );
 }

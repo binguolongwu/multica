@@ -24,6 +24,100 @@ func New(queries *db.Queries) *Service {
 	return &Service{Queries: queries}
 }
 
+// ── Template system ──
+
+// WikiTemplate defines a directory layout preset.
+type WikiTemplate struct {
+	Name        string
+	Description string
+	Dirs        []string // wiki/ subdirectories (relative to wiki/)
+}
+
+// Templates is the built-in template catalog.
+var Templates = map[string]WikiTemplate{
+	"general": {
+		Name:        "general",
+		Description: "General-purpose knowledge base for project management.",
+		Dirs:        []string{"entities", "intents", "knowledge", "policies", "procedures", "insights", "summaries"},
+	},
+	"customer-service": {
+		Name:        "customer-service",
+		Description: "Customer service knowledge system with customer entities, intents, and procedures.",
+		Dirs:        []string{"entities", "intents", "knowledge", "policies", "procedures", "insights", "summaries"},
+	},
+	"engineering": {
+		Name:        "engineering",
+		Description: "Engineering knowledge base for services, RFCs, and incident response.",
+		Dirs:        []string{"entities", "intents", "knowledge", "policies", "procedures", "insights", "summaries"},
+	},
+}
+
+// CoreDirs are always present regardless of template.
+var CoreDirs = []string{"raw", "schema", "system"}
+
+// LinkingRule defines minimum link counts per directory.
+type LinkingRule struct {
+	MinTotalLinks  int
+	RequiresLinkTo []string // at least one link must match one of these prefixes
+}
+
+// LinkingRules maps wiki/ subdirectory to its linking requirements.
+var LinkingRules = map[string]LinkingRule{
+	"entities":   {MinTotalLinks: 2, RequiresLinkTo: []string{"intents/", "procedures/"}},
+	"intents":    {MinTotalLinks: 0, RequiresLinkTo: []string{"entities/", "procedures/"}},
+	"knowledge":  {MinTotalLinks: 1, RequiresLinkTo: []string{"entities/"}},
+	"policies":   {MinTotalLinks: 1, RequiresLinkTo: []string{"procedures/"}},
+	"procedures": {MinTotalLinks: 1, RequiresLinkTo: []string{"policies/", "intents/"}},
+	"insights":   {MinTotalLinks: 0, RequiresLinkTo: nil},
+	"summaries":  {MinTotalLinks: 0, RequiresLinkTo: nil},
+}
+
+// DirForPath returns the wiki/ subdirectory for a page path, e.g. "wiki/entities/foo.md" → "entities".
+func DirForPath(path string) string {
+	if !strings.HasPrefix(path, "wiki/") {
+		return ""
+	}
+	rest := strings.TrimPrefix(path, "wiki/")
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+// ValidateLinks checks link counts against linking rules and returns warnings.
+func ValidateLinks(path string, links []string) []string {
+	dir := DirForPath(path)
+	rule, ok := LinkingRules[dir]
+	if !ok {
+		return nil
+	}
+	var warnings []string
+	if rule.MinTotalLinks > 0 && len(links) < rule.MinTotalLinks {
+		warnings = append(warnings, fmt.Sprintf(
+			"%s requires at least %d links, found %d", dir, rule.MinTotalLinks, len(links)))
+	}
+	if len(rule.RequiresLinkTo) > 0 {
+		found := false
+		for _, prefix := range rule.RequiresLinkTo {
+			for _, link := range links {
+				if strings.HasPrefix(link, prefix) {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			warnings = append(warnings, fmt.Sprintf(
+				"%s requires at least one link to %s", dir, strings.Join(rule.RequiresLinkTo, " or ")))
+		}
+	}
+	return warnings
+}
+
 // ContentHash returns the SHA-256 hex digest of content.
 func ContentHash(content string) string {
 	h := sha256.Sum256([]byte(content))
@@ -76,20 +170,30 @@ func ExtractWikiLinks(content string) []string {
 // InferPageType guesses the wiki page type from its path.
 func InferPageType(path string) string {
 	switch {
+	case strings.HasPrefix(path, "wiki/entities/"):
+		return "entity"
+	case strings.HasPrefix(path, "wiki/intents/"):
+		return "intent"
+	case strings.HasPrefix(path, "wiki/knowledge/"):
+		return "knowledge"
+	case strings.HasPrefix(path, "wiki/policies/"):
+		return "policy"
+	case strings.HasPrefix(path, "wiki/procedures/"):
+		return "procedure"
+	case strings.HasPrefix(path, "wiki/insights/"):
+		return "insight"
+	case strings.HasPrefix(path, "wiki/summaries/"):
+		return "summary"
 	case strings.HasPrefix(path, "wiki/sources/"):
 		return "source"
 	case strings.HasPrefix(path, "wiki/projects/"):
 		return "project"
-	case strings.HasPrefix(path, "wiki/entities/"):
-		return "entity"
 	case strings.HasPrefix(path, "wiki/concepts/"):
 		return "concept"
-	case strings.HasPrefix(path, "wiki/synthesis/"):
-		return "synthesis"
 	case strings.HasPrefix(path, "wiki/areas/"):
 		return "area"
-	case strings.HasPrefix(path, "wiki/retrospectives/"):
-		return "retrospective"
+	case strings.HasPrefix(path, "wiki/synthesis/"):
+		return "synthesis"
 	case path == "wiki/index.md":
 		return "index"
 	case path == "wiki/log.md":
@@ -133,46 +237,79 @@ func (s *Service) BootstrapSpace(ctx context.Context, spaceID pgtype.UUID, slug 
 }
 
 func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug string) error {
-	pages := []struct {
+	// Determine template from the space; default to "general"
+	tmpl, ok := Templates["general"] // default
+	if !ok {
+		tmpl = Templates["general"]
+	}
+
+	type pageSpec struct {
 		path     string
 		title    string
 		content  string
 		pageType string
-	}{
-		{
-			path:     "wiki/index.md",
-			title:    "Wiki Index",
-			content:  `# Wiki Index\n\n## Sources\n\n*(none yet)*\n\n## Projects\n\n*(none yet)*\n\n## Entities\n\n*(none yet)*\n\n## Concepts\n\n*(none yet)*\n\n## Synthesis\n\n*(none yet)*\n\n## Areas\n\n*(none yet)*\n`,
+	}
+	var pages []pageSpec
+
+	// ── Core directory markers ──
+	for _, dir := range CoreDirs {
+		pages = append(pages, pageSpec{
+			path: dir + "/.gitkeep", title: ".gitkeep", content: "", pageType: "meta",
+		})
+	}
+
+	// ── Template wiki/ directories ──
+	for _, dir := range tmpl.Dirs {
+		pages = append(pages, pageSpec{
+			path: "wiki/" + dir + "/.gitkeep", title: ".gitkeep", content: "", pageType: "meta",
+		})
+		// _TEMPLATE.md for each directory
+		tmplContent := pageTemplateContent(dir)
+		if tmplContent != "" {
+			pages = append(pages, pageSpec{
+				path: "wiki/" + dir + "/_TEMPLATE.md", title: "_TEMPLATE", content: tmplContent, pageType: "meta",
+			})
+		}
+	}
+
+	// ── Schema files (replace old AGENTS.md/IDEA.md) ──
+	pages = append(pages,
+		pageSpec{path: "schema/writing_rules.md", title: "Writing Rules", content: writingRulesMd, pageType: "meta"},
+		pageSpec{path: "schema/linking_rules.md", title: "Linking Rules", content: linkingRulesMd, pageType: "meta"},
+		pageSpec{path: "schema/entity_rules.md", title: "Entity Rules", content: entityRulesMd, pageType: "meta"},
+		pageSpec{path: "schema/update_policy.md", title: "Update Policy", content: updatePolicyMd, pageType: "meta"},
+	)
+
+	// ── System log files ──
+	pages = append(pages,
+		pageSpec{path: "system/ingestion_log.md", title: "Ingestion Log", content: "# Ingestion Log\n\n", pageType: "meta"},
+		pageSpec{path: "system/update_log.md", title: "Update Log", content: fmt.Sprintf("## [%s] bootstrap | Wiki space \"%s\" created\n- template: %s\n- notes: Initial V2 bootstrap\n", time.Now().Format("2006-01-02"), slug, tmpl.Name), pageType: "meta"},
+		pageSpec{path: "system/conflict_log.md", title: "Conflict Log", content: "# Conflict Log\n\n", pageType: "meta"},
+	)
+
+	// ── Wiki index and log ──
+	pages = append(pages,
+		pageSpec{
+			path: "wiki/index.md", title: "Wiki Index",
+			content:  fmt.Sprintf("# Wiki Index\n\n_Last updated: %s_\n\n", time.Now().Format("2006-01-02 15:04")),
 			pageType: "index",
 		},
-		{
-			path:     "wiki/log.md",
-			title:    "Wiki Log",
-			content:  fmt.Sprintf("## [%s] setup | Wiki space created\n- new pages: [[wiki/index.md]], [[wiki/log.md]]\n- notes: Initial bootstrap of wiki space \"%s\"\n", time.Now().Format("2006-01-02"), slug),
+		pageSpec{
+			path: "wiki/log.md", title: "Wiki Log",
+			content:  fmt.Sprintf("## [%s] bootstrap | Wiki space \"%s\" created\n- template: %s\n- notes: Initial V2 bootstrap\n", time.Now().Format("2006-01-02"), slug, tmpl.Name),
 			pageType: "log",
 		},
-		{
-			path:     "AGENTS.md",
-			title:    "AGENTS.md — LLM Wiki Schema",
-			content:  agentsMdTemplate,
-			pageType: "meta",
+	)
+
+	// ── Legacy pages (V1 compat, keep AGENTS.md and IDEA.md) ──
+	pages = append(pages,
+		pageSpec{
+			path: "AGENTS.md", title: "AGENTS.md", content: agentsMdV2, pageType: "meta",
 		},
-		{
-			path:     "IDEA.md",
-			title:    "LLM Wiki Pattern",
-			content:  ideaMdTemplate,
-			pageType: "meta",
+		pageSpec{
+			path: "IDEA.md", title: "LLM Wiki Pattern V2", content: ideaMdV2, pageType: "meta",
 		},
-		// raw/ directory — imported raw documents
-		{path: "raw/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		// wiki/ directory markers — ensure empty dirs appear in tree
-		{path: "wiki/sources/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/projects/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/entities/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/concepts/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/synthesis/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-		{path: "wiki/areas/.gitkeep", title: ".gitkeep", content: "", pageType: "meta"},
-	}
+	)
 
 	for _, p := range pages {
 		contentHash := ContentHash(p.content)
@@ -195,7 +332,52 @@ func (s *Service) bootstrapPages(ctx context.Context, spaceID pgtype.UUID, slug 
 	return nil
 }
 
-const agentsMdTemplate = `# AGENTS.md — LLM Wiki Schema
+// pageTemplateContent returns the _TEMPLATE.md content for a wiki directory.
+func pageTemplateContent(dir string) string {
+	switch dir {
+	case "entities":
+		return entitiesTemplateMd
+	case "intents":
+		return intentsTemplateMd
+	case "knowledge":
+		return knowledgeTemplateMd
+	case "policies":
+		return policiesTemplateMd
+	case "procedures":
+		return proceduresTemplateMd
+	case "insights":
+		return insightsTemplateMd
+	case "summaries":
+		return summariesTemplateMd
+	default:
+		return ""
+	}
+}
+
+// ── Page template constants ──
+const entitiesTemplateMd = "# {{Entity Name}}\n\n## Attributes\n- type: {{customer | product | project | member | agent | other}}\n- status: {{active | inactive | pending}}\n- {{custom_key}}: {{custom_value}}\n\n## History\n- {{event_description}} ({{date}})\n\n## Related\n- [[intents/{{intent_name}}]]\n- [[policies/{{policy_name}}]]\n- [[procedures/{{procedure_name}}]]\n\n## Notes\n{{free_text}}\n"
+const intentsTemplateMd = "# {{Intent Name}}\n\n## Definition\n{{one_sentence_description}}\n\n## Triggers\n- \"{{user_phrase_1}}\"\n- \"{{user_phrase_2}}\"\n\n## Handling Strategy\n1. {{step_1}}\n2. {{step_2}}\n3. {{step_3}}\n\n## Expected Outcomes\n- {{outcome_1}}\n\n## Related\n- [[entities/{{entity}}]]\n- [[procedures/{{procedure}}]]\n"
+const knowledgeTemplateMd = "# {{Topic}}\n\n## Summary\n{{2-3 sentence overview}}\n\n## Details\n{{structured_content}}\n\n## Related\n- [[entities/{{entity}}]]\n- [[intents/{{intent}}]]\n"
+const policiesTemplateMd = "# {{Policy Name}}\n\n## Scope\n{{who_does_this_apply_to}}\n\n## Rule\n{{concise_rule_statement}}\n\n## Exceptions\n- {{exception_1}}\n\n## Consequences\n{{what_happens_when_applied}}\n\n## Related\n- [[procedures/{{procedure}}]]\n"
+const proceduresTemplateMd = "# {{Procedure Name}}\n\n## Trigger\n{{when_to_execute}}\n\n## Steps\n1. {{step_1}}\n2. {{step_2}}\n\n## Expected Duration\n{{time_estimate}}\n\n## Related\n- [[policies/{{policy}}]]\n- [[intents/{{intent}}]]\n"
+const insightsTemplateMd = "# {{Insight Title}}\n\n## Source\n- raw/{{source_file}}\n\n## Finding\n{{key_insight}}\n\n## Evidence\n{{supporting_data}}\n\n## Recommendations\n- {{action_1}}\n\n## Related\n- [[entities/{{entity}}]]\n- [[intents/{{intent}}]]\n"
+const summariesTemplateMd = "# {{Summary Title}}\n\n## Period\n{{start_date}} to {{end_date}}\n\n## Source\n- raw/{{source_file}}\n\n## Key Points\n- {{point_1}}\n- {{point_2}}\n\n## Related\n- [[insights/{{insight}}]]\n"
+
+// ── Schema file constants ──
+const writingRulesMd = "# Wiki Writing Rules\n\n## Immutable Layers\n- /raw/   — source of truth, never edit\n- /schema/ — these rules, human-reviewed changes only\n- /system/ — auto-generated logs\n\n## LLM-editable Layers\n- /wiki/** — core knowledge layer\n- system/update_log.md — append-only update records\n\n## Format\n- All pages MUST be valid markdown\n- Use frontmatter for metadata\n- Use [[wikilinks]] for cross-references\n- Prefer structured sections over free text\n- Every page MUST follow its directory's _TEMPLATE.md\n\n## Anti-patterns\n- Do NOT create pages outside /wiki/ except update_log\n- Do NOT duplicate entities — check index.md first\n- Do NOT remove information; use strikethrough and note why\n"
+
+const linkingRulesMd = "# Wiki Linking Rules\n\n## Entity pages MUST link to:\n- At least 2 other nodes (entity, intent, policy, or procedure)\n- At least 1 [[intents/...]] or [[procedures/...]]\n\n## Intent pages MUST link to:\n- At least 1 [[entities/...]]\n- At least 1 [[procedures/...]]\n\n## Policy pages MUST link to:\n- At least 1 [[procedures/...]]\n\n## Procedure pages MUST link to:\n- At least 1 [[policies/...]] or [[intents/...]]\n\n## Knowledge pages MUST link to:\n- At least 1 [[entities/...]]\n\n## General\n- Broken links are flagged in system/conflict_log.md\n- Orphan pages (no incoming links) are flagged monthly\n"
+
+const entityRulesMd = "# Entity Rules\n\n## Entity lifecycle\n- Created: from raw/ data extraction\n- Updated: when new raw/ data references this entity\n- Merged: when two entities describe the same thing (mark one as redirect)\n- Archived: moved to entities/.archived/ if inactive > 90 days\n\n## Naming\n- customer_NNN for customer entities\n- product_XXX for product entities\n- Lowercase, underscores, ASCII only\n\n## Attributes\n- Every entity MUST have: type, status\n- Prefer structured key:value over prose in Attributes section\n"
+
+const updatePolicyMd = "# Update Policy\n\n## When to update\n- New raw/ data arrives — review within 24h\n- index.md regenerated weekly (or on demand)\n- Conflict detected — write conflict_log, keep latest verified version\n\n## Confidence\n- Every update SHOULD include a confidence annotation:\n  - [high]   — verified against multiple raw sources\n  - [medium] — single source, plausible\n  - [low]    — inferred, needs verification\n\n## Conflict resolution\n- Preserve latest verified version\n- Mark disputed section with <!-- CONFLICT: reason -->\n- Log to system/conflict_log.md\n"
+
+// ── V2 AGENTS.md / IDEA.md ──
+const agentsMdV2 = "# AGENTS.md — LLM Wiki V2\n\nYou are the maintainer of this workspace wiki. The wiki is a persistent, interlinked\nknowledge base following the Karpathy LLM Wiki pattern.\n\n## Layout\n- schema/ — behavior rules (read at startup)\n- raw/ — immutable source documents\n- system/ — ingestion_log, update_log, conflict_log\n- wiki/ — index.md, log.md, entities/, intents/, knowledge/, policies/, procedures/, insights/, summaries/\n\n## Key Principles\n- Entity-first: everything belongs to an entity, intent, or procedure\n- raw/ is immutable — read only, never edit\n- Every wiki/ page must follow its _TEMPLATE.md\n- Cross-link with [[wikilinks]]\n- Log all changes to system/update_log.md\n\n## Operations\nSee: multica-wiki-ingest, multica-wiki-maintain, multica-wiki-query, multica-wiki-lint,\nmultica-wiki-index-refresh. Read schema/*.md at startup for full instructions.\n"
+
+const ideaMdV2 = "# LLM Wiki V2 — Karpathy-Style Knowledge System\n\nThe wiki follows the LLM Wiki pattern with configurable templates, schema-driven\nbehavior, and entity-first design.\n\n## Layers\n1. raw/ — immutable source documents (truth layer)\n2. wiki/ — LLM-maintained structured knowledge\n3. schema/ — behavior rules the agent reads at startup\n4. system/ — logs for auditability\n\n## Why This Pattern\nLLM Wiki accumulates knowledge: the LLM reads sources once, extracts structured\nunderstanding, and writes durable, interlinked pages. Knowledge compounds over time.\n\n## References\n- schema/writing_rules.md\n- schema/linking_rules.md\n- schema/entity_rules.md\n- schema/update_policy.md\n"
+
+const agentsMdTemplate = `# AGENTS.md — LLM Wiki Schema (V1, retained for reference)
 
 You are the maintainer of this workspace wiki. The wiki is a persistent, interlinked
 knowledge base. You read sources, extract knowledge, and integrate it into evolving

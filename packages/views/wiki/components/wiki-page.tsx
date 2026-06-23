@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2, Download, ChevronDown, Check } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
-import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace } from "@multica/core/wiki";
+import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace, useUpsertWikiPage, useDeleteWikiPage, useUpdateWikiSpace } from "@multica/core/wiki";
 import { agentListOptions } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
@@ -27,6 +27,43 @@ export function WikiPage() {
   const [spaceSlug] = useState(DEFAULT_SPACE);
   const [ingestOpen, setIngestOpen] = useState(false);
   const [wikiAgentId, setWikiAgentId] = useState<string>("");
+  const [selectedDir, setSelectedDir] = useState<string>("");
+  const updateSpace = useUpdateWikiSpace(wsId);
+  const initialRender = useRef(true);
+
+  // Save agent selection to wiki_space
+  useEffect(() => {
+    if (initialRender.current) {
+      initialRender.current = false;
+      return;
+    }
+    if (wikiAgentId) {
+      updateSpace.mutate({ slug: spaceSlug, data: { default_agent_id: wikiAgentId } });
+    }
+  }, [wikiAgentId, spaceSlug, updateSpace]);
+
+  const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
+
+  // Load saved agent from wiki_space on mount
+  const agentLoaded = useRef(false);
+  useEffect(() => {
+    if (!agentLoaded.current && spaces?.[0]?.default_agent_id) {
+      setWikiAgentId(spaces[0].default_agent_id);
+      agentLoaded.current = true;
+    }
+  }, [spaces]);
+
+  const enabledDirs = useMemo(() => {
+    const defaultDirs = ["raw", "wiki/entities", "wiki/intents", "wiki/knowledge", "wiki/policies", "wiki/procedures", "wiki/insights", "wiki/summaries"];
+    try {
+      const s = spaces?.[0];
+      if (s && (s as any).settings?.enabled_dirs) {
+        const dirs = (s as any).settings.enabled_dirs;
+        return ["raw", ...dirs.map((d: string) => `wiki/${d}`)];
+      }
+    } catch {}
+    return defaultDirs;
+  }, [spaces]);
 
   const { data: agents } = useQuery(agentListOptions(wsId));
   const [agentOpen, setAgentOpen] = useState(false);
@@ -35,9 +72,9 @@ export function WikiPage() {
     !agentSearch || a.name.toLowerCase().includes(agentSearch.toLowerCase()),
   );
   const selectedAgent = agents?.find((a) => a.id === wikiAgentId);
-
-  const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
   const createSpace = useCreateWikiSpace(wsId);
+  const upsertPage = useUpsertWikiPage(wsId, spaceSlug);
+  const deletePage = useDeleteWikiPage(wsId, spaceSlug);
   const { data: pages, isLoading: pagesLoading } = useQuery(
     wikiPagesOptions(wsId, spaceSlug, searchQuery ? { search: searchQuery } : undefined),
   );
@@ -49,6 +86,43 @@ export function WikiPage() {
     setSelectedPath(path);
     setSearchQuery("");
   }, []);
+
+  const handleCreateDir = useCallback((parentDir: string, name: string) => {
+    const dirPath = parentDir ? `${parentDir}/${name}` : name;
+    upsertPage.mutate({
+      path: `${dirPath}/.gitkeep`,
+      data: { content: "" },
+    });
+  }, [upsertPage]);
+
+  const handleDelete = useCallback((targetPath: string, isFile: boolean) => {
+    if (isFile) {
+      if (!confirm(`Delete "${targetPath}"? This cannot be undone.`)) return;
+      deletePage.mutate(targetPath, {
+        onSuccess: () => {
+          if (selectedPath === targetPath) setSelectedPath(null);
+        },
+      });
+    } else {
+      // Directory: check for children first
+      const hasChildren = (pages || []).some((p) =>
+        p.path.startsWith(`${targetPath}/`) && !p.path.endsWith("/.gitkeep"),
+      );
+      if (hasChildren) {
+        alert(t(($) => $.wiki_page.tree_cannot_delete));
+        return;
+      }
+      if (!confirm(`Delete directory "${targetPath}/"? This cannot be undone.`)) return;
+      // Delete the .gitkeep marker
+      const gitkeep = (pages || []).find((p) => p.path === `${targetPath}/.gitkeep`);
+      if (gitkeep) deletePage.mutate(gitkeep.path);
+      // Also delete any empty subdir .gitkeep markers recursively
+      (pages || []).filter((p) => p.path.startsWith(`${targetPath}/`) && p.path.endsWith("/.gitkeep")).forEach((p) => {
+        deletePage.mutate(p.path);
+      });
+      if (selectedDir === targetPath) setSelectedDir("");
+    }
+  }, [pages, deletePage, selectedPath, selectedDir, t]);
 
   if (spacesLoading) {
     return (
@@ -154,7 +228,16 @@ export function WikiPage() {
               <Skeleton className="h-4 w-2/3" />
             </div>
           ) : (
-            <WikiFileTree pages={pages ?? []} selectedPath={selectedPath} onSelect={handleSelectPage} />
+            <WikiFileTree
+              pages={pages ?? []}
+              selectedPath={selectedPath}
+              onSelect={handleSelectPage}
+              selectedDir={selectedDir}
+              onSelectDir={setSelectedDir}
+              onCreateDir={handleCreateDir}
+              onDelete={handleDelete}
+              enabledDirs={enabledDirs}
+            />
           )}
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -181,7 +264,7 @@ export function WikiPage() {
         </div>
       </div>
 
-      <WikiIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} spaceSlug={spaceSlug} wikiAgentId={wikiAgentId} />
+      <WikiIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} spaceSlug={spaceSlug} wikiAgentId={wikiAgentId} defaultDir={selectedDir || "raw"} />
     </div>
   );
 }

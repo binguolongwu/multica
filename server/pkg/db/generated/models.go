@@ -814,18 +814,19 @@ type WikiOperation struct {
 }
 
 type WikiPage struct {
-	ID                pgtype.UUID        `json:"id"`
-	SpaceID           pgtype.UUID        `json:"space_id"`
-	Path              string             `json:"path"`
-	Title             pgtype.Text        `json:"title"`
-	PageType          pgtype.Text        `json:"page_type"`
-	Content           string             `json:"content"`
-	Frontmatter       []byte             `json:"frontmatter"`
-	Backlinks         []byte             `json:"backlinks"`
-	ContentHash       string             `json:"content_hash"`
-	CurrentRevisionID pgtype.UUID        `json:"current_revision_id"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ID                 pgtype.UUID        `json:"id"`
+	SpaceID            pgtype.UUID        `json:"space_id"`
+	Path               string             `json:"path"`
+	Title              pgtype.Text        `json:"title"`
+	PageType           pgtype.Text        `json:"page_type"`
+	Content            string             `json:"content"`
+	Frontmatter        []byte             `json:"frontmatter"`
+	Backlinks          []byte             `json:"backlinks"`
+	ContentHash        string             `json:"content_hash"`
+	CurrentRevisionID  pgtype.UUID        `json:"current_revision_id"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	ValidationWarnings []byte             `json:"validation_warnings"`
 }
 
 type WikiPageRevision struct {
@@ -852,31 +853,34 @@ type WikiQuerySession struct {
 }
 
 type WikiSource struct {
-	ID           pgtype.UUID        `json:"id"`
-	SpaceID      pgtype.UUID        `json:"space_id"`
-	SourceType   string             `json:"source_type"`
-	Title        string             `json:"title"`
-	Url          pgtype.Text        `json:"url"`
-	RawPath      string             `json:"raw_path"`
-	Content      string             `json:"content"`
-	ContentHash  string             `json:"content_hash"`
-	AttachmentID pgtype.UUID        `json:"attachment_id"`
-	MimeType     pgtype.Text        `json:"mime_type"`
-	Status       string             `json:"status"`
-	Metadata     []byte             `json:"metadata"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID             pgtype.UUID        `json:"id"`
+	SpaceID        pgtype.UUID        `json:"space_id"`
+	SourceType     string             `json:"source_type"`
+	Title          string             `json:"title"`
+	Url            pgtype.Text        `json:"url"`
+	RawPath        string             `json:"raw_path"`
+	Content        string             `json:"content"`
+	ContentHash    string             `json:"content_hash"`
+	AttachmentID   pgtype.UUID        `json:"attachment_id"`
+	MimeType       pgtype.Text        `json:"mime_type"`
+	Status         string             `json:"status"`
+	Metadata       []byte             `json:"metadata"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	IngestedToPath pgtype.Text        `json:"ingested_to_path"`
 }
 
 type WikiSpace struct {
-	ID          pgtype.UUID        `json:"id"`
-	WorkspaceID pgtype.UUID        `json:"workspace_id"`
-	Slug        string             `json:"slug"`
-	DisplayName string             `json:"display_name"`
-	AccessScope string             `json:"access_scope"`
-	Status      string             `json:"status"`
-	Settings    []byte             `json:"settings"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	ID             pgtype.UUID        `json:"id"`
+	WorkspaceID    pgtype.UUID        `json:"workspace_id"`
+	Slug           string             `json:"slug"`
+	DisplayName    string             `json:"display_name"`
+	AccessScope    string             `json:"access_scope"`
+	Status         string             `json:"status"`
+	Settings       []byte             `json:"settings"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	DefaultAgentID pgtype.UUID        `json:"default_agent_id"`
+	Template       string             `json:"template"`
 }
 
 type Workspace struct {

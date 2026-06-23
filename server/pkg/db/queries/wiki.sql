@@ -1,8 +1,8 @@
 -- Wiki Space queries
 
 -- name: CreateWikiSpace :one
-INSERT INTO wiki_space (workspace_id, slug, display_name, access_scope, settings)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO wiki_space (workspace_id, slug, display_name, access_scope, settings, template)
+VALUES ($1, $2, $3, $4, $5, sqlc.narg('template'))
 RETURNING *;
 
 -- name: GetWikiSpace :one
@@ -19,6 +19,7 @@ UPDATE wiki_space SET
     display_name = COALESCE(sqlc.narg('display_name'), display_name),
     settings = CASE WHEN sqlc.narg('settings')::jsonb IS NOT NULL THEN settings || sqlc.narg('settings')::jsonb ELSE settings END,
     status = COALESCE(sqlc.narg('status'), status),
+    default_agent_id = CASE WHEN sqlc.narg('default_agent_id')::uuid IS NOT NULL THEN sqlc.narg('default_agent_id')::uuid ELSE default_agent_id END,
     updated_at = now()
 WHERE workspace_id = $1 AND slug = $2
 RETURNING *;
@@ -79,6 +80,10 @@ WHERE space_id = $1
   AND to_tsvector('english', content) @@ plainto_tsquery('english', $2)
 ORDER BY ts_rank(to_tsvector('english', content), plainto_tsquery('english', $2)) DESC
 LIMIT sqlc.narg('limit');
+
+-- name: SetWikiPageValidationWarnings :exec
+UPDATE wiki_page SET validation_warnings = $2::jsonb
+WHERE space_id = $1 AND path = $3;
 
 -- name: DeleteWikiPage :exec
 DELETE FROM wiki_page

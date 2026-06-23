@@ -9,6 +9,8 @@ export const WikiSpaceSchema = z.object({
   display_name: z.string(),
   access_scope: z.enum(["shared", "personal"]),
   status: z.enum(["active", "archived"]),
+  default_agent_id: z.string().nullable(),
+  template: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -38,6 +40,7 @@ export const WikiPageSchema = z.object({
   page_type: z.string().nullable(),
   content: z.string(),
   content_hash: z.string(),
+  validation_warnings: z.array(z.string()),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -96,10 +99,12 @@ export interface CreateWikiSpaceRequest {
   slug?: string;
   display_name: string;
   access_scope?: "shared" | "personal";
+  template?: string;
 }
 
 export interface UpdateWikiSpaceRequest {
   display_name?: string;
+  default_agent_id?: string;
 }
 
 export interface WriteWikiPageRequest {
@@ -145,3 +150,6 @@ export interface ListWikiPagesParams {
 export interface ListWikiOperationsParams {
   limit?: number;
 }
+
+export interface CrawlURLRequest { url: string; }
+export interface CrawlURLResponse { content: string; url: string; }

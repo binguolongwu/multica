@@ -123,6 +123,8 @@ import type {
   CreateWikiOperationRequest,
   ListWikiPagesParams,
   ListWikiOperationsParams,
+  CrawlURLRequest,
+  CrawlURLResponse,
   Squad,
   SquadMember,
   SquadMemberStatusListResponse,
@@ -2324,5 +2326,9 @@ export class ApiClient {
 
   async getWikiOperation(wsId: string, slug: string, id: string): Promise<WikiOperation> {
     return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/operations/${id}`);
+  }
+
+  async crawlWikiURL(wsId: string, slug: string, data: CrawlURLRequest): Promise<CrawlURLResponse> {
+    return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/crawl`, { method: "POST", body: JSON.stringify(data) });
   }
 }

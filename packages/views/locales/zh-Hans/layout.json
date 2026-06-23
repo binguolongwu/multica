@@ -49,7 +49,16 @@
     "ingest_failed": "导入失败",
     "ingest_upload_failed": "上传失败",
     "ingest_save_failed": "保存失败",
-    "ingest_crawl_failed": "抓取失败"
+    "ingest_crawl_failed": "抓取失败",
+    "ingest_dir_select": "选择目标目录",
+    "ingest_dir_new_folder": "新建文件夹",
+    "ingest_dir_delete": "删除",
+    "ingest_dir_name": "名称",
+    "ingest_dir_create": "创建",
+    "ingest_dir_confirm": "确认",
+    "ingest_import_to": "导入至:",
+    "ingest_browse": "浏览",
+    "tree_cannot_delete": "目录下有文件或子目录，请先清空后再删除。"
   },
   "workspace_loader": {
     "loading_workspace": "正在加载工作区...",

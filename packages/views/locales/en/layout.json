@@ -49,7 +49,16 @@
     "ingest_failed": "Import failed",
     "ingest_upload_failed": "Upload failed",
     "ingest_save_failed": "Save failed",
-    "ingest_crawl_failed": "Crawl failed"
+    "ingest_crawl_failed": "Crawl failed",
+    "ingest_dir_select": "Select target directory",
+    "ingest_dir_new_folder": "New folder",
+    "ingest_dir_delete": "Delete",
+    "ingest_dir_name": "name",
+    "ingest_dir_create": "Create",
+    "ingest_dir_confirm": "Confirm",
+    "ingest_import_to": "Import to:",
+    "ingest_browse": "Browse",
+    "tree_cannot_delete": "Directory has files or subdirectories. Remove them first."
   },
   "workspace_loader": {
     "loading_workspace": "Loading workspace…",

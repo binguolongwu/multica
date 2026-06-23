@@ -102,7 +102,7 @@ const createWikiPage = `-- name: CreateWikiPage :one
 
 INSERT INTO wiki_page (space_id, path, title, page_type, content, frontmatter, backlinks, content_hash)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at
+RETURNING id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at, validation_warnings
 `
 
 type CreateWikiPageParams struct {
@@ -142,6 +142,7 @@ func (q *Queries) CreateWikiPage(ctx context.Context, arg CreateWikiPageParams) 
 		&i.CurrentRevisionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ValidationWarnings,
 	)
 	return i, err
 }
@@ -223,7 +224,7 @@ const createWikiSource = `-- name: CreateWikiSource :one
 
 INSERT INTO wiki_source (space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $9, $10, $8)
-RETURNING id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at
+RETURNING id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at, ingested_to_path
 `
 
 type CreateWikiSourceParams struct {
@@ -268,15 +269,16 @@ func (q *Queries) CreateWikiSource(ctx context.Context, arg CreateWikiSourcePara
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
+		&i.IngestedToPath,
 	)
 	return i, err
 }
 
 const createWikiSpace = `-- name: CreateWikiSpace :one
 
-INSERT INTO wiki_space (workspace_id, slug, display_name, access_scope, settings)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at
+INSERT INTO wiki_space (workspace_id, slug, display_name, access_scope, settings, template)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at, default_agent_id, template
 `
 
 type CreateWikiSpaceParams struct {
@@ -285,6 +287,7 @@ type CreateWikiSpaceParams struct {
 	DisplayName string      `json:"display_name"`
 	AccessScope string      `json:"access_scope"`
 	Settings    []byte      `json:"settings"`
+	Template    pgtype.Text `json:"template"`
 }
 
 // Wiki Space queries
@@ -295,6 +298,7 @@ func (q *Queries) CreateWikiSpace(ctx context.Context, arg CreateWikiSpaceParams
 		arg.DisplayName,
 		arg.AccessScope,
 		arg.Settings,
+		arg.Template,
 	)
 	var i WikiSpace
 	err := row.Scan(
@@ -307,6 +311,8 @@ func (q *Queries) CreateWikiSpace(ctx context.Context, arg CreateWikiSpaceParams
 		&i.Settings,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultAgentID,
+		&i.Template,
 	)
 	return i, err
 }
@@ -331,7 +337,7 @@ INSERT INTO wiki_space (workspace_id, slug, display_name, access_scope)
 VALUES ($1, 'default', 'default', 'shared')
 ON CONFLICT (workspace_id, slug)
 DO UPDATE SET updated_at = wiki_space.updated_at
-RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at
+RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at, default_agent_id, template
 `
 
 func (q *Queries) EnsureWikiDefaultSpace(ctx context.Context, workspaceID pgtype.UUID) (WikiSpace, error) {
@@ -347,6 +353,8 @@ func (q *Queries) EnsureWikiDefaultSpace(ctx context.Context, workspaceID pgtype
 		&i.Settings,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultAgentID,
+		&i.Template,
 	)
 	return i, err
 }
@@ -378,7 +386,7 @@ func (q *Queries) GetWikiOperation(ctx context.Context, id pgtype.UUID) (WikiOpe
 }
 
 const getWikiPageByPath = `-- name: GetWikiPageByPath :one
-SELECT id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at FROM wiki_page
+SELECT id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at, validation_warnings FROM wiki_page
 WHERE space_id = $1 AND path = $2
 `
 
@@ -403,12 +411,13 @@ func (q *Queries) GetWikiPageByPath(ctx context.Context, arg GetWikiPageByPathPa
 		&i.CurrentRevisionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ValidationWarnings,
 	)
 	return i, err
 }
 
 const getWikiPageInSpace = `-- name: GetWikiPageInSpace :one
-SELECT wp.id, wp.space_id, wp.path, wp.title, wp.page_type, wp.content, wp.frontmatter, wp.backlinks, wp.content_hash, wp.current_revision_id, wp.created_at, wp.updated_at FROM wiki_page wp
+SELECT wp.id, wp.space_id, wp.path, wp.title, wp.page_type, wp.content, wp.frontmatter, wp.backlinks, wp.content_hash, wp.current_revision_id, wp.created_at, wp.updated_at, wp.validation_warnings FROM wiki_page wp
 JOIN wiki_space ws ON ws.id = wp.space_id
 WHERE ws.workspace_id = $1 AND wp.space_id = $2 AND wp.path = $3
 `
@@ -435,6 +444,7 @@ func (q *Queries) GetWikiPageInSpace(ctx context.Context, arg GetWikiPageInSpace
 		&i.CurrentRevisionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ValidationWarnings,
 	)
 	return i, err
 }
@@ -461,7 +471,7 @@ func (q *Queries) GetWikiQuerySession(ctx context.Context, id pgtype.UUID) (Wiki
 }
 
 const getWikiSource = `-- name: GetWikiSource :one
-SELECT id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at FROM wiki_source
+SELECT id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at, ingested_to_path FROM wiki_source
 WHERE id = $1 AND space_id = $2
 `
 
@@ -487,12 +497,13 @@ func (q *Queries) GetWikiSource(ctx context.Context, arg GetWikiSourceParams) (W
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
+		&i.IngestedToPath,
 	)
 	return i, err
 }
 
 const getWikiSpace = `-- name: GetWikiSpace :one
-SELECT id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at FROM wiki_space
+SELECT id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at, default_agent_id, template FROM wiki_space
 WHERE workspace_id = $1 AND slug = $2 AND status = 'active'
 `
 
@@ -514,6 +525,8 @@ func (q *Queries) GetWikiSpace(ctx context.Context, arg GetWikiSpaceParams) (Wik
 		&i.Settings,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultAgentID,
+		&i.Template,
 	)
 	return i, err
 }
@@ -608,7 +621,7 @@ func (q *Queries) ListWikiPageRevisions(ctx context.Context, arg ListWikiPageRev
 }
 
 const listWikiPages = `-- name: ListWikiPages :many
-SELECT id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at FROM wiki_page
+SELECT id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at, validation_warnings FROM wiki_page
 WHERE space_id = $1
 ORDER BY path
 `
@@ -635,6 +648,7 @@ func (q *Queries) ListWikiPages(ctx context.Context, spaceID pgtype.UUID) ([]Wik
 			&i.CurrentRevisionID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ValidationWarnings,
 		); err != nil {
 			return nil, err
 		}
@@ -683,7 +697,7 @@ func (q *Queries) ListWikiPagesByBacklink(ctx context.Context, arg ListWikiPages
 }
 
 const listWikiSources = `-- name: ListWikiSources :many
-SELECT id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at FROM wiki_source
+SELECT id, space_id, source_type, title, url, raw_path, content, content_hash, attachment_id, mime_type, status, metadata, created_at, ingested_to_path FROM wiki_source
 WHERE space_id = $1
 ORDER BY created_at DESC
 `
@@ -711,6 +725,7 @@ func (q *Queries) ListWikiSources(ctx context.Context, spaceID pgtype.UUID) ([]W
 			&i.Status,
 			&i.Metadata,
 			&i.CreatedAt,
+			&i.IngestedToPath,
 		); err != nil {
 			return nil, err
 		}
@@ -723,7 +738,7 @@ func (q *Queries) ListWikiSources(ctx context.Context, spaceID pgtype.UUID) ([]W
 }
 
 const listWikiSpaces = `-- name: ListWikiSpaces :many
-SELECT id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at FROM wiki_space
+SELECT id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at, default_agent_id, template FROM wiki_space
 WHERE workspace_id = $1 AND status = 'active'
 ORDER BY CASE WHEN slug = 'default' THEN 0 ELSE 1 END, display_name, slug
 `
@@ -747,6 +762,8 @@ func (q *Queries) ListWikiSpaces(ctx context.Context, workspaceID pgtype.UUID) (
 			&i.Settings,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DefaultAgentID,
+			&i.Template,
 		); err != nil {
 			return nil, err
 		}
@@ -805,6 +822,22 @@ func (q *Queries) SearchWikiPages(ctx context.Context, arg SearchWikiPagesParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const setWikiPageValidationWarnings = `-- name: SetWikiPageValidationWarnings :exec
+UPDATE wiki_page SET validation_warnings = $2::jsonb
+WHERE space_id = $1 AND path = $3
+`
+
+type SetWikiPageValidationWarningsParams struct {
+	SpaceID pgtype.UUID `json:"space_id"`
+	Column2 []byte      `json:"column_2"`
+	Path    string      `json:"path"`
+}
+
+func (q *Queries) SetWikiPageValidationWarnings(ctx context.Context, arg SetWikiPageValidationWarningsParams) error {
+	_, err := q.db.Exec(ctx, setWikiPageValidationWarnings, arg.SpaceID, arg.Column2, arg.Path)
+	return err
 }
 
 const updateWikiOperationStatus = `-- name: UpdateWikiOperationStatus :one
@@ -896,17 +929,19 @@ UPDATE wiki_space SET
     display_name = COALESCE($3, display_name),
     settings = CASE WHEN $4::jsonb IS NOT NULL THEN settings || $4::jsonb ELSE settings END,
     status = COALESCE($5, status),
+    default_agent_id = CASE WHEN $6::uuid IS NOT NULL THEN $6::uuid ELSE default_agent_id END,
     updated_at = now()
 WHERE workspace_id = $1 AND slug = $2
-RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at
+RETURNING id, workspace_id, slug, display_name, access_scope, status, settings, created_at, updated_at, default_agent_id, template
 `
 
 type UpdateWikiSpaceParams struct {
-	WorkspaceID pgtype.UUID `json:"workspace_id"`
-	Slug        string      `json:"slug"`
-	DisplayName pgtype.Text `json:"display_name"`
-	Settings    []byte      `json:"settings"`
-	Status      pgtype.Text `json:"status"`
+	WorkspaceID    pgtype.UUID `json:"workspace_id"`
+	Slug           string      `json:"slug"`
+	DisplayName    pgtype.Text `json:"display_name"`
+	Settings       []byte      `json:"settings"`
+	Status         pgtype.Text `json:"status"`
+	DefaultAgentID pgtype.UUID `json:"default_agent_id"`
 }
 
 func (q *Queries) UpdateWikiSpace(ctx context.Context, arg UpdateWikiSpaceParams) (WikiSpace, error) {
@@ -916,6 +951,7 @@ func (q *Queries) UpdateWikiSpace(ctx context.Context, arg UpdateWikiSpaceParams
 		arg.DisplayName,
 		arg.Settings,
 		arg.Status,
+		arg.DefaultAgentID,
 	)
 	var i WikiSpace
 	err := row.Scan(
@@ -928,6 +964,8 @@ func (q *Queries) UpdateWikiSpace(ctx context.Context, arg UpdateWikiSpaceParams
 		&i.Settings,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultAgentID,
+		&i.Template,
 	)
 	return i, err
 }
@@ -945,7 +983,7 @@ DO UPDATE SET
     content_hash = EXCLUDED.content_hash,
     current_revision_id = COALESCE(EXCLUDED.current_revision_id, wiki_page.current_revision_id),
     updated_at = now()
-RETURNING id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at
+RETURNING id, space_id, path, title, page_type, content, frontmatter, backlinks, content_hash, current_revision_id, created_at, updated_at, validation_warnings
 `
 
 type UpsertWikiPageParams struct {
@@ -986,6 +1024,7 @@ func (q *Queries) UpsertWikiPage(ctx context.Context, arg UpsertWikiPageParams) 
 		&i.CurrentRevisionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ValidationWarnings,
 	)
 	return i, err
 }
