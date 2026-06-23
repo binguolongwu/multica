@@ -30,7 +30,7 @@ function buildTree(pages: WikiPage[], enabledDirs: string[], titleMap: Map<strin
   pathMap.set("", root);
 
   for (const page of pages) {
-    if (page.path.endsWith("/.gitkeep")) continue;
+    const isGitkeep = page.path.endsWith("/.gitkeep");
     if (page.title) titleMap.set(page.path, page.title);
 
     const parts = page.path.split("/");
@@ -43,6 +43,9 @@ function buildTree(pages: WikiPage[], enabledDirs: string[], titleMap: Map<strin
       currentPath = currentPath ? `${currentPath}/${part}` : part;
 
       if (pathMap.has(currentPath)) continue;
+
+      // Don't create leaf node for .gitkeep — but still propagate parent dirs above
+      if (isGitkeep && isLast) continue;
 
       const node: TreeNode = { name: part, path: currentPath, isDir: !isLast, children: [] };
       pathMap.set(currentPath, node);

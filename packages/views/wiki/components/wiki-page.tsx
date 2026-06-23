@@ -81,7 +81,7 @@ export function WikiPage() {
     const dirPath = parentDir ? `${parentDir}/${name}` : name;
     upsertPage.mutate({
       path: `${dirPath}/.gitkeep`,
-      data: { content: "" },
+      data: { content: "." },
     }, {
       onSuccess: () => { setSelectedDir(dirPath); },
       onError: () => toast.error("Failed to create directory"),
