@@ -257,21 +257,22 @@ func (s *Service) MoveFile(ctx context.Context, configID, workspaceID pgtype.UUI
 		return err
 	}
 	pc := s.toProviderConfig(cfgRow)
-	reader, err := d.Download(ctx, pc, srcKey)
+	fullSrc := resolveKey(pc.FolderPrefix, srcKey)
+	fullDest := resolveKey(pc.FolderPrefix, destKey)
+	reader, err := d.Download(ctx, pc, fullSrc)
 	if err != nil {
 		return fmt.Errorf("download source: %w", err)
 	}
 	defer reader.Close()
-	// Read into memory (reasonable for files up to ~50MB)
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("read source: %w", err)
 	}
-	_, err = d.Upload(ctx, pc, destKey, bytes.NewReader(data), int64(len(data)), "application/octet-stream")
+	_, err = d.Upload(ctx, pc, fullDest, bytes.NewReader(data), int64(len(data)), "application/octet-stream")
 	if err != nil {
 		return fmt.Errorf("upload to dest: %w", err)
 	}
-	if err := d.Delete(ctx, pc, srcKey); err != nil {
+	if err := d.Delete(ctx, pc, fullSrc); err != nil {
 		return fmt.Errorf("delete source: %w", err)
 	}
 	return nil
