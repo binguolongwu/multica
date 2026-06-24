@@ -152,7 +152,7 @@ export function LlmSettingsTab() {
       </Button>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[60vw] max-h-[60vh] overflow-y-auto">
           <DialogTitle>{editing ? "Edit Provider" : "Add Provider"}</DialogTitle>
           <div className="space-y-3">
             <div>
