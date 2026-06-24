@@ -123,9 +123,9 @@ export function LlmSettingsTab() {
             <div className="space-y-1 pl-6">
               {modelsByProvider(provider.id).map((model) => (
                 <div key={model.id} className="flex items-center gap-2 text-sm">
-                  <span className="font-mono text-xs">{model.model_id}</span>
-                  {model.display_name && (
-                    <span className="text-muted-foreground">({model.display_name})</span>
+                  <span className="font-mono text-xs">{model.model_code}</span>
+                  {model.name && (
+                    <span className="text-muted-foreground">({model.name})</span>
                   )}
                   {model.capabilities?.length > 0 && (
                     <span className="text-xs text-muted-foreground">
