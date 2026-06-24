@@ -282,8 +282,12 @@ func (s *Service) DeleteFile(ctx context.Context, id, configID, workspaceID pgty
 // --- Internal helpers ---
 
 func (s *Service) decryptSecretKey(encrypted []byte) string {
-	if len(encrypted) == 0 || s.SecretBox == nil {
+	if len(encrypted) == 0 {
 		return ""
+	}
+	if s.SecretBox == nil {
+		// No encryption configured — stored value is plaintext
+		return string(encrypted)
 	}
 	plain, err := s.SecretBox.Open(encrypted)
 	if err != nil {

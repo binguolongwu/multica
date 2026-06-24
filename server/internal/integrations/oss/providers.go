@@ -19,7 +19,8 @@ type AliyunDriver struct{}
 func (d *AliyunDriver) client(cfg ProviderConfig) (*oss.Client, error) {
 	endpoint := cfg.Endpoint
 	if endpoint == "" {
-		endpoint = fmt.Sprintf("https://oss-%s.aliyuncs.com", cfg.Region)
+		region := strings.TrimPrefix(cfg.Region, "oss-")
+		endpoint = fmt.Sprintf("https://oss-%s.aliyuncs.com", region)
 	}
 	return oss.New(endpoint, cfg.AccessKey, cfg.SecretKey)
 }
@@ -92,7 +93,8 @@ func (d *AliyunDriver) publicURL(cfg ProviderConfig, key string) string {
 	if cfg.CustomDomain != "" {
 		return fmt.Sprintf("https://%s/%s", cfg.CustomDomain, key)
 	}
-	return fmt.Sprintf("https://%s.%s/%s", cfg.Bucket, cfg.Endpoint, key)
+	region := strings.TrimPrefix(cfg.Region, "oss-")
+	return fmt.Sprintf("https://%s.oss-%s.aliyuncs.com/%s", cfg.Bucket, region, key)
 }
 
 // ── Tencent COS (腾讯云对象存储) ────────────────────────────────────────────
