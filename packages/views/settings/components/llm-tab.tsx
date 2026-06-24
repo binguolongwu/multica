@@ -46,16 +46,31 @@ export function LlmSettingsTab() {
   };
   const openEdit = (p: LLMProvider) => {
     setEditing(p);
-    setForm({ name: p.name, api_base_url: p.api_base_url, api_key: p.api_key, env_var_api_key: p.env_var_api_key, env_var_base_url: p.env_var_base_url });
+    // If api_key is masked (contains ****), don't pre-fill — the user
+    // must type a new key to change it. The backend preserves the
+    // existing value when we send an empty api_key on update.
+    const isMasked = p.api_key.includes("****");
+    setForm({
+      name: p.name,
+      api_base_url: p.api_base_url,
+      api_key: isMasked ? "" : p.api_key,
+      env_var_api_key: p.env_var_api_key,
+      env_var_base_url: p.env_var_base_url,
+    });
     setDialogOpen(true);
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // When editing and api_key is empty (masked), omit it so the
+      // backend COALESCE preserves the stored value.
+      const payload = editing && !form.api_key
+        ? { name: form.name, api_base_url: form.api_base_url, env_var_api_key: form.env_var_api_key, env_var_base_url: form.env_var_base_url }
+        : form;
       if (editing) {
-        return api.updateLLMProvider(editing.id, form);
+        return api.updateLLMProvider(editing.id, payload);
       }
-      return api.createLLMProvider(form);
+      return api.createLLMProvider(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: llmKeys.providers });
