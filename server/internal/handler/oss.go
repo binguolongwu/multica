@@ -228,8 +228,20 @@ func (h *Handler) UploadOSSFile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ListOSSFiles handles GET /api/workspaces/{id}/oss/configs/{configId}/files
+// ListOSSFiles returns files directly from the OSS provider (not just DB records).
 func (h *Handler) ListOSSFiles(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil { writeError(w, http.StatusServiceUnavailable, "oss integration is not configured"); return }
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID); if !ok { return }
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id"); if !ok { return }
+	prefix := r.URL.Query().Get("prefix")
+	keys, err := h.OssService.ListProviderKeys(r.Context(), configID, parseUUID(workspaceID), prefix)
+	if err != nil { writeError(w, http.StatusInternalServerError, "failed to list files"); return }
+	writeJSON(w, http.StatusOK, keys)
+}
+
+// ListOSSFilesFromDB handles GET /api/workspaces/{id}/oss/configs/{configId}/files/db — legacy DB-based listing.
+func (h *Handler) ListOSSFilesFromDB(w http.ResponseWriter, r *http.Request) {
 	if h.OssService == nil {
 		writeError(w, http.StatusServiceUnavailable, "oss integration is not configured")
 		return
@@ -298,6 +310,43 @@ func (h *Handler) GetOSSFileDownloadURL(w http.ResponseWriter, r *http.Request) 
 		"url":          url,
 		"created_at":   obj.CreatedAt,
 	})
+}
+
+// CreateOSSDirectory handles POST /api/oss/configs/{configId}/directories
+func (h *Handler) CreateOSSDirectory(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil { writeError(w, http.StatusServiceUnavailable, "oss integration is not configured"); return }
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID); if !ok { return }
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id"); if !ok { return }
+	var req struct{ Prefix string `json:"prefix"` }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Prefix == "" { writeError(w, http.StatusBadRequest, "prefix required"); return }
+	if err := h.OssService.CreateDirectory(r.Context(), configID, parseUUID(workspaceID), req.Prefix); err != nil { writeError(w, http.StatusInternalServerError, "failed to create directory"); return }
+	writeJSON(w, http.StatusCreated, map[string]string{"ok": "true"})
+}
+
+// DeleteOSSDirectory handles DELETE /api/oss/configs/{configId}/directories?prefix=...
+func (h *Handler) DeleteOSSDirectory(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil { writeError(w, http.StatusServiceUnavailable, "oss integration is not configured"); return }
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID); if !ok { return }
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id"); if !ok { return }
+	prefix := r.URL.Query().Get("prefix")
+	if prefix == "" { writeError(w, http.StatusBadRequest, "prefix required"); return }
+	n, err := h.OssService.DeleteDirectory(r.Context(), configID, parseUUID(workspaceID), prefix)
+	if err != nil { writeError(w, http.StatusInternalServerError, "failed to delete directory"); return }
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": n})
+}
+
+// MoveOSSFile handles POST /api/oss/configs/{configId}/files/move
+func (h *Handler) MoveOSSFile(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil { writeError(w, http.StatusServiceUnavailable, "oss integration is not configured"); return }
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID); if !ok { return }
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id"); if !ok { return }
+	var req struct{ SrcKey string `json:"src_key"`; DestKey string `json:"dest_key"` }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SrcKey == "" || req.DestKey == "" { writeError(w, http.StatusBadRequest, "src_key and dest_key required"); return }
+	if err := h.OssService.MoveFile(r.Context(), configID, parseUUID(workspaceID), req.SrcKey, req.DestKey); err != nil { writeError(w, http.StatusInternalServerError, "failed to move file"); return }
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
 // DeleteOSSFile handles DELETE /api/workspaces/{id}/oss/configs/{configId}/files/{fileId}

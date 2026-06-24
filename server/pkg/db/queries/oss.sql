@@ -44,5 +44,8 @@ SELECT * FROM oss_object WHERE id = $1 AND config_id = $2;
 -- name: DeleteOSSObject :exec
 DELETE FROM oss_object WHERE id = $1 AND config_id = $2;
 
+-- name: DeleteOSSObjectByKey :exec
+DELETE FROM oss_object WHERE config_id = $1 AND key = $2;
+
 -- name: ListOSSObjectsByPrefix :many
 SELECT * FROM oss_object WHERE config_id = $1 AND key LIKE $2 ORDER BY created_at DESC;

@@ -1,6 +1,7 @@
 package oss
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -193,6 +194,89 @@ func (s *Service) TestExistingConnection(ctx context.Context, configID, workspac
 	return err
 }
 
+// CreateDirectory creates a zero-byte marker object to represent a directory prefix.
+func (s *Service) CreateDirectory(ctx context.Context, configID, workspaceID pgtype.UUID, prefix string) error {
+	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{ID: configID, WorkspaceID: workspaceID})
+	if err != nil {
+		return fmt.Errorf("get oss config: %w", err)
+	}
+	d, err := s.driverFor(cfgRow.Provider)
+	if err != nil {
+		return err
+	}
+	pc := s.toProviderConfig(cfgRow)
+	fullKey := resolveKey(pc.FolderPrefix, prefix)
+	if !strings.HasSuffix(fullKey, "/") {
+		fullKey += "/"
+	}
+	_, err = d.Upload(ctx, pc, fullKey, strings.NewReader(""), 0, "application/x-directory")
+	return err
+}
+
+// DeleteDirectory deletes all objects under a prefix (including the directory marker).
+func (s *Service) DeleteDirectory(ctx context.Context, configID, workspaceID pgtype.UUID, prefix string) (int, error) {
+	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{ID: configID, WorkspaceID: workspaceID})
+	if err != nil {
+		return 0, fmt.Errorf("get oss config: %w", err)
+	}
+	d, err := s.driverFor(cfgRow.Provider)
+	if err != nil {
+		return 0, err
+	}
+	pc := s.toProviderConfig(cfgRow)
+	fullPrefix := resolveKey(pc.FolderPrefix, prefix)
+	if !strings.HasSuffix(fullPrefix, "/") {
+		fullPrefix += "/"
+	}
+	keys, err := d.ListKeys(ctx, pc, fullPrefix, 1000)
+	if err != nil {
+		return 0, err
+	}
+	for _, k := range keys {
+		if err := d.Delete(ctx, pc, k); err != nil {
+			slog.Warn("oss: failed to delete key during directory removal", "key", k, "error", err)
+		}
+	}
+	// Also delete the prefix marker itself
+	_ = d.Delete(ctx, pc, fullPrefix)
+	// Delete any oss_object records for deleted keys
+	for _, k := range keys {
+		_ = s.Queries.DeleteOSSObjectByKey(ctx, db.DeleteOSSObjectByKeyParams{ConfigID: configID, Key: k})
+	}
+	return len(keys), nil
+}
+
+// MoveFile copies an object to a new key then deletes the original.
+func (s *Service) MoveFile(ctx context.Context, configID, workspaceID pgtype.UUID, srcKey, destKey string) error {
+	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{ID: configID, WorkspaceID: workspaceID})
+	if err != nil {
+		return fmt.Errorf("get oss config: %w", err)
+	}
+	d, err := s.driverFor(cfgRow.Provider)
+	if err != nil {
+		return err
+	}
+	pc := s.toProviderConfig(cfgRow)
+	reader, err := d.Download(ctx, pc, srcKey)
+	if err != nil {
+		return fmt.Errorf("download source: %w", err)
+	}
+	defer reader.Close()
+	// Read into memory (reasonable for files up to ~50MB)
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("read source: %w", err)
+	}
+	_, err = d.Upload(ctx, pc, destKey, bytes.NewReader(data), int64(len(data)), "application/octet-stream")
+	if err != nil {
+		return fmt.Errorf("upload to dest: %w", err)
+	}
+	if err := d.Delete(ctx, pc, srcKey); err != nil {
+		return fmt.Errorf("delete source: %w", err)
+	}
+	return nil
+}
+
 // TestConnection validates OSS provider credentials by attempting to list objects.
 func (s *Service) TestConnection(ctx context.Context, params CreateConfigParams) error {
 	if err := validateEndpoint(params.Endpoint); err != nil {
@@ -214,6 +298,21 @@ func (s *Service) TestConnection(ctx context.Context, params CreateConfigParams)
 	}
 	_, err = d.ListKeys(ctx, pc, "", 1)
 	return err
+}
+
+// ListProviderKeys returns object keys directly from the OSS provider.
+func (s *Service) ListProviderKeys(ctx context.Context, configID, workspaceID pgtype.UUID, prefix string) ([]string, error) {
+	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{ID: configID, WorkspaceID: workspaceID})
+	if err != nil {
+		return nil, fmt.Errorf("get oss config: %w", err)
+	}
+	d, err := s.driverFor(cfgRow.Provider)
+	if err != nil {
+		return nil, err
+	}
+	pc := s.toProviderConfig(cfgRow)
+	fullPrefix := resolveKey(pc.FolderPrefix, prefix)
+	return d.ListKeys(ctx, pc, fullPrefix, 200)
 }
 
 // ListFiles returns object metadata for a config.

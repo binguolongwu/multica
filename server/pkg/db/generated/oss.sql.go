@@ -119,6 +119,20 @@ func (q *Queries) DeleteOSSObject(ctx context.Context, arg DeleteOSSObjectParams
 	return err
 }
 
+const deleteOSSObjectByKey = `-- name: DeleteOSSObjectByKey :exec
+DELETE FROM oss_object WHERE config_id = $1 AND key = $2
+`
+
+type DeleteOSSObjectByKeyParams struct {
+	ConfigID pgtype.UUID `json:"config_id"`
+	Key      string      `json:"key"`
+}
+
+func (q *Queries) DeleteOSSObjectByKey(ctx context.Context, arg DeleteOSSObjectByKeyParams) error {
+	_, err := q.db.Exec(ctx, deleteOSSObjectByKey, arg.ConfigID, arg.Key)
+	return err
+}
+
 const deleteOSSProviderConfig = `-- name: DeleteOSSProviderConfig :exec
 DELETE FROM oss_provider_config WHERE id = $1 AND workspace_id = $2
 `

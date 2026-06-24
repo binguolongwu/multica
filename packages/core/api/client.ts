@@ -2380,8 +2380,11 @@ export class ApiClient {
   async testOssConfigConnection(configId: string): Promise<{ ok: string }> {
     return this.fetch(`/api/oss/configs/${configId}/test`, { method: "POST" });
   }
-  async listOssFiles(configId: string, qs?: string): Promise<OssObject[]> {
+  async listOssFiles(configId: string, qs?: string): Promise<string[]> {
     return this.fetch(`/api/oss/configs/${configId}/files${qs ? `?${qs}` : ""}`);
+  }
+  async listOssDbFiles(configId: string, qs?: string): Promise<OssObject[]> {
+    return this.fetch(`/api/oss/configs/${configId}/files/db${qs ? `?${qs}` : ""}`);
   }
   async getOssFileDownloadUrl(configId: string, fileId: string): Promise<OssObjectWithUrl> {
     return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`);
@@ -2393,5 +2396,14 @@ export class ApiClient {
   }
   async deleteOssFile(configId: string, fileId: string): Promise<void> {
     return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`, { method: "DELETE" });
+  }
+  async createOssDirectory(configId: string, prefix: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/directories`, { method: "POST", body: JSON.stringify({ prefix }) });
+  }
+  async deleteOssDirectory(configId: string, prefix: string): Promise<{ deleted: number }> {
+    return this.fetch(`/api/oss/configs/${configId}/directories?prefix=${encodeURIComponent(prefix)}`, { method: "DELETE" });
+  }
+  async moveOssFile(configId: string, srcKey: string, destKey: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/files/move`, { method: "POST", body: JSON.stringify({ src_key: srcKey, dest_key: destKey }) });
   }
 }

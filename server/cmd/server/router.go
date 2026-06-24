@@ -1067,8 +1067,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Delete("/configs/{configId}", h.DeleteOSSConfig)
 			r.Post("/configs/{configId}/files/upload", h.UploadOSSFile)
 			r.Get("/configs/{configId}/files", h.ListOSSFiles)
+			r.Get("/configs/{configId}/files/db", h.ListOSSFilesFromDB)
 			r.Get("/configs/{configId}/files/{fileId}", h.GetOSSFileDownloadURL)
 			r.Delete("/configs/{configId}/files/{fileId}", h.DeleteOSSFile)
+			r.Post("/configs/{configId}/directories", h.CreateOSSDirectory)
+			r.Delete("/configs/{configId}/directories", h.DeleteOSSDirectory)
+			r.Post("/configs/{configId}/files/move", h.MoveOSSFile)
 		})
 
 		r.Route("/api/wiki", func(r chi.Router) {
