@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2, Download, ChevronDown, Check } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace, useUpsertWikiPage, useDeleteWikiPage, useUpdateWikiSpace } from "@multica/core/wiki";
+import { api as wikiApi } from "@multica/core/api";
 import { agentListOptions } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
@@ -88,7 +89,18 @@ export function WikiPage() {
     });
   }, [upsertPage]);
 
-  // Protected paths: schema rules, system logs, templates, index, AGENTS, IDEA
+  const handleMove = useCallback(async (srcPath: string, destDir: string) => {
+    const basename = srcPath.split("/").pop() || srcPath;
+    const destPath = `${destDir}/${basename}`;
+    if (srcPath === destPath) return;
+    try {
+      const detail = await wikiApi.getWikiPage(wsId, spaceSlug, srcPath);
+      await wikiApi.upsertWikiPage(wsId, spaceSlug, destPath, { content: detail.content, summary: `moved from ${srcPath}` });
+      await wikiApi.deleteWikiPage(wsId, spaceSlug, srcPath);
+      setSelectedPath(destPath);
+    } catch { toast.error("移动失败"); }
+  }, [wsId, spaceSlug]);
+
   // Protected from deletion: schema, system, templates, index, AGENTS, IDEA
   const isProtectedPath = useCallback((path: string) => {
     const del = [/^schema\//, /^system\//, /\/_TEMPLATE\.md$/, /^wiki\/index\.md$/, /^wiki\/log\.md$/, /^AGENTS\.md$/, /^IDEA\.md$/];
@@ -258,6 +270,8 @@ export function WikiPage() {
               onCreateDir={handleCreateDir}
               onDelete={handleDelete}
               enabledDirs={enabledDirs}
+              onMove={handleMove}
+              isMovable={(p) => !isProtectedPath(p)}
             />
           )}
         </div>

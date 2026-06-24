@@ -14,6 +14,8 @@ interface WikiFileTreeProps {
   onCreateDir: (parentDir: string, name: string) => void;
   onDelete: (targetPath: string, isFile: boolean) => void;
   enabledDirs: string[];
+  onMove?: (srcPath: string, destDir: string) => void;
+  isMovable?: (path: string) => boolean;
 }
 
 interface TreeNode {
@@ -79,10 +81,12 @@ function buildTree(pages: WikiPage[], enabledDirs: string[], titleMap: Map<strin
   return root.children;
 }
 
-function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir, titleMap, creating, newNameInput, onNewNameChange, onCreateSubmit }: {
+function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDir, titleMap, creating, newNameInput, onNewNameChange, onCreateSubmit, onMove, isMovable }: {
   node: TreeNode; depth: number; selectedPath: string | null; selectedDir: string; onSelect: (path: string) => void; onSelectDir: (dir: string) => void; titleMap: Map<string, string>;
   creating: boolean; newNameInput: string; onNewNameChange: (v: string) => void; onCreateSubmit: () => void;
+  onMove?: (srcPath: string, destDir: string) => void; isMovable?: (path: string) => boolean;
 }) {
+  const [dragOver, setDragOver] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -95,8 +99,9 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
 
   if (node.isDir) {
     const isSelected = selectedDir === node.path;
+    const canAcceptDrop = !isMovable || isMovable(node.path);
     return (
-      <div key={node.path}>
+      <div key={node.path} onDragOver={e => { if (!canAcceptDrop) return; e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); const src = e.dataTransfer.getData("text/wiki-path"); if (src && onMove) onMove(src, node.path); }} className={dragOver ? "ring-2 ring-primary rounded" : ""}>
         <button
           className={`flex w-full items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent ${isSelected ? "bg-accent ring-1 ring-inset ring-border" : ""}`}
           style={{ paddingLeft: 12 + depth * 16 }}
@@ -115,7 +120,7 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
         {expanded && (
           <>
             {node.children.map((c) => (
-              <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} creating={creating} newNameInput={newNameInput} onNewNameChange={onNewNameChange} onCreateSubmit={onCreateSubmit} />
+              <TreeItem key={c.path} node={c} depth={depth + 1} selectedPath={selectedPath} selectedDir={selectedDir} onSelect={onSelect} onSelectDir={onSelectDir} titleMap={titleMap} creating={creating} newNameInput={newNameInput} onNewNameChange={onNewNameChange} onCreateSubmit={onCreateSubmit} onMove={onMove} isMovable={isMovable} />
             ))}
             {creating && isSelected && (
               <div className="flex items-center gap-1 rounded px-2 py-0.5" style={{ paddingLeft: 12 + (depth + 1) * 16 }}>
@@ -136,11 +141,14 @@ function TreeItem({ node, depth, selectedPath, selectedDir, onSelect, onSelectDi
       </div>
     );
   }
-  return (
+      const canDrag = !isMovable || isMovable(node.path);
+    return (
     <button
-      className={`flex w-full items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent ${selectedPath === node.path ? "bg-accent font-medium" : ""}`}
+      className={`flex w-full items-center gap-1 rounded px-2 py-1 text-left text-sm hover:bg-accent ${selectedPath === node.path ? "bg-accent font-medium" : ""} ${!canDrag ? "opacity-50 cursor-not-allowed" : ""}`}
       style={{ paddingLeft: 12 + depth * 16 }}
       onClick={() => onSelect(node.path)}
+      draggable={canDrag}
+      onDragStart={e => { if (!canDrag) return; e.dataTransfer.setData("text/wiki-path", node.path); }}
     >
       <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       <span className="truncate text-xs">{titleMap.get(node.path) || node.name}</span>
