@@ -90,9 +90,15 @@ export function OssFileBrowser() {
   };
 
   const handleDownload = async (filePath: string) => {
-    if (!selectedConfig || !cfg) return;
-    const domain = cfg.custom_domain || `${cfg.bucket}.${cfg.provider === "qiniu" ? "clouddn.com" : "com"}`;
-    window.open(`https://${domain}/${filePath}`, "_blank");
+    if (!selectedConfig) return;
+    try {
+      const resp = await api.listOssDbFiles(selectedConfig, `prefix=${encodeURIComponent(filePath)}`);
+      const match = Array.isArray(resp) ? resp.find((f: any) => f.key === filePath) : null;
+      if (match?.id) {
+        const urlResp = await api.getOssFileDownloadUrl(selectedConfig, match.id);
+        window.open(urlResp.url, "_blank");
+      }
+    } catch { toast.error("获取下载链接失败"); }
   };
 
   const handleDrop = async (destDir: string) => {

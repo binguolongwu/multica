@@ -255,6 +255,10 @@ func (h *Handler) ListOSSFilesFromDB(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if _, err := h.OssService.GetConfig(r.Context(), configID, parseUUID(workspaceID)); err != nil {
+		writeError(w, http.StatusNotFound, "config not found")
+		return
+	}
 	prefix := r.URL.Query().Get("prefix")
 	files, err := h.OssService.ListFiles(r.Context(), configID, prefix)
 	if err != nil {
