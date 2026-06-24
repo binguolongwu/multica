@@ -1,12 +1,30 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../api";
 import type { RuntimeModelsResult } from "../types/agent";
+import type { LLMModelCatalogEntry } from "../types/llm";
 
 export const runtimeModelsKeys = {
   all: () => ["runtimes", "models"] as const,
   forRuntime: (runtimeId: string) =>
     [...runtimeModelsKeys.all(), runtimeId] as const,
 };
+
+// ── Server-side LLM Model Catalog — always available, no daemon needed ──────
+
+/** Fetches the server-side LLM model catalog. Returns entries in the same
+ *  wire shape as daemon-discovered models so the UI can merge both sources. */
+export async function resolveServerModelCatalog(): Promise<LLMModelCatalogEntry[]> {
+  return api.listLLMModelCatalog();
+}
+
+export function serverModelCatalogOptions() {
+  return queryOptions({
+    queryKey: ["llm-model-catalog"],
+    queryFn: resolveServerModelCatalog,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
 
 const POLL_INTERVAL_MS = 500;
 const POLL_TIMEOUT_MS = 30_000;

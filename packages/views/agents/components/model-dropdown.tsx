@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Cpu, Loader2, Plus, Check, Info } from "lucide-react";
-import { runtimeModelsOptions } from "@multica/core/runtimes";
+import { runtimeModelsOptions, serverModelCatalogOptions } from "@multica/core/runtimes";
 import type { RuntimeModel } from "@multica/core/types";
 import {
   Popover,
@@ -42,14 +42,22 @@ export function ModelDropdown({
   const modelsQuery = useQuery(
     runtimeModelsOptions(runtimeOnline ? runtimeId : null),
   );
+  const catalogQuery = useQuery(serverModelCatalogOptions());
 
   const supported = modelsQuery.data?.supported ?? true;
-  // Stable reference for the model list — `?? []` would mint a fresh
-  // array each render and force every downstream useMemo to invalidate.
-  const models = useMemo(
-    () => modelsQuery.data?.models ?? [],
-    [modelsQuery.data],
-  );
+  // Merge server-side catalog with daemon-discovered models.
+  const models = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: Array<{ id: string; label: string; provider?: string; default?: boolean }> = [];
+    for (const e of catalogQuery.data ?? []) {
+      if (!seen.has(e.id)) { seen.add(e.id); merged.push({ id: e.id, label: e.label, provider: e.provider, default: e.default }); }
+    }
+    for (const m of modelsQuery.data?.models ?? []) {
+      if (seen.has(m.id)) { const idx = merged.findIndex((x) => x.id === m.id); if (idx >= 0) merged[idx] = m; }
+      else { seen.add(m.id); merged.push(m); }
+    }
+    return merged;
+  }, [modelsQuery.data, catalogQuery.data]);
   const grouped = useMemo(() => groupByProvider(models), [models]);
 
   // When the selected runtime reports it doesn't support per-agent

@@ -140,6 +140,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
+import type { LLMProvider, LLMModel, LLMModelCatalogEntry } from "../types/llm";
 import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
@@ -2405,5 +2406,36 @@ export class ApiClient {
   }
   async moveOssFile(configId: string, srcKey: string, destKey: string): Promise<{ ok: string }> {
     return this.fetch(`/api/oss/configs/${configId}/files/move`, { method: "POST", body: JSON.stringify({ src_key: srcKey, dest_key: destKey }) });
+  }
+
+  // ── LLM Provider / Model Catalog ──────────────────────────────────
+
+  async listLLMProviders(): Promise<LLMProvider[]> {
+    return this.fetch("/api/llm-providers");
+  }
+  async createLLMProvider(data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch("/api/llm-providers", { method: "POST", body: JSON.stringify(data) });
+  }
+  async updateLLMProvider(id: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch(`/api/llm-providers/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  async deleteLLMProvider(id: string): Promise<void> {
+    return this.fetch(`/api/llm-providers/${id}`, { method: "DELETE" });
+  }
+
+  async listLLMModels(): Promise<LLMModel[]> {
+    return this.fetch("/api/llm-models");
+  }
+  async listLLMModelCatalog(): Promise<LLMModelCatalogEntry[]> {
+    return this.fetch("/api/llm-models/catalog");
+  }
+  async createLLMModel(data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch("/api/llm-models", { method: "POST", body: JSON.stringify(data) });
+  }
+  async updateLLMModel(id: string, data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch(`/api/llm-models/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  async deleteLLMModel(id: string): Promise<void> {
+    return this.fetch(`/api/llm-models/${id}`, { method: "DELETE" });
   }
 }
