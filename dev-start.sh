@@ -37,7 +37,7 @@ BACKEND_PID=$!
 
 # Start frontend dev server
 echo "Starting frontend dev server on :$FRONTEND_PORT..."
-FRONTEND_PORT=$FRONTEND_PORT pnpm dev:web &
+REMOTE_API_URL="http://localhost:$PORT" FRONTEND_PORT=$FRONTEND_PORT pnpm dev:web &
 FRONTEND_PID=$!
 
 echo ""
