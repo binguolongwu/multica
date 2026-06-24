@@ -140,7 +140,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
-import type { LLMProvider, LLMModel, LLMModelCatalogEntry } from "../types/llm";
+import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry } from "../types/llm";
 import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
@@ -2410,6 +2410,9 @@ export class ApiClient {
 
   // ── LLM Provider / Model Catalog (workspace-scoped) ────────────────
 
+  async listLLMProviderTemplates(): Promise<LLMProviderTemplate[]> {
+    return this.fetch("/api/llm-provider-templates");
+  }
   async listLLMProviders(workspaceId: string): Promise<LLMProvider[]> {
     return this.fetch(`/api/workspaces/${workspaceId}/llm-providers`);
   }
