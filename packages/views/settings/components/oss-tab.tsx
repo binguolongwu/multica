@@ -114,7 +114,11 @@ export function OssSettingsTab() {
             <Button variant="outline" size="sm" onClick={async () => {
               setTesting(true);
               try {
-                await api.testOssConnection(form);
+                if (editing) {
+                  await api.testOssConfigConnection(editing.id);
+                } else {
+                  await api.testOssConnection(form);
+                }
                 toast.success("连接测试成功");
               } catch { toast.error("连接测试失败，请检查参数"); }
               setTesting(false);

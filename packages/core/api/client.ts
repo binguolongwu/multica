@@ -2377,6 +2377,9 @@ export class ApiClient {
   async testOssConnection(data: CreateOssConfigRequest): Promise<{ ok: string }> {
     return this.fetch(`/api/oss/configs/test`, { method: "POST", body: JSON.stringify(data) });
   }
+  async testOssConfigConnection(configId: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/test`, { method: "POST" });
+  }
   async listOssFiles(configId: string, qs?: string): Promise<OssObject[]> {
     return this.fetch(`/api/oss/configs/${configId}/files${qs ? `?${qs}` : ""}`);
   }

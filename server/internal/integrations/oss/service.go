@@ -176,9 +176,24 @@ func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.U
 	return obj, nil
 }
 
-// TestConnection validates an OSS provider configuration by attempting to
-// list objects (limit 1). Returns an error if the credentials or bucket
-// are invalid.
+// TestExistingConnection validates an existing config using stored credentials.
+func (s *Service) TestExistingConnection(ctx context.Context, configID, workspaceID pgtype.UUID) error {
+	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
+		ID: configID, WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return fmt.Errorf("get oss config: %w", err)
+	}
+	pc := s.toProviderConfig(cfgRow)
+	d, err := s.driverFor(pc.Provider)
+	if err != nil {
+		return err
+	}
+	_, err = d.ListKeys(ctx, pc, "", 1)
+	return err
+}
+
+// TestConnection validates OSS provider credentials by attempting to list objects.
 func (s *Service) TestConnection(ctx context.Context, params CreateConfigParams) error {
 	if err := validateEndpoint(params.Endpoint); err != nil {
 		return fmt.Errorf("invalid endpoint: %w", err)

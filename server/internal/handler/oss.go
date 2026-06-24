@@ -114,7 +114,7 @@ func (h *Handler) DeleteOSSConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNoContent, nil)
 }
 
-// TestOSSConnection handles POST /api/oss/configs/test — validates OSS credentials.
+// TestOSSConnection handles POST /api/oss/configs/test — validates inline credentials.
 func (h *Handler) TestOSSConnection(w http.ResponseWriter, r *http.Request) {
 	if h.OssService == nil {
 		writeError(w, http.StatusServiceUnavailable, "oss integration is not configured")
@@ -131,7 +131,30 @@ func (h *Handler) TestOSSConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.OssService.TestConnection(r.Context(), req); err != nil {
-		slog.Warn("oss: connection test failed", "error", err)
+		slog.Warn("oss: inline connection test failed", "error", err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+// TestOSSConfigConnection handles POST /api/oss/configs/{configId}/test — validates existing config with stored credentials.
+func (h *Handler) TestOSSConfigConnection(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil {
+		writeError(w, http.StatusServiceUnavailable, "oss integration is not configured")
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	if !ok {
+		return
+	}
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id")
+	if !ok {
+		return
+	}
+	if err := h.OssService.TestExistingConnection(r.Context(), configID, parseUUID(workspaceID)); err != nil {
+		slog.Warn("oss: stored config test failed", "config", uuidToString(configID), "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false"})
 		return
 	}
@@ -158,12 +181,14 @@ func (h *Handler) UploadOSSFile(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 100<<20)
 	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "file too large (max 100 MB)")
+		slog.Warn("oss: multipart parse failed", "config", chi.URLParam(r, "configId"), "error", err)
+		writeError(w, http.StatusBadRequest, "file too large or invalid form")
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		slog.Warn("oss: missing file field", "config", chi.URLParam(r, "configId"), "error", err)
 		writeError(w, http.StatusBadRequest, "missing file field")
 		return
 	}
