@@ -44,8 +44,18 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	_, ok = parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
+	providerID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
 	if !ok {
+		return
+	}
+	// Validate the provider belongs to this workspace (defense against
+	// cross-workspace IDOR: reject provider_id from request body).
+	_, err := h.Queries.GetLLMProvider(r.Context(), db.GetLLMProviderParams{
+		ID:          providerID,
+		WorkspaceID: parseUUID(wsID),
+	})
+	if err != nil {
+		writeError(w, http.StatusNotFound, "provider not found in this workspace")
 		return
 	}
 	var req db.CreateLLMModelParams
@@ -57,6 +67,8 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "model_code is required")
 		return
 	}
+	// Override with URL-path provider ID; ignore any body-supplied value.
+	req.ProviderID = providerID
 	req.WorkspaceID = parseUUID(wsID)
 	model, err := h.Queries.CreateLLMModel(r.Context(), req)
 	if err != nil {
