@@ -103,7 +103,7 @@ export function WikiPage() {
 
   // Protected from deletion: schema, system, templates, index, AGENTS, IDEA
   const isProtectedPath = useCallback((path: string) => {
-    const del = [/^schema\//, /^system\//, /\/_TEMPLATE\.md$/, /^wiki\/index\.md$/, /^wiki\/log\.md$/, /^AGENTS\.md$/, /^IDEA\.md$/];
+    const del = [/^schema$/, /^schema\//, /^system$/, /^system\//, /\/_TEMPLATE\.md$/, /^wiki\/index\.md$/, /^wiki\/log\.md$/, /^AGENTS\.md$/, /^IDEA\.md$/];
     return del.some((p) => p.test(path));
   }, []);
 
