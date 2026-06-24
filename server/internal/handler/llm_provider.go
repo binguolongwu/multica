@@ -15,12 +15,9 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// apiKeyMaskLen is the minimum prefix length preserved when masking.
-const apiKeyMaskLen = 8
-
 func maskAPIKey(key string) string {
-	if len(key) > apiKeyMaskLen {
-		return key[:apiKeyMaskLen] + "****"
+	if len(key) > 8 {
+		return key[:8] + "****"
 	}
 	if key != "" {
 		return "****"
@@ -28,36 +25,26 @@ func maskAPIKey(key string) string {
 	return ""
 }
 
-// validateAPIBaseURL parses and validates a base URL to prevent SSRF.
-// It rejects:
-//   - Unparseable URLs
-//   - Non-HTTPS schemes (in production contexts)
-//   - Hostnames that resolve to private/loopback/link-local addresses
-//   - URLs with embedded userinfo (which can smuggle hosts)
 func validateAPIBaseURL(raw string) error {
 	if raw == "" {
-		return nil // empty is allowed (falls back to daemon local config)
+		return nil
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
 		return err
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return nil // unknown scheme, let it through
+		return nil
 	}
 	if u.User != nil {
-		return nil // userinfo present, suspicious — block
+		return nil
 	}
 	host := u.Hostname()
 	if host == "" {
-		return nil // no host to validate
+		return nil
 	}
-	// Resolve and check for private/loopback ranges
 	addrs, err := net.LookupHost(host)
 	if err != nil {
-		// DNS failure — allow through so legitimate new domains work.
-		// An attacker who controls DNS can already redirect traffic;
-		// we rely on HTTPS cert validation as the primary guard.
 		return nil
 	}
 	for _, addr := range addrs {
@@ -69,19 +56,11 @@ func validateAPIBaseURL(raw string) error {
 			return nil
 		}
 	}
-	// Sanity check: when scheme is http:// but host isn't localhost,
-	// it's still risky in production. Don't enforce here since dev
-	// environments may use plain HTTP; the RBAC gate on provider CRUD
-	// (admin-only) is the primary control.
 	return nil
 }
 
 // ── LLM Provider CRUD ────────────────────────────────────────────────────────
 
-// ListLLMProviders handles GET /api/llm-providers
-// Read access: any workspace member. api_key is always masked in list
-// responses — use GET /api/llm-providers/{id} (or a future dedicated
-// endpoint) with admin role to read the real value.
 func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.workspaceMember(w, r, workspaceID)
@@ -94,8 +73,6 @@ func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list llm providers")
 		return
 	}
-	// Always mask api_key in list responses — even admins get the masked
-	// version. The real value is only returned on create response.
 	for i := range providers {
 		providers[i].ApiKey = maskAPIKey(providers[i].ApiKey)
 	}
@@ -105,8 +82,6 @@ func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, providers)
 }
 
-// CreateLLMProvider handles POST /api/llm-providers
-// Write access: admin or owner only.
 func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
@@ -118,8 +93,8 @@ func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, "name is required")
+	if req.Name == "" || req.Code == "" {
+		writeError(w, http.StatusBadRequest, "name and code are required")
 		return
 	}
 	if err := validateAPIBaseURL(req.ApiBaseUrl); err != nil {
@@ -135,8 +110,6 @@ func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, provider)
 }
 
-// UpdateLLMProvider handles PUT /api/llm-providers/{id}
-// Write access: admin or owner only.
 func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
@@ -152,10 +125,8 @@ func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	// When api_key contains the mask sentinel, the caller is NOT changing
-	// the key — strip it so COALESCE preserves the existing value.
 	if req.ApiKey.Valid && strings.Contains(req.ApiKey.String, "****") {
-		req.ApiKey = pgtype.Text{} // invalidate → COALESCE keeps old value
+		req.ApiKey = pgtype.Text{}
 	}
 	if req.ApiBaseUrl.Valid && req.ApiBaseUrl.String != "" {
 		if err := validateAPIBaseURL(req.ApiBaseUrl.String); err != nil {
@@ -170,13 +141,10 @@ func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to update llm provider")
 		return
 	}
-	// Mask api_key in the response
 	provider.ApiKey = maskAPIKey(provider.ApiKey)
 	writeJSON(w, http.StatusOK, provider)
 }
 
-// DeleteLLMProvider handles DELETE /api/llm-providers/{id}
-// Write access: admin or owner only.
 func (h *Handler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
@@ -193,4 +161,24 @@ func (h *Handler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Provider Templates ──────────────────────────────────────────────────────
+
+func (h *Handler) ListLLMProviderTemplates(w http.ResponseWriter, r *http.Request) {
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID)
+	if !ok {
+		return
+	}
+	templates, err := h.Queries.ListLLMProviderTemplates(r.Context())
+	if err != nil {
+		slog.Warn("llm: failed to list templates", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list llm templates")
+		return
+	}
+	if templates == nil {
+		templates = []db.LlmProviderTemplate{}
+	}
+	writeJSON(w, http.StatusOK, templates)
 }

@@ -18,7 +18,7 @@ func (h *Handler) autoInjectLLMEnv(ctx context.Context, model string, customEnv 
 	if model == "" {
 		return
 	}
-	provider, err := h.Queries.GetLLMProviderByModelID(ctx, model)
+	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, model)
 	if err != nil {
 		return // model not in catalog, nothing to inject
 	}
@@ -41,7 +41,7 @@ func (h *Handler) autoInjectLLMEnv(ctx context.Context, model string, customEnv 
 // LLM provider credentials from the catalog. Used by UpdateAgent when the
 // model field changes. Existing custom_env keys are never overwritten.
 func (h *Handler) injectLLMEnvIntoAgent(ctx context.Context, agentID pgtype.UUID, model string) {
-	provider, err := h.Queries.GetLLMProviderByModelID(ctx, model)
+	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, model)
 	if err != nil {
 		return
 	}

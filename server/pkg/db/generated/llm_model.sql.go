@@ -12,34 +12,47 @@ import (
 )
 
 const createLLMModel = `-- name: CreateLLMModel :one
-INSERT INTO llm_model (provider_id, model_id, display_name, capabilities, context_window)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at
+INSERT INTO llm_model (provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, sort)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at
 `
 
 type CreateLLMModelParams struct {
 	ProviderID    pgtype.UUID `json:"provider_id"`
-	ModelID       string      `json:"model_id"`
-	DisplayName   string      `json:"display_name"`
-	Capabilities  []string    `json:"capabilities"`
+	Name          string      `json:"name"`
+	ModelCode     string      `json:"model_code"`
+	Type          int16       `json:"type"`
+	Temperature   float64     `json:"temperature"`
+	MaxTokens     int32       `json:"max_tokens"`
 	ContextWindow int32       `json:"context_window"`
+	Capabilities  []string    `json:"capabilities"`
+	Sort          int32       `json:"sort"`
 }
 
 func (q *Queries) CreateLLMModel(ctx context.Context, arg CreateLLMModelParams) (LlmModel, error) {
 	row := q.db.QueryRow(ctx, createLLMModel,
 		arg.ProviderID,
-		arg.ModelID,
-		arg.DisplayName,
-		arg.Capabilities,
+		arg.Name,
+		arg.ModelCode,
+		arg.Type,
+		arg.Temperature,
+		arg.MaxTokens,
 		arg.ContextWindow,
+		arg.Capabilities,
+		arg.Sort,
 	)
 	var i LlmModel
 	err := row.Scan(
 		&i.ID,
 		&i.ProviderID,
-		&i.ModelID,
-		&i.DisplayName,
-		&i.Capabilities,
+		&i.Name,
+		&i.ModelCode,
+		&i.Type,
+		&i.Temperature,
+		&i.MaxTokens,
 		&i.ContextWindow,
+		&i.Capabilities,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,7 +69,7 @@ func (q *Queries) DeleteLLMModel(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getLLMModel = `-- name: GetLLMModel :one
-SELECT id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at FROM llm_model WHERE id = $1
+SELECT id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at FROM llm_model WHERE id = $1
 `
 
 func (q *Queries) GetLLMModel(ctx context.Context, id pgtype.UUID) (LlmModel, error) {
@@ -65,30 +78,40 @@ func (q *Queries) GetLLMModel(ctx context.Context, id pgtype.UUID) (LlmModel, er
 	err := row.Scan(
 		&i.ID,
 		&i.ProviderID,
-		&i.ModelID,
-		&i.DisplayName,
-		&i.Capabilities,
+		&i.Name,
+		&i.ModelCode,
+		&i.Type,
+		&i.Temperature,
+		&i.MaxTokens,
 		&i.ContextWindow,
+		&i.Capabilities,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const getLLMModelByModelID = `-- name: GetLLMModelByModelID :one
-SELECT id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at FROM llm_model WHERE model_id = $1
+const getLLMModelByModelCode = `-- name: GetLLMModelByModelCode :one
+SELECT id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at FROM llm_model WHERE model_code = $1 AND status = 1
 `
 
-func (q *Queries) GetLLMModelByModelID(ctx context.Context, modelID string) (LlmModel, error) {
-	row := q.db.QueryRow(ctx, getLLMModelByModelID, modelID)
+func (q *Queries) GetLLMModelByModelCode(ctx context.Context, modelCode string) (LlmModel, error) {
+	row := q.db.QueryRow(ctx, getLLMModelByModelCode, modelCode)
 	var i LlmModel
 	err := row.Scan(
 		&i.ID,
 		&i.ProviderID,
-		&i.ModelID,
-		&i.DisplayName,
-		&i.Capabilities,
+		&i.Name,
+		&i.ModelCode,
+		&i.Type,
+		&i.Temperature,
+		&i.MaxTokens,
 		&i.ContextWindow,
+		&i.Capabilities,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -96,7 +119,7 @@ func (q *Queries) GetLLMModelByModelID(ctx context.Context, modelID string) (Llm
 }
 
 const listLLMModels = `-- name: ListLLMModels :many
-SELECT id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at FROM llm_model ORDER BY provider_id, display_name
+SELECT id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at FROM llm_model WHERE status = 1 ORDER BY provider_id, sort, name
 `
 
 func (q *Queries) ListLLMModels(ctx context.Context) ([]LlmModel, error) {
@@ -111,10 +134,15 @@ func (q *Queries) ListLLMModels(ctx context.Context) ([]LlmModel, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProviderID,
-			&i.ModelID,
-			&i.DisplayName,
-			&i.Capabilities,
+			&i.Name,
+			&i.ModelCode,
+			&i.Type,
+			&i.Temperature,
+			&i.MaxTokens,
 			&i.ContextWindow,
+			&i.Capabilities,
+			&i.Status,
+			&i.Sort,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -129,7 +157,7 @@ func (q *Queries) ListLLMModels(ctx context.Context) ([]LlmModel, error) {
 }
 
 const listLLMModelsByProvider = `-- name: ListLLMModelsByProvider :many
-SELECT id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at FROM llm_model WHERE provider_id = $1 ORDER BY display_name
+SELECT id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at FROM llm_model WHERE provider_id = $1 AND status = 1 ORDER BY sort, name
 `
 
 func (q *Queries) ListLLMModelsByProvider(ctx context.Context, providerID pgtype.UUID) ([]LlmModel, error) {
@@ -144,10 +172,15 @@ func (q *Queries) ListLLMModelsByProvider(ctx context.Context, providerID pgtype
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProviderID,
-			&i.ModelID,
-			&i.DisplayName,
-			&i.Capabilities,
+			&i.Name,
+			&i.ModelCode,
+			&i.Type,
+			&i.Temperature,
+			&i.MaxTokens,
 			&i.ContextWindow,
+			&i.Capabilities,
+			&i.Status,
+			&i.Sort,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -163,38 +196,58 @@ func (q *Queries) ListLLMModelsByProvider(ctx context.Context, providerID pgtype
 
 const updateLLMModel = `-- name: UpdateLLMModel :one
 UPDATE llm_model SET
-    model_id = COALESCE($2, model_id),
-    display_name = COALESCE($3, display_name),
-    capabilities = COALESCE($4, capabilities),
-    context_window = COALESCE($5, context_window),
+    name = COALESCE($2, name),
+    model_code = COALESCE($3, model_code),
+    type = COALESCE($4, type),
+    temperature = COALESCE($5, temperature),
+    max_tokens = COALESCE($6, max_tokens),
+    context_window = COALESCE($7, context_window),
+    capabilities = COALESCE($8, capabilities),
+    status = COALESCE($9, status),
+    sort = COALESCE($10, sort),
     updated_at = now()
-WHERE id = $1 RETURNING id, provider_id, model_id, display_name, capabilities, context_window, created_at, updated_at
+WHERE id = $1 RETURNING id, provider_id, name, model_code, type, temperature, max_tokens, context_window, capabilities, status, sort, created_at, updated_at
 `
 
 type UpdateLLMModelParams struct {
-	ID            pgtype.UUID `json:"id"`
-	ModelID       pgtype.Text `json:"model_id"`
-	DisplayName   pgtype.Text `json:"display_name"`
-	Capabilities  []string    `json:"capabilities"`
-	ContextWindow pgtype.Int4 `json:"context_window"`
+	ID            pgtype.UUID   `json:"id"`
+	Name          pgtype.Text   `json:"name"`
+	ModelCode     pgtype.Text   `json:"model_code"`
+	Type          pgtype.Int2   `json:"type"`
+	Temperature   pgtype.Float8 `json:"temperature"`
+	MaxTokens     pgtype.Int4   `json:"max_tokens"`
+	ContextWindow pgtype.Int4   `json:"context_window"`
+	Capabilities  []string      `json:"capabilities"`
+	Status        pgtype.Int2   `json:"status"`
+	Sort          pgtype.Int4   `json:"sort"`
 }
 
 func (q *Queries) UpdateLLMModel(ctx context.Context, arg UpdateLLMModelParams) (LlmModel, error) {
 	row := q.db.QueryRow(ctx, updateLLMModel,
 		arg.ID,
-		arg.ModelID,
-		arg.DisplayName,
-		arg.Capabilities,
+		arg.Name,
+		arg.ModelCode,
+		arg.Type,
+		arg.Temperature,
+		arg.MaxTokens,
 		arg.ContextWindow,
+		arg.Capabilities,
+		arg.Status,
+		arg.Sort,
 	)
 	var i LlmModel
 	err := row.Scan(
 		&i.ID,
 		&i.ProviderID,
-		&i.ModelID,
-		&i.DisplayName,
-		&i.Capabilities,
+		&i.Name,
+		&i.ModelCode,
+		&i.Type,
+		&i.Temperature,
+		&i.MaxTokens,
 		&i.ContextWindow,
+		&i.Capabilities,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

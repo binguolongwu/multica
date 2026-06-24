@@ -13,8 +13,6 @@ import (
 
 // ── LLM Model CRUD ───────────────────────────────────────────────────────────
 
-// ListLLMModels handles GET /api/llm-models
-// Read access: any workspace member.
 func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.workspaceMember(w, r, workspaceID)
@@ -33,9 +31,6 @@ func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, models)
 }
 
-// LLMModelCatalogEntry is a lightweight model entry for the agent picker dropdown.
-// Mirrors the wire shape of ModelEntry from runtime_models.go so the frontend
-// can merge server catalog results with daemon-discovered results.
 type LLMModelCatalogEntry struct {
 	ID       string `json:"id"`
 	Label    string `json:"label"`
@@ -43,16 +38,12 @@ type LLMModelCatalogEntry struct {
 	Default  bool   `json:"default"`
 }
 
-// ListLLMModelCatalog handles GET /api/llm-models/catalog
-// Returns all models as lightweight catalog entries suitable for the
-// agent model picker dropdown. No daemon involvement needed.
 func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.workspaceMember(w, r, workspaceID)
 	if !ok {
 		return
 	}
-	// Join models with providers to include provider name
 	providers, err := h.Queries.ListLLMProviders(r.Context())
 	if err != nil {
 		slog.Warn("llm: failed to list providers for catalog", "error", err)
@@ -75,12 +66,12 @@ func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
 		if providerName == "" {
 			providerName = "Unknown"
 		}
-		label := m.DisplayName
+		label := m.Name
 		if label == "" {
-			label = m.ModelID
+			label = m.ModelCode
 		}
 		entries = append(entries, LLMModelCatalogEntry{
-			ID:       m.ModelID,
+			ID:       m.ModelCode,
 			Label:    label,
 			Provider: providerName,
 			Default:  false,
@@ -89,8 +80,6 @@ func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, entries)
 }
 
-// CreateLLMModel handles POST /api/llm-models
-// Write access: admin or owner only.
 func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
@@ -102,8 +91,8 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ModelID == "" {
-		writeError(w, http.StatusBadRequest, "model_id is required")
+	if req.ModelCode == "" {
+		writeError(w, http.StatusBadRequest, "model_code is required")
 		return
 	}
 	model, err := h.Queries.CreateLLMModel(r.Context(), req)
@@ -115,8 +104,6 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, model)
 }
 
-// UpdateLLMModel handles PUT /api/llm-models/{id}
-// Write access: admin or owner only.
 func (h *Handler) UpdateLLMModel(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
@@ -142,8 +129,6 @@ func (h *Handler) UpdateLLMModel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, model)
 }
 
-// DeleteLLMModel handles DELETE /api/llm-models/{id}
-// Write access: admin or owner only.
 func (h *Handler) DeleteLLMModel(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")

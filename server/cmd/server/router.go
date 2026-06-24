@@ -604,6 +604,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		// the platform level. RBAC is gated inside each handler via
 		// resolveWorkspaceID / requireWorkspaceRole.
 		r.Get("/api/llm-providers", h.ListLLMProviders)
+		r.Get("/api/llm-provider-templates", h.ListLLMProviderTemplates)
 		r.Post("/api/llm-providers", h.CreateLLMProvider)
 		r.Put("/api/llm-providers/{id}", h.UpdateLLMProvider)
 		r.Delete("/api/llm-providers/{id}", h.DeleteLLMProvider)

@@ -12,34 +12,44 @@ import (
 )
 
 const createLLMProvider = `-- name: CreateLLMProvider :one
-INSERT INTO llm_provider (name, api_base_url, api_key, env_var_api_key, env_var_base_url)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, name, api_base_url, api_key, env_var_api_key, env_var_base_url, created_at, updated_at
+INSERT INTO llm_provider (name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, sort)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
 `
 
 type CreateLLMProviderParams struct {
 	Name          string `json:"name"`
+	Code          string `json:"code"`
+	ApiType       string `json:"api_type"`
 	ApiBaseUrl    string `json:"api_base_url"`
 	ApiKey        string `json:"api_key"`
 	EnvVarApiKey  string `json:"env_var_api_key"`
 	EnvVarBaseUrl string `json:"env_var_base_url"`
+	Sort          int32  `json:"sort"`
 }
 
 func (q *Queries) CreateLLMProvider(ctx context.Context, arg CreateLLMProviderParams) (LlmProvider, error) {
 	row := q.db.QueryRow(ctx, createLLMProvider,
 		arg.Name,
+		arg.Code,
+		arg.ApiType,
 		arg.ApiBaseUrl,
 		arg.ApiKey,
 		arg.EnvVarApiKey,
 		arg.EnvVarBaseUrl,
+		arg.Sort,
 	)
 	var i LlmProvider
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Code,
+		&i.ApiType,
 		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,7 +66,7 @@ func (q *Queries) DeleteLLMProvider(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getLLMProvider = `-- name: GetLLMProvider :one
-SELECT id, name, api_base_url, api_key, env_var_api_key, env_var_base_url, created_at, updated_at FROM llm_provider WHERE id = $1
+SELECT id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE id = $1
 `
 
 func (q *Queries) GetLLMProvider(ctx context.Context, id pgtype.UUID) (LlmProvider, error) {
@@ -65,40 +75,85 @@ func (q *Queries) GetLLMProvider(ctx context.Context, id pgtype.UUID) (LlmProvid
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Code,
+		&i.ApiType,
 		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const getLLMProviderByModelID = `-- name: GetLLMProviderByModelID :one
-SELECT p.id, p.name, p.api_base_url, p.api_key, p.env_var_api_key, p.env_var_base_url, p.created_at, p.updated_at FROM llm_provider p
+const getLLMProviderByModelCode = `-- name: GetLLMProviderByModelCode :one
+SELECT p.id, p.name, p.code, p.api_type, p.api_base_url, p.api_key, p.env_var_api_key, p.env_var_base_url, p.status, p.sort, p.created_at, p.updated_at FROM llm_provider p
 JOIN llm_model m ON m.provider_id = p.id
-WHERE m.model_id = $1
+WHERE m.model_code = $1 AND p.status = 1
 `
 
-func (q *Queries) GetLLMProviderByModelID(ctx context.Context, modelID string) (LlmProvider, error) {
-	row := q.db.QueryRow(ctx, getLLMProviderByModelID, modelID)
+func (q *Queries) GetLLMProviderByModelCode(ctx context.Context, modelCode string) (LlmProvider, error) {
+	row := q.db.QueryRow(ctx, getLLMProviderByModelCode, modelCode)
 	var i LlmProvider
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Code,
+		&i.ApiType,
 		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const listLLMProviderTemplates = `-- name: ListLLMProviderTemplates :many
+SELECT id, name, code, api_type, api_base_url, env_var_api_key, env_var_base_url, anthropic_api_url, sort, status, created_at, updated_at FROM llm_provider_template WHERE status = 1 ORDER BY sort, name
+`
+
+func (q *Queries) ListLLMProviderTemplates(ctx context.Context) ([]LlmProviderTemplate, error) {
+	rows, err := q.db.Query(ctx, listLLMProviderTemplates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LlmProviderTemplate{}
+	for rows.Next() {
+		var i LlmProviderTemplate
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Code,
+			&i.ApiType,
+			&i.ApiBaseUrl,
+			&i.EnvVarApiKey,
+			&i.EnvVarBaseUrl,
+			&i.AnthropicApiUrl,
+			&i.Sort,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLLMProviders = `-- name: ListLLMProviders :many
-SELECT id, name, api_base_url, api_key, env_var_api_key, env_var_base_url, created_at, updated_at FROM llm_provider ORDER BY name
+SELECT id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE status = 1 ORDER BY sort, name
 `
 
 func (q *Queries) ListLLMProviders(ctx context.Context) ([]LlmProvider, error) {
@@ -113,10 +168,14 @@ func (q *Queries) ListLLMProviders(ctx context.Context) ([]LlmProvider, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.Code,
+			&i.ApiType,
 			&i.ApiBaseUrl,
 			&i.ApiKey,
 			&i.EnvVarApiKey,
 			&i.EnvVarBaseUrl,
+			&i.Status,
+			&i.Sort,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -133,40 +192,56 @@ func (q *Queries) ListLLMProviders(ctx context.Context) ([]LlmProvider, error) {
 const updateLLMProvider = `-- name: UpdateLLMProvider :one
 UPDATE llm_provider SET
     name = COALESCE($2, name),
-    api_base_url = COALESCE($3, api_base_url),
-    api_key = COALESCE($4, api_key),
-    env_var_api_key = COALESCE($5, env_var_api_key),
-    env_var_base_url = COALESCE($6, env_var_base_url),
+    code = COALESCE($3, code),
+    api_type = COALESCE($4, api_type),
+    api_base_url = COALESCE($5, api_base_url),
+    api_key = COALESCE($6, api_key),
+    env_var_api_key = COALESCE($7, env_var_api_key),
+    env_var_base_url = COALESCE($8, env_var_base_url),
+    status = COALESCE($9, status),
+    sort = COALESCE($10, sort),
     updated_at = now()
-WHERE id = $1 RETURNING id, name, api_base_url, api_key, env_var_api_key, env_var_base_url, created_at, updated_at
+WHERE id = $1 RETURNING id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
 `
 
 type UpdateLLMProviderParams struct {
 	ID            pgtype.UUID `json:"id"`
 	Name          pgtype.Text `json:"name"`
+	Code          pgtype.Text `json:"code"`
+	ApiType       pgtype.Text `json:"api_type"`
 	ApiBaseUrl    pgtype.Text `json:"api_base_url"`
 	ApiKey        pgtype.Text `json:"api_key"`
 	EnvVarApiKey  pgtype.Text `json:"env_var_api_key"`
 	EnvVarBaseUrl pgtype.Text `json:"env_var_base_url"`
+	Status        pgtype.Int2 `json:"status"`
+	Sort          pgtype.Int4 `json:"sort"`
 }
 
 func (q *Queries) UpdateLLMProvider(ctx context.Context, arg UpdateLLMProviderParams) (LlmProvider, error) {
 	row := q.db.QueryRow(ctx, updateLLMProvider,
 		arg.ID,
 		arg.Name,
+		arg.Code,
+		arg.ApiType,
 		arg.ApiBaseUrl,
 		arg.ApiKey,
 		arg.EnvVarApiKey,
 		arg.EnvVarBaseUrl,
+		arg.Status,
+		arg.Sort,
 	)
 	var i LlmProvider
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Code,
+		&i.ApiType,
 		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
+		&i.Status,
+		&i.Sort,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

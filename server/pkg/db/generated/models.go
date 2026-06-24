@@ -608,25 +608,76 @@ type LarkUserBinding struct {
 }
 
 type LlmModel struct {
-	ID            pgtype.UUID        `json:"id"`
-	ProviderID    pgtype.UUID        `json:"provider_id"`
-	ModelID       string             `json:"model_id"`
-	DisplayName   string             `json:"display_name"`
-	Capabilities  []string           `json:"capabilities"`
-	ContextWindow int32              `json:"context_window"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID pgtype.UUID `json:"id"`
+	// FK to llm_provider. CASCADE delete.
+	ProviderID pgtype.UUID `json:"provider_id"`
+	// Human-readable model name (e.g. DeepSeek-V4-Pro).
+	Name string `json:"name"`
+	// API-facing identifier passed to LLM CLI via --model (e.g. deepseek-v4-pro).
+	ModelCode string `json:"model_code"`
+	// Model type: 1=LLM对话, 2=视觉, 3=生图, 4=嵌入, 5=语音.
+	Type int16 `json:"type"`
+	// Default sampling temperature (0.0-2.0).
+	Temperature float64 `json:"temperature"`
+	// Default max output tokens per request.
+	MaxTokens int32 `json:"max_tokens"`
+	// Max context window in tokens. Informational only.
+	ContextWindow int32 `json:"context_window"`
+	// Array of tags: text, vision, code, tool_use.
+	Capabilities []string `json:"capabilities"`
+	// 0=disabled, 1=enabled.
+	Status int16 `json:"status"`
+	// Display sort order within provider (asc).
+	Sort      int32              `json:"sort"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LlmProvider struct {
-	ID            pgtype.UUID        `json:"id"`
-	Name          string             `json:"name"`
-	ApiBaseUrl    string             `json:"api_base_url"`
-	ApiKey        string             `json:"api_key"`
-	EnvVarApiKey  string             `json:"env_var_api_key"`
-	EnvVarBaseUrl string             `json:"env_var_base_url"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID pgtype.UUID `json:"id"`
+	// Human-readable provider name (e.g. DeepSeek, OpenAI).
+	Name string `json:"name"`
+	// Machine-friendly short code, globally unique (e.g. deepseek, openai).
+	Code string `json:"code"`
+	// API protocol family: openai, anthropic. Determines default env var naming.
+	ApiType string `json:"api_type"`
+	// API endpoint base URL.
+	ApiBaseUrl string `json:"api_base_url"`
+	// Authentication key. Masked in list responses for all users.
+	ApiKey string `json:"api_key"`
+	// Env var name for API key injection into agent runtime.
+	EnvVarApiKey string `json:"env_var_api_key"`
+	// Env var name for API base URL injection into agent runtime.
+	EnvVarBaseUrl string `json:"env_var_base_url"`
+	// 0=disabled, 1=enabled. Disabled providers are hidden from agent model picker.
+	Status int16 `json:"status"`
+	// Display sort order (asc).
+	Sort      int32              `json:"sort"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LlmProviderTemplate struct {
+	ID pgtype.UUID `json:"id"`
+	// Template display name.
+	Name string `json:"name"`
+	// Machine-friendly short code, globally unique.
+	Code string `json:"code"`
+	// API protocol family: openai, anthropic.
+	ApiType string `json:"api_type"`
+	// Default API endpoint for this provider type.
+	ApiBaseUrl string `json:"api_base_url"`
+	// Env var name for API key injection.
+	EnvVarApiKey string `json:"env_var_api_key"`
+	// Env var name for API base URL injection.
+	EnvVarBaseUrl string `json:"env_var_base_url"`
+	// Alternative Anthropic-compatible endpoint when api_type=anthropic.
+	AnthropicApiUrl string `json:"anthropic_api_url"`
+	Sort            int32  `json:"sort"`
+	// 0=disabled, 1=enabled.
+	Status    int16              `json:"status"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Member struct {
