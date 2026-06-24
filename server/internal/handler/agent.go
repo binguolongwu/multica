@@ -822,6 +822,11 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		rc = []byte("{}")
 	}
 
+	// Auto-inject LLM provider credentials when the model matches the
+	// server-side catalog. The user's explicit custom_env takes
+	// precedence — only keys not already present are set.
+	h.autoInjectLLMEnv(r.Context(), req.Model, req.CustomEnv)
+
 	ce, _ := json.Marshal(req.CustomEnv)
 	if req.CustomEnv == nil {
 		ce = []byte("{}")
@@ -1211,6 +1216,13 @@ func (h *Handler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("update agent failed", append(logger.RequestAttrs(r), "error", err, "agent_id", id)...)
 		writeError(w, http.StatusInternalServerError, "failed to update agent: "+err.Error())
 		return
+	}
+
+	// When the model was changed and matches the server-side LLM catalog,
+	// auto-inject the provider's api_key / api_base_url into custom_env.
+	// Existing custom_env keys are never overwritten.
+	if req.Model != nil && *req.Model != "" {
+		h.injectLLMEnvIntoAgent(r.Context(), updated.ID, *req.Model)
 	}
 
 	// mcp_config / thinking_level: null/empty in the request means explicitly

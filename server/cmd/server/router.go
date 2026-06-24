@@ -593,6 +593,20 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Post("/api/upload-file", h.UploadFile)
 		r.Post("/api/feedback", h.CreateFeedback)
 
+		// LLM Provider & Model catalog — global resources managed at
+		// the platform level. RBAC is gated inside each handler via
+		// resolveWorkspaceID / requireWorkspaceRole.
+		r.Get("/api/llm-providers", h.ListLLMProviders)
+		r.Post("/api/llm-providers", h.CreateLLMProvider)
+		r.Put("/api/llm-providers/{id}", h.UpdateLLMProvider)
+		r.Delete("/api/llm-providers/{id}", h.DeleteLLMProvider)
+
+		r.Get("/api/llm-models", h.ListLLMModels)
+		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
+		r.Post("/api/llm-models", h.CreateLLMModel)
+		r.Put("/api/llm-models/{id}", h.UpdateLLMModel)
+		r.Delete("/api/llm-models/{id}", h.DeleteLLMModel)
+
 		// Attachment download — user-scoped (auth-only), NOT
 		// workspace-scoped. The handler self-resolves the workspace
 		// from the attachment row and enforces membership inside, so

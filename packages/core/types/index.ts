@@ -204,3 +204,5 @@ export type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "./billing";
+
+export type { LLMProvider, LLMModel, LLMModelCatalogEntry } from "./llm";
