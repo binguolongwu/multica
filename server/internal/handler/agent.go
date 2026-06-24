@@ -825,7 +825,7 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	// Auto-inject LLM provider credentials when the model matches the
 	// server-side catalog. The user's explicit custom_env takes
 	// precedence — only keys not already present are set.
-	h.autoInjectLLMEnv(r.Context(), req.Model, req.CustomEnv)
+	h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, req.CustomEnv)
 
 	ce, _ := json.Marshal(req.CustomEnv)
 	if req.CustomEnv == nil {
@@ -1222,7 +1222,7 @@ func (h *Handler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	// auto-inject the provider's api_key / api_base_url into custom_env.
 	// Existing custom_env keys are never overwritten.
 	if req.Model != nil && *req.Model != "" {
-		h.injectLLMEnvIntoAgent(r.Context(), updated.ID, *req.Model)
+		h.injectLLMEnvIntoAgent(r.Context(), updated.ID, uuidToString(updated.WorkspaceID), *req.Model)
 	}
 
 	// mcp_config / thinking_level: null/empty in the request means explicitly

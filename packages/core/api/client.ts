@@ -2408,34 +2408,34 @@ export class ApiClient {
     return this.fetch(`/api/oss/configs/${configId}/files/move`, { method: "POST", body: JSON.stringify({ src_key: srcKey, dest_key: destKey }) });
   }
 
-  // ── LLM Provider / Model Catalog ──────────────────────────────────
+  // ── LLM Provider / Model Catalog (workspace-scoped) ────────────────
 
-  async listLLMProviders(): Promise<LLMProvider[]> {
-    return this.fetch("/api/llm-providers");
+  async listLLMProviders(workspaceId: string): Promise<LLMProvider[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers`);
   }
-  async createLLMProvider(data: Partial<LLMProvider>): Promise<LLMProvider> {
-    return this.fetch("/api/llm-providers", { method: "POST", body: JSON.stringify(data) });
+  async createLLMProvider(workspaceId: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers`, { method: "POST", body: JSON.stringify(data) });
   }
-  async updateLLMProvider(id: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
-    return this.fetch(`/api/llm-providers/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  async updateLLMProvider(workspaceId: string, id: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${id}`, { method: "PUT", body: JSON.stringify(data) });
   }
-  async deleteLLMProvider(id: string): Promise<void> {
-    return this.fetch(`/api/llm-providers/${id}`, { method: "DELETE" });
+  async deleteLLMProvider(workspaceId: string, id: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${id}`, { method: "DELETE" });
   }
 
-  async listLLMModels(): Promise<LLMModel[]> {
-    return this.fetch("/api/llm-models");
+  async listLLMModels(workspaceId: string, providerId: string): Promise<LLMModel[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models`);
   }
   async listLLMModelCatalog(): Promise<LLMModelCatalogEntry[]> {
     return this.fetch("/api/llm-models/catalog");
   }
-  async createLLMModel(data: Partial<LLMModel>): Promise<LLMModel> {
-    return this.fetch("/api/llm-models", { method: "POST", body: JSON.stringify(data) });
+  async createLLMModel(workspaceId: string, providerId: string, data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models`, { method: "POST", body: JSON.stringify(data) });
   }
-  async updateLLMModel(id: string, data: Partial<LLMModel>): Promise<LLMModel> {
-    return this.fetch(`/api/llm-models/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  async updateLLMModel(workspaceId: string, providerId: string, id: string, data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/${id}`, { method: "PUT", body: JSON.stringify(data) });
   }
-  async deleteLLMModel(id: string): Promise<void> {
-    return this.fetch(`/api/llm-models/${id}`, { method: "DELETE" });
+  async deleteLLMModel(workspaceId: string, providerId: string, id: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/${id}`, { method: "DELETE" });
   }
 }

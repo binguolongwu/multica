@@ -7,19 +7,26 @@ import (
 	"github.com/go-chi/chi/v5"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// ── LLM Model CRUD ───────────────────────────────────────────────────────────
+// ── LLM Model CRUD (workspace-scoped) ────────────────────────────────────────
 
 func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.workspaceMember(w, r, workspaceID)
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, wsID)
 	if !ok {
 		return
 	}
-	models, err := h.Queries.ListLLMModels(r.Context())
+	wsUUID := parseUUID(wsID)
+	pid, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
+	if !ok {
+		return
+	}
+	models, err := h.Queries.ListLLMModelsByProvider(r.Context(), db.ListLLMModelsByProviderParams{
+		ProviderID:  pid,
+		WorkspaceID: wsUUID,
+	})
 	if err != nil {
 		slog.Warn("llm: failed to list models", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to list llm models")
@@ -31,58 +38,13 @@ func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, models)
 }
 
-type LLMModelCatalogEntry struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Provider string `json:"provider"`
-	Default  bool   `json:"default"`
-}
-
-func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.workspaceMember(w, r, workspaceID)
+func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
-	providers, err := h.Queries.ListLLMProviders(r.Context())
-	if err != nil {
-		slog.Warn("llm: failed to list providers for catalog", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to list llm catalog")
-		return
-	}
-	providerMap := make(map[pgtype.UUID]string, len(providers))
-	for _, p := range providers {
-		providerMap[p.ID] = p.Name
-	}
-	models, err := h.Queries.ListLLMModels(r.Context())
-	if err != nil {
-		slog.Warn("llm: failed to list models for catalog", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to list llm catalog")
-		return
-	}
-	entries := make([]LLMModelCatalogEntry, 0, len(models))
-	for _, m := range models {
-		providerName := providerMap[m.ProviderID]
-		if providerName == "" {
-			providerName = "Unknown"
-		}
-		label := m.Name
-		if label == "" {
-			label = m.ModelCode
-		}
-		entries = append(entries, LLMModelCatalogEntry{
-			ID:       m.ModelCode,
-			Label:    label,
-			Provider: providerName,
-			Default:  false,
-		})
-	}
-	writeJSON(w, http.StatusOK, entries)
-}
-
-func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	_, ok = parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
 	if !ok {
 		return
 	}
@@ -95,6 +57,7 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "model_code is required")
 		return
 	}
+	req.WorkspaceID = parseUUID(wsID)
 	model, err := h.Queries.CreateLLMModel(r.Context(), req)
 	if err != nil {
 		slog.Warn("llm: failed to create model", "error", err)
@@ -105,12 +68,16 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateLLMModel(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
-	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "id"), "model_id")
+	_, ok = parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
+	if !ok {
+		return
+	}
+	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "modelId"), "model_id")
 	if !ok {
 		return
 	}
@@ -120,6 +87,7 @@ func (h *Handler) UpdateLLMModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.ID = id
+	req.WorkspaceID = parseUUID(wsID)
 	model, err := h.Queries.UpdateLLMModel(r.Context(), req)
 	if err != nil {
 		slog.Warn("llm: failed to update model", "error", err)
@@ -130,19 +98,78 @@ func (h *Handler) UpdateLLMModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteLLMModel(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
-	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "id"), "model_id")
+	_, ok = parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
 	if !ok {
 		return
 	}
-	if err := h.Queries.DeleteLLMModel(r.Context(), id); err != nil {
+	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "modelId"), "model_id")
+	if !ok {
+		return
+	}
+	if err := h.Queries.DeleteLLMModel(r.Context(), db.DeleteLLMModelParams{
+		ID:          id,
+		WorkspaceID: parseUUID(wsID),
+	}); err != nil {
 		slog.Warn("llm: failed to delete model", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to delete llm model")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Global Model Catalog (merged from all workspaces) ────────────────────────
+
+type LLMModelCatalogEntry struct {
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Provider string `json:"provider"`
+	Default  bool   `json:"default"`
+}
+
+func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
+	// Any authenticated user can see the catalog.
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID)
+	if !ok {
+		return
+	}
+	type catalogRow struct {
+		ModelCode    string `json:"model_code"`
+		Name         string `json:"name"`
+		ProviderName string `json:"provider_name"`
+	}
+	rows, err := h.Queries.ListLLMModelsForCatalog(r.Context())
+	if err != nil {
+		slog.Warn("llm: failed to list catalog", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list llm catalog")
+		return
+	}
+	entries := make([]LLMModelCatalogEntry, 0, len(rows))
+	seen := map[string]bool{}
+	for _, r := range rows {
+		// Dedup by model_code across workspaces
+		if seen[r.ModelCode] {
+			continue
+		}
+		seen[r.ModelCode] = true
+		entries = append(entries, LLMModelCatalogEntry{
+			ID:       r.ModelCode,
+			Label:    coalesceStr(r.Name, r.ModelCode),
+			Provider: coalesceStr(r.ProviderName, "Unknown"),
+			Default:  false,
+		})
+	}
+	writeJSON(w, http.StatusOK, entries)
+}
+
+func coalesceStr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

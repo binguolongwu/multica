@@ -1,12 +1,12 @@
 -- name: CreateLLMProvider :one
-INSERT INTO llm_provider (name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, sort)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+INSERT INTO llm_provider (workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, sort)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
 
 -- name: GetLLMProvider :one
-SELECT * FROM llm_provider WHERE id = $1;
+SELECT * FROM llm_provider WHERE id = $1 AND workspace_id = $2;
 
 -- name: ListLLMProviders :many
-SELECT * FROM llm_provider WHERE status = 1 ORDER BY sort, name;
+SELECT * FROM llm_provider WHERE workspace_id = $1 AND status = 1 ORDER BY sort, name;
 
 -- name: UpdateLLMProvider :one
 UPDATE llm_provider SET
@@ -20,15 +20,15 @@ UPDATE llm_provider SET
     status = COALESCE(sqlc.narg('status'), status),
     sort = COALESCE(sqlc.narg('sort'), sort),
     updated_at = now()
-WHERE id = $1 RETURNING *;
+WHERE id = $1 AND workspace_id = $2 RETURNING *;
 
 -- name: DeleteLLMProvider :exec
-DELETE FROM llm_provider WHERE id = $1;
+DELETE FROM llm_provider WHERE id = $1 AND workspace_id = $2;
 
 -- name: GetLLMProviderByModelCode :one
 SELECT p.* FROM llm_provider p
 JOIN llm_model m ON m.provider_id = p.id
-WHERE m.model_code = $1 AND p.status = 1;
+WHERE m.model_code = $1 AND m.workspace_id = $2 AND p.status = 1;
 
 -- name: ListLLMProviderTemplates :many
 SELECT * FROM llm_provider_template WHERE status = 1 ORDER BY sort, name;

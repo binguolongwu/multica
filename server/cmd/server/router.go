@@ -600,20 +600,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Post("/api/upload-file", h.UploadFile)
 		r.Post("/api/feedback", h.CreateFeedback)
 
-		// LLM Provider & Model catalog — global resources managed at
-		// the platform level. RBAC is gated inside each handler via
-		// resolveWorkspaceID / requireWorkspaceRole.
-		r.Get("/api/llm-providers", h.ListLLMProviders)
+		// LLM Provider templates (global, shared across all workspaces).
 		r.Get("/api/llm-provider-templates", h.ListLLMProviderTemplates)
-		r.Post("/api/llm-providers", h.CreateLLMProvider)
-		r.Put("/api/llm-providers/{id}", h.UpdateLLMProvider)
-		r.Delete("/api/llm-providers/{id}", h.DeleteLLMProvider)
-
-		r.Get("/api/llm-models", h.ListLLMModels)
+		// Model catalog (merged from all workspaces, used by agent picker).
 		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
-		r.Post("/api/llm-models", h.CreateLLMModel)
-		r.Put("/api/llm-models/{id}", h.UpdateLLMModel)
-		r.Delete("/api/llm-models/{id}", h.DeleteLLMModel)
 
 		// Attachment download — user-scoped (auth-only), NOT
 		// workspace-scoped. The handler self-resolves the workspace
@@ -648,6 +638,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// are admin-gated below).
 					r.Get("/runtime-profiles", h.ListRuntimeProfiles)
 					r.Get("/runtime-profiles/{profileId}", h.GetRuntimeProfile)
+					// LLM providers and models (workspace-scoped).
+					r.Get("/llm-providers", h.ListLLMProviders)
+					r.Get("/llm-providers/{providerId}/models", h.ListLLMModels)
 				})
 				// Admin-level access
 				r.Group(func(r chi.Router) {
@@ -665,6 +658,13 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Patch("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Put("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
+					// LLM providers and models (admin-only mutations).
+					r.Post("/llm-providers", h.CreateLLMProvider)
+					r.Put("/llm-providers/{providerId}", h.UpdateLLMProvider)
+					r.Delete("/llm-providers/{providerId}", h.DeleteLLMProvider)
+					r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
+					r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
+					r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
 				})
 				// Owner-only access
 				r.With(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner")).Delete("/", h.DeleteWorkspace)

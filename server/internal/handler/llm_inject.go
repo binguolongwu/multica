@@ -10,17 +10,16 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// autoInjectLLMEnv injects the LLM provider's api_key and api_base_url into
-// customEnv when the given model matches a server-side catalog entry. Keys
-// that are already present in customEnv are never overwritten — the user's
-// explicit configuration always takes precedence.
-func (h *Handler) autoInjectLLMEnv(ctx context.Context, model string, customEnv map[string]string) {
-	if model == "" {
+func (h *Handler) autoInjectLLMEnv(ctx context.Context, workspaceID, model string, customEnv map[string]string) {
+	if model == "" || workspaceID == "" {
 		return
 	}
-	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, model)
+	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, db.GetLLMProviderByModelCodeParams{
+		ModelCode:   model,
+		WorkspaceID: parseUUID(workspaceID),
+	})
 	if err != nil {
-		return // model not in catalog, nothing to inject
+		return
 	}
 	if customEnv == nil {
 		customEnv = map[string]string{}
@@ -37,15 +36,14 @@ func (h *Handler) autoInjectLLMEnv(ctx context.Context, model string, customEnv 
 	}
 }
 
-// injectLLMEnvIntoAgent updates an existing agent's custom_env with the
-// LLM provider credentials from the catalog. Used by UpdateAgent when the
-// model field changes. Existing custom_env keys are never overwritten.
-func (h *Handler) injectLLMEnvIntoAgent(ctx context.Context, agentID pgtype.UUID, model string) {
-	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, model)
+func (h *Handler) injectLLMEnvIntoAgent(ctx context.Context, agentID pgtype.UUID, workspaceID, model string) {
+	provider, err := h.Queries.GetLLMProviderByModelCode(ctx, db.GetLLMProviderByModelCodeParams{
+		ModelCode:   model,
+		WorkspaceID: parseUUID(workspaceID),
+	})
 	if err != nil {
 		return
 	}
-	// Load current agent to get existing custom_env for merge.
 	agent, err := h.Queries.GetAgent(ctx, agentID)
 	if err != nil {
 		slog.Warn("llm: failed to load agent for env injection", "agent_id", uuidToString(agentID), "error", err)
@@ -79,6 +77,6 @@ func (h *Handler) injectLLMEnvIntoAgent(ctx context.Context, agentID pgtype.UUID
 		ID:        agent.ID,
 		CustomEnv: raw,
 	}); err != nil {
-		slog.Warn("llm: failed to inject custom_env", "agent_id", agentID, "error", err)
+		slog.Warn("llm: failed to inject custom_env", "agent_id", uuidToString(agentID), "error", err)
 	}
 }

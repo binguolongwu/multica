@@ -59,15 +59,16 @@ func validateAPIBaseURL(raw string) error {
 	return nil
 }
 
-// ── LLM Provider CRUD ────────────────────────────────────────────────────────
+// ── LLM Provider CRUD (workspace-scoped) ─────────────────────────────────────
 
 func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.workspaceMember(w, r, workspaceID)
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, wsID)
 	if !ok {
 		return
 	}
-	providers, err := h.Queries.ListLLMProviders(r.Context())
+	wsUUID := parseUUID(wsID)
+	providers, err := h.Queries.ListLLMProviders(r.Context(), wsUUID)
 	if err != nil {
 		slog.Warn("llm: failed to list providers", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to list llm providers")
@@ -83,8 +84,8 @@ func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
@@ -101,6 +102,7 @@ func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid api_base_url: "+err.Error())
 		return
 	}
+	req.WorkspaceID = parseUUID(wsID)
 	provider, err := h.Queries.CreateLLMProvider(r.Context(), req)
 	if err != nil {
 		slog.Warn("llm: failed to create provider", "error", err)
@@ -111,12 +113,12 @@ func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
-	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "id"), "provider_id")
+	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
 	if !ok {
 		return
 	}
@@ -135,6 +137,7 @@ func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	req.ID = id
+	req.WorkspaceID = parseUUID(wsID)
 	provider, err := h.Queries.UpdateLLMProvider(r.Context(), req)
 	if err != nil {
 		slog.Warn("llm: failed to update provider", "error", err)
@@ -146,16 +149,19 @@ func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
 	if !ok {
 		return
 	}
-	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "id"), "provider_id")
+	id, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
 	if !ok {
 		return
 	}
-	if err := h.Queries.DeleteLLMProvider(r.Context(), id); err != nil {
+	if err := h.Queries.DeleteLLMProvider(r.Context(), db.DeleteLLMProviderParams{
+		ID:          id,
+		WorkspaceID: parseUUID(wsID),
+	}); err != nil {
 		slog.Warn("llm: failed to delete provider", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to delete llm provider")
 		return
@@ -163,9 +169,8 @@ func (h *Handler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ── Provider Templates ──────────────────────────────────────────────────────
-
 func (h *Handler) ListLLMProviderTemplates(w http.ResponseWriter, r *http.Request) {
+	// Global: any authenticated user can read templates
 	workspaceID := h.resolveWorkspaceID(r)
 	_, ok := h.workspaceMember(w, r, workspaceID)
 	if !ok {
