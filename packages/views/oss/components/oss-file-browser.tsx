@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HardDrive, Search, Download, Trash2 } from "lucide-react";
+import { HardDrive, Search, Download, Trash2, Upload } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { api } from "@multica/core/api";
 import { Input } from "@multica/ui/components/ui/input";
@@ -19,6 +19,7 @@ export function OssFileBrowser() {
   const wsId = useWorkspaceId();
   const [selectedConfig, setSelectedConfig] = useState("");
   const [search, setSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const { data: configs } = useQuery<OssProviderConfig[]>({
     queryKey: ["oss", "configs", wsId],
@@ -41,6 +42,19 @@ export function OssFileBrowser() {
       const resp = await api.getOssFileDownloadUrl(selectedConfig, file.id);
       window.open(resp.url, "_blank");
     } catch { alert("下载失败"); }
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedConfig) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      await api.uploadOssFile(selectedConfig, form);
+      window.location.reload();
+    } catch { alert("上传失败"); }
+    setUploading(false);
   };
 
   const handleDelete = async (file: OssObject) => {
@@ -66,17 +80,21 @@ export function OssFileBrowser() {
         <>
           <div className="mb-4 flex items-center gap-3">
             <select className="h-9 w-64 rounded-md border bg-background px-3 text-sm" value={selectedConfig} onChange={e => setSelectedConfig(e.target.value)}>
-              <option value="">选择 OSS 配置...</option>
+              <option value="">选择存储平台</option>
               {configs.map(c => <option key={c.id} value={c.id}>{c.name} ({c.bucket})</option>)}
             </select>
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-8" placeholder="搜索文件 (prefix)..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+            <Button variant="outline" size="sm" disabled={uploading || !selectedConfig} onClick={() => document.getElementById("oss-upload")?.click()}>
+              <Upload className="mr-1 h-3.5 w-3.5" />{uploading ? "上传中..." : "上传"}
+            </Button>
+            <input type="file" id="oss-upload" className="hidden" onChange={handleUpload} disabled={uploading || !selectedConfig} />
           </div>
           <div className="flex-1 overflow-y-auto rounded-md border">
             {isLoading ? <p className="p-8 text-center text-sm text-muted-foreground">加载中...</p>
-            : !selectedConfig ? <p className="p-8 text-center text-sm text-muted-foreground">请选择 OSS 配置</p>
+            : !selectedConfig ? <p className="p-8 text-center text-sm text-muted-foreground">请选择存储平台</p>
             : files && files.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">暂无文件</p>
             : (
               <table className="w-full text-sm">

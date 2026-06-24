@@ -2383,6 +2383,9 @@ export class ApiClient {
   async getOssFileDownloadUrl(configId: string, fileId: string): Promise<OssObjectWithUrl> {
     return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`);
   }
+  async uploadOssFile(configId: string, formData: FormData): Promise<OssObjectWithUrl> {
+    return this.fetch(`/api/oss/configs/${configId}/files/upload`, { method: "POST", body: formData });
+  }
   async deleteOssFile(configId: string, fileId: string): Promise<void> {
     return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`, { method: "DELETE" });
   }
