@@ -139,6 +139,7 @@ const ROUTE_ICONS: Record<string, string> = {
   runtimes: "Monitor",
   skills: "BookOpenText",
   settings: "Settings",
+  llm: "Cpu",
 };
 
 /**

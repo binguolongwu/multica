@@ -228,7 +228,7 @@ export function LlmSettingsTab() {
 
       {/* ── Provider Dialog ────────────── */}
       <Dialog open={providerDialog} onOpenChange={setProviderDialog}>
-        <DialogContent className="w-[60vw] max-h-[60vh] overflow-y-auto">
+        <DialogContent className="overflow-y-auto" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "60vh" }}>
           <DialogTitle>{editingProvider ? "编辑供应商" : "新增供应商"}</DialogTitle>
           <div className="space-y-3">
             <div>
@@ -287,7 +287,7 @@ export function LlmSettingsTab() {
 
       {/* ── Model Dialog ────────────── */}
       <Dialog open={modelDialog} onOpenChange={setModelDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="overflow-y-auto" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "60vh" }}>
           <DialogTitle>{editingModel ? "编辑模型" : "新增模型"}</DialogTitle>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">

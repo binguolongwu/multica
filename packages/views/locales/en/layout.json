@@ -10,8 +10,10 @@
     "usage": "Usage",
     "runtimes": "Runtimes",
     "skills": "Skills",
-    "wiki": "Wiki", "oss": "Cloud Storage",
-    "settings": "Settings"
+    "wiki": "Wiki",
+    "oss": "Cloud Storage",
+    "settings": "Settings",
+    "llm": "LLM Models"
   },
   "help": {
     "trigger": "Help",
@@ -21,14 +23,26 @@
     "feedback": "Feedback"
   },
   "wiki_page": {
-    "title": "Wiki", "ingest": "Ingest", "ingest_need_agent": "Please select a Wiki admin agent first", "wiki_agent": "Wiki agent", "search": "Search wiki...",
-    "edit": "Edit", "save": "Save", "cancel": "Cancel", "saving": "Saving...",
-    "links": "Links", "backlinks": "Backlinks", "properties": "Properties", "on_this_page": "On this page",
-    "no_pages": "No pages yet", "select_page": "Select a page from the tree to read",
+    "title": "Wiki",
+    "ingest": "Ingest",
+    "ingest_need_agent": "Please select a Wiki admin agent first",
+    "wiki_agent": "Wiki agent",
+    "search": "Search wiki...",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "links": "Links",
+    "backlinks": "Backlinks",
+    "properties": "Properties",
+    "on_this_page": "On this page",
+    "no_pages": "No pages yet",
+    "select_page": "Select a page from the tree to read",
     "page_not_found": "Page not found",
     "not_setup_title": "Wiki not set up",
     "not_setup_desc": "Create a wiki space to start building your knowledge base.",
-    "create_wiki": "Create Wiki", "creating": "Creating...",
+    "create_wiki": "Create Wiki",
+    "creating": "Creating...",
     "ingest_title": "Ingest Knowledge",
     "ingest_inbox": "Inbox",
     "ingest_url": "URL",
@@ -58,7 +72,8 @@
     "ingest_dir_confirm": "Confirm",
     "ingest_import_to": "Import to:",
     "ingest_browse": "Browse",
-    "tree_cannot_delete": "Directory has files or subdirectories. Remove them first.", "tree_protected": "System pages are protected and cannot be deleted"
+    "tree_cannot_delete": "Directory has files or subdirectories. Remove them first.",
+    "tree_protected": "System pages are protected and cannot be deleted"
   },
   "workspace_loader": {
     "loading_workspace": "Loading workspace…",

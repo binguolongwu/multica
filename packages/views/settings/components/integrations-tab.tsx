@@ -1,7 +1,6 @@
 "use client";
 
 import { LarkTab } from "./lark-tab";
-import { LlmSettingsTab } from "./llm-tab";
 import { WikiSettingsTab } from "../../wiki/components/wiki-settings-tab";
 import { OssSettingsTab } from "./oss-tab";
 import { useT } from "../../i18n";
@@ -16,11 +15,6 @@ export function IntegrationsTab() {
   const { t } = useT("settings");
   return (
     <div className="space-y-10">
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">LLM · 大模型管理</h2>
-        <LlmSettingsTab />
-      </section>
-
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Wiki</h2>
         <WikiSettingsTab />

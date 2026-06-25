@@ -10,8 +10,10 @@
     "usage": "用量",
     "runtimes": "运行时",
     "skills": "Skills",
-    "wiki": "知识库", "oss": "云存储",
-    "settings": "设置"
+    "wiki": "知识库",
+    "oss": "云存储",
+    "settings": "设置",
+    "llm": "大模型"
   },
   "help": {
     "trigger": "帮助",
@@ -21,14 +23,26 @@
     "feedback": "反馈"
   },
   "wiki_page": {
-    "title": "知识库", "ingest": "摄取", "ingest_need_agent": "请选择一位知识库管理员", "wiki_agent": "Wiki 智能体", "search": "搜索...",
-    "edit": "编辑", "save": "保存", "cancel": "取消", "saving": "保存中...",
-    "links": "链接", "backlinks": "反向链接", "properties": "属性", "on_this_page": "本页导航",
-    "no_pages": "暂无页面", "select_page": "从左侧目录选择页面阅读",
+    "title": "知识库",
+    "ingest": "摄取",
+    "ingest_need_agent": "请选择一位知识库管理员",
+    "wiki_agent": "Wiki 智能体",
+    "search": "搜索...",
+    "edit": "编辑",
+    "save": "保存",
+    "cancel": "取消",
+    "saving": "保存中...",
+    "links": "链接",
+    "backlinks": "反向链接",
+    "properties": "属性",
+    "on_this_page": "本页导航",
+    "no_pages": "暂无页面",
+    "select_page": "从左侧目录选择页面阅读",
     "page_not_found": "页面未找到",
     "not_setup_title": "知识库未设置",
     "not_setup_desc": "创建一个知识库空间以开始构建知识库。",
-    "create_wiki": "创建知识库", "creating": "创建中...",
+    "create_wiki": "创建知识库",
+    "creating": "创建中...",
     "ingest_title": "摄取知识",
     "ingest_inbox": "收件箱",
     "ingest_url": "网址",
@@ -58,7 +72,8 @@
     "ingest_dir_confirm": "确认",
     "ingest_import_to": "导入至:",
     "ingest_browse": "浏览",
-    "tree_cannot_delete": "目录下有文件或子目录，请先清空后再删除。", "tree_protected": "系统页面受保护，不可删除"
+    "tree_cannot_delete": "目录下有文件或子目录，请先清空后再删除。",
+    "tree_protected": "系统页面受保护，不可删除"
   },
   "workspace_loader": {
     "loading_workspace": "正在加载工作区...",
