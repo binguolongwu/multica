@@ -48,7 +48,7 @@ func writeContextFiles(workDir, provider string, ctx TaskContextForEnv, manifest
 		// themselves or it survived from a crashed prior run we can't
 		// safely distinguish from intentional content. Refusing the
 		// write is the correct call: the runtime brief (CLAUDE.md /
-		// AGENTS.md / GEMINI.md) already carries every fact this file
+		// AGENTS.md) already carries every fact this file
 		// would, so the agent runs fine without the sidecar copy.
 		// Anything else is a real failure.
 		if !errors.Is(err, errPathPreExists) {
@@ -501,6 +501,14 @@ func renderIssueContext(provider string, ctx TaskContextForEnv) string {
 		b.WriteString("**Triggering comment ID:** `" + ctx.TriggerCommentID + "`\n\n")
 	} else {
 		b.WriteString("**Trigger:** New Assignment\n\n")
+	}
+
+	// Assignment handoff note (MUL-3375): the assigner's scoping instruction for
+	// this run. Distinct from a comment — there is no thread to reply to.
+	if ctx.HandoffNote != "" {
+		b.WriteString("## Handoff Note\n\n")
+		b.WriteString("The person who assigned this issue left this instruction for the run. Treat it as scope guidance and follow it before doing anything broader:\n\n")
+		fmt.Fprintf(&b, "> %s\n\n", ctx.HandoffNote)
 	}
 
 	b.WriteString("## Quick Start\n\n")

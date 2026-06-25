@@ -16,6 +16,7 @@ import (
 type RepoContextForEnv struct {
 	URL         string // remote URL
 	Description string // optional repo description
+	Ref         string // optional default checkout ref for this task
 }
 
 // ProjectResourceForEnv describes a single resource attached to the issue's
@@ -85,6 +86,7 @@ type TaskContextForEnv struct {
 	AutopilotSource         string
 	AutopilotTriggerPayload string
 	QuickCreatePrompt       string // non-empty for quick-create tasks
+	HandoffNote             string // assignment handoff instruction; rendered into issue_context.md (MUL-3375)
 	IsSquadLeader           bool   // true when the agent is acting as a squad leader (may exit silently on no_action)
 	// WorkspaceContext is the workspace-level system prompt (workspace.context
 	// in the DB). Rendered into the brief as `## Workspace Context` when
