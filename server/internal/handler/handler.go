@@ -21,7 +21,6 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/featureflagdispatch"
-	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/oss"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
@@ -164,7 +163,8 @@ type Handler struct {
 	// can yield cleanly when the DB is healthy without blocking
 	// process exit indefinitely if the pool is frozen — at worst the
 	// next replica waits the full TTL.
-	LarkHub *lark.Hub
+	ChannelSupervisor interface{ Run(context.Context); WaitWithTimeout(time.Duration) bool; ShutdownTimeout() time.Duration }
+	ChannelRouter     interface{ Drain() }
 	// WikiService is the wiki knowledge base service. Nil when wiki is not
 	// configured; handlers return 503 in that case.
 	WikiService *wiki.Service

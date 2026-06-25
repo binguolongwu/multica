@@ -46,6 +46,7 @@
     "./chat": "./chat/index.ts",
     "./settings": "./settings/index.ts",
     "./settings/lark-tab": "./settings/components/lark-tab.tsx",
+    "./settings/components/llm-tab": "./settings/components/llm-tab.tsx",
     "./lark": "./lark/index.ts",
     "./invite": "./invite/index.ts",
     "./invitations": "./invitations/index.ts",
