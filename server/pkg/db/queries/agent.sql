@@ -8,6 +8,10 @@ SELECT * FROM agent
 WHERE workspace_id = $1
 ORDER BY created_at ASC;
 
+-- name: ListAgentRuntimeInfos :many
+SELECT ar.id, ar.provider, ar.name FROM agent_runtime ar
+WHERE ar.id = ANY($1::uuid[]);
+
 -- name: GetAgent :one
 SELECT * FROM agent
 WHERE id = $1;

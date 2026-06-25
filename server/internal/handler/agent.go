@@ -60,8 +60,10 @@ type AgentResponse struct {
 	// ThinkingLevel is the runtime-native reasoning/effort token persisted
 	// for this agent (empty = use runtime default). The picker is per-runtime
 	// per-model; the API never normalizes across providers. See MUL-2339.
-	ThinkingLevel string              `json:"thinking_level"`
-	OwnerID       *string             `json:"owner_id"`
+	ThinkingLevel   string              `json:"thinking_level"`
+	RuntimeProvider string              `json:"runtime_provider,omitempty"`
+	RuntimeName     string              `json:"runtime_name,omitempty"`
+	OwnerID         *string             `json:"owner_id"`
 	Skills        []AgentSkillSummary `json:"skills"`
 	CreatedAt     string              `json:"created_at"`
 	UpdatedAt     string              `json:"updated_at"`
@@ -558,7 +560,30 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Batch-load skills for all agents to avoid N+1.
+	// Batch-load runtime provider + name for all agents to avoid N+1.
+runtimeIDs := make([]pgtype.UUID, 0, len(agents))
+seen := map[string]bool{}
+for _, a := range agents {
+	if !seen[uuidToString(a.RuntimeID)] {
+		runtimeIDs = append(runtimeIDs, a.RuntimeID)
+		seen[uuidToString(a.RuntimeID)] = true
+	}
+}
+runtimeProviderMap := map[string]string{}
+runtimeNameMap := map[string]string{}
+if len(runtimeIDs) > 0 {
+	rtRows, err := h.Queries.ListAgentRuntimeInfos(r.Context(), runtimeIDs)
+	if err != nil {
+		slog.Warn("failed to batch-load runtime infos", "error", err)
+	}
+	for _, row := range rtRows {
+		id := uuidToString(row.ID)
+		runtimeProviderMap[id] = row.Provider
+		runtimeNameMap[id] = row.Name
+	}
+}
+
+// Batch-load skills for all agents to avoid N+1.
 	skillRows, err := h.Queries.ListAgentSkillsByWorkspace(r.Context(), parseUUID(workspaceID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load agent skills")
@@ -599,6 +624,8 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		resp := agentToResponse(a)
+			resp.RuntimeProvider = runtimeProviderMap[uuidToString(a.RuntimeID)]
+resp.RuntimeName = runtimeNameMap[uuidToString(a.RuntimeID)]
 		if skills, ok := skillMap[resp.ID]; ok {
 			resp.Skills = skills
 		}
@@ -795,6 +822,11 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	if req.RuntimeConfig == nil {
 		rc = []byte("{}")
 	}
+
+	// Auto-inject LLM provider credentials when the model matches the
+	// server-side catalog. The user's explicit custom_env takes
+	// precedence — only keys not already present are set.
+	h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, req.CustomEnv)
 
 	ce, _ := json.Marshal(req.CustomEnv)
 	if req.CustomEnv == nil {
@@ -1185,6 +1217,13 @@ func (h *Handler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("update agent failed", append(logger.RequestAttrs(r), "error", err, "agent_id", id)...)
 		writeError(w, http.StatusInternalServerError, "failed to update agent: "+err.Error())
 		return
+	}
+
+	// When the model was changed and matches the server-side LLM catalog,
+	// auto-inject the provider's api_key / api_base_url into custom_env.
+	// Existing custom_env keys are never overwritten.
+	if req.Model != nil && *req.Model != "" {
+		h.injectLLMEnvIntoAgent(r.Context(), updated.ID, uuidToString(updated.WorkspaceID), *req.Model)
 	}
 
 	// mcp_config / thinking_level: null/empty in the request means explicitly

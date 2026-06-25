@@ -11,7 +11,8 @@
     "runtimes": "런타임",
     "skills": "스킬",
     "wiki": "Wiki",
-    "settings": "설정"
+    "settings": "설정",
+    "llm": "LLM 모델"
   },
   "help": {
     "trigger": "도움말",

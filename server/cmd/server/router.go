@@ -26,7 +26,8 @@ import (
 	"github.com/multica-ai/multica/server/internal/integrations/channel"
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
-	"github.com/multica-ai/multica/server/internal/integrations/wiki"
+	"github.com/multica-ai/multica/server/internal/integrations/oss"
+"github.com/multica-ai/multica/server/internal/integrations/wiki"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
 	"github.com/multica-ai/multica/server/internal/realtime"
@@ -398,6 +399,36 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		bus.SubscribeAll(wikiIngestion.HandleEvent)
 		slog.Info("wiki integration enabled")
 	}
+	// OSS integration. Always enabled — no secret key required.
+	// Workspace admins configure their own OSS providers via
+	// the integrations settings page.
+	{
+		ossBox, err := secretbox.LoadKey("MULTICA_OSS_SECRET_KEY")
+		var ossSecBox *secretbox.Box
+		if err != nil {
+			slog.Warn("oss: MULTICA_OSS_SECRET_KEY not set, secret_key will be stored in plaintext",
+				"error", err)
+		} else {
+			var boxErr error
+			ossSecBox, boxErr = secretbox.New(ossBox)
+			if boxErr != nil {
+				slog.Warn("oss: failed to create SecretBox, secret_key will be stored in plaintext",
+					"error", boxErr)
+			}
+		}
+		ossSvc := oss.New(queries, ossSecBox)
+		// Register built-in S3-compatible driver (covers MinIO, S3, R2, B2, etc.)
+		ossSvc.RegisterDriver("s3_compatible", &oss.S3Driver{}) // MinIO / R2 / B2 / generic
+		ossSvc.RegisterDriver("minio", &oss.S3Driver{})
+		ossSvc.RegisterDriver("qiniu", &oss.QiniuDriver{})
+		ossSvc.RegisterDriver("aliyun_oss", &oss.AliyunDriver{})
+		ossSvc.RegisterDriver("tencent_cos", &oss.TencentCOSDriver{})
+		ossSvc.RegisterDriver("huawei_obs", &oss.S3Driver{}) // OBS supports S3 API
+		ossSvc.RegisterDriver("baidu_bos", &oss.S3Driver{})  // BOS supports S3 API
+		ossSvc.RegisterDriver("volcengine_tos", &oss.S3Driver{}) // TOS supports S3 API
+		h.OssService = ossSvc
+		slog.Info("oss integration enabled")
+	}
 	if opts.HeartbeatScheduler != nil {
 		h.HeartbeatScheduler = opts.HeartbeatScheduler
 	}
@@ -594,6 +625,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Post("/api/upload-file", h.UploadFile)
 		r.Post("/api/feedback", h.CreateFeedback)
 
+		// LLM Provider templates (global, shared across all workspaces).
+		r.Get("/api/llm-provider-templates", h.ListLLMProviderTemplates)
+		// Model catalog (merged from all workspaces, used by agent picker).
+		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
+
 		// Attachment download — user-scoped (auth-only), NOT
 		// workspace-scoped. The handler self-resolves the workspace
 		// from the attachment row and enforces membership inside, so
@@ -627,6 +663,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// are admin-gated below).
 					r.Get("/runtime-profiles", h.ListRuntimeProfiles)
 					r.Get("/runtime-profiles/{profileId}", h.GetRuntimeProfile)
+					// LLM providers and models (workspace-scoped).
+					r.Get("/llm-providers", h.ListLLMProviders)
+					r.Get("/llm-providers/{providerId}/models", h.ListLLMModels)
 				})
 				// Admin-level access
 				r.Group(func(r chi.Router) {
@@ -644,6 +683,13 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Patch("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Put("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
+					// LLM providers and models (admin-only mutations).
+					r.Post("/llm-providers", h.CreateLLMProvider)
+					r.Put("/llm-providers/{providerId}", h.UpdateLLMProvider)
+					r.Delete("/llm-providers/{providerId}", h.DeleteLLMProvider)
+					r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
+					r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
+					r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
 				})
 				// Owner-only access
 				r.With(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner")).Delete("/", h.DeleteWorkspace)
@@ -1050,6 +1096,55 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				})
 			})
 			r.Get("/api/chat/pending-tasks", h.ListPendingChatTasks)
+
+			// Wiki knowledge base — header-based workspace resolution
+			// so CLI (multica wiki read-page/write-page/list-pages/search)
+			// can use /api/wiki/... paths. The URL-based routes under
+			// /api/workspaces/{id}/wiki remain for web/desktop which
+			// embed workspace in the URL path.
+			// OSS object storage integration — header-based workspace resolution
+		// so CLI (multica oss upload/download/list) can use /api/oss/... paths.
+		r.Route("/api/oss", func(r chi.Router) {
+			r.Get("/configs", h.ListOSSConfigs)
+			r.Post("/configs", h.CreateOSSConfig)
+			r.Post("/configs/test", h.TestOSSConnection)
+			r.Post("/configs/{configId}/test", h.TestOSSConfigConnection)
+			r.Get("/configs/{configId}", h.ListOSSConfigs)
+			r.Patch("/configs/{configId}", h.UpdateOSSConfig)
+			r.Delete("/configs/{configId}", h.DeleteOSSConfig)
+			r.Post("/configs/{configId}/files/upload", h.UploadOSSFile)
+			r.Get("/configs/{configId}/files", h.ListOSSFiles)
+			r.Get("/configs/{configId}/files/db", h.ListOSSFilesFromDB)
+			r.Get("/configs/{configId}/files/{fileId}", h.GetOSSFileDownloadURL)
+			r.Delete("/configs/{configId}/files/{fileId}", h.DeleteOSSFile)
+			r.Post("/configs/{configId}/directories", h.CreateOSSDirectory)
+			r.Delete("/configs/{configId}/directories", h.DeleteOSSDirectory)
+			r.Post("/configs/{configId}/files/move", h.MoveOSSFile)
+		})
+
+		r.Route("/api/wiki", func(r chi.Router) {
+				r.Get("/spaces", h.ListWikiSpaces)
+				r.Post("/spaces", h.CreateWikiSpace)
+				r.Get("/spaces/{slug}/overview", h.GetWikiSpaceOverview)
+				r.Get("/spaces/{slug}", h.GetWikiSpace)
+				r.Patch("/spaces/{slug}", h.UpdateWikiSpace)
+				r.Delete("/spaces/{slug}", h.ArchiveWikiSpace)
+				r.Get("/spaces/{slug}/pages", h.ListWikiPages)
+				r.Post("/spaces/{slug}/pages/batch", h.BatchReadWikiPages)
+				r.Post("/spaces/{slug}/pages/batch-write", h.BatchWriteWikiPages)
+				r.Get("/spaces/{slug}/pages/*", h.GetWikiPage)
+				r.Put("/spaces/{slug}/pages/*", h.UpsertWikiPage)
+				r.Delete("/spaces/{slug}/pages/*", h.DeleteWikiPage)
+				r.Get("/spaces/{slug}/page-revisions/*", h.ListWikiPageRevisions)
+				r.Get("/spaces/{slug}/sources", h.ListWikiSources)
+				r.Post("/spaces/{slug}/sources", h.CreateWikiSource)
+				r.Get("/spaces/{slug}/sources/{id}", h.GetWikiSource)
+				r.Delete("/spaces/{slug}/sources/{id}", h.DeleteWikiSource)
+				r.Post("/spaces/{slug}/crawl", h.CrawlURL)
+				r.Get("/spaces/{slug}/operations", h.ListWikiOperations)
+				r.Post("/spaces/{slug}/operations", h.CreateWikiOperation)
+				r.Get("/spaces/{slug}/operations/{id}", h.GetWikiOperation)
+			})
 
 			// Inbox
 			r.Route("/api/inbox", func(r chi.Router) {

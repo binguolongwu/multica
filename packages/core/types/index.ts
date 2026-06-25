@@ -103,6 +103,7 @@ export type {
   ListProjectResourcesResponse,
 } from "./project";
 export type { PinnedItem, PinnedItemType, CreatePinRequest, ReorderPinsRequest } from "./pin";
+export type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "./oss";
 export type {
   GitHubInstallation,
   GitHubMergeableState,
@@ -203,3 +204,5 @@ export type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "./billing";
+
+export type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry } from "./llm";

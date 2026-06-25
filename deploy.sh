@@ -24,15 +24,15 @@ log() { echo "[$(date '+%H:%M:%S')] $*"; }
 # ==================== STEP 1: Pull latest code ====================
 log "=== Pulling latest code from GitHub ==="
 cd "$SOURCE_DIR"
-git fetch origin main
+git fetch binguo main
 LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main)
+REMOTE=$(git rev-parse binguo/main)
 
 if [ "$LOCAL" = "$REMOTE" ]; then
   log "Already up to date ($LOCAL)"
 else
   log "Pulling $REMOTE..."
-  git pull --ff-only origin main
+  git pull --ff-only binguo main
 fi
 
 # ==================== STEP 2: Build Go backend ====================

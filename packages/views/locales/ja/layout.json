@@ -11,7 +11,8 @@
     "runtimes": "ランタイム",
     "skills": "スキル",
     "wiki": "Wiki",
-    "settings": "設定"
+    "settings": "設定",
+    "llm": "大規模言語モデル"
   },
   "help": {
     "trigger": "ヘルプ",

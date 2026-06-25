@@ -607,6 +607,64 @@ type LarkUserBinding struct {
 	BoundAt        pgtype.Timestamptz `json:"bound_at"`
 }
 
+type LlmModel struct {
+	ID pgtype.UUID `json:"id"`
+	// FK to workspace for direct workspace-scoped queries.
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	ProviderID    pgtype.UUID        `json:"provider_id"`
+	Name          string             `json:"name"`
+	ModelCode     string             `json:"model_code"`
+	Type          int16              `json:"type"`
+	Temperature   float64            `json:"temperature"`
+	MaxTokens     int32              `json:"max_tokens"`
+	ContextWindow int32              `json:"context_window"`
+	Capabilities  []string           `json:"capabilities"`
+	Status        int16              `json:"status"`
+	Sort          int32              `json:"sort"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LlmProvider struct {
+	ID pgtype.UUID `json:"id"`
+	// FK to workspace. Provider is scoped to a single workspace.
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	Name          string             `json:"name"`
+	Code          string             `json:"code"`
+	ApiType       string             `json:"api_type"`
+	ApiBaseUrl    string             `json:"api_base_url"`
+	ApiKey        string             `json:"api_key"`
+	EnvVarApiKey  string             `json:"env_var_api_key"`
+	EnvVarBaseUrl string             `json:"env_var_base_url"`
+	Status        int16              `json:"status"`
+	Sort          int32              `json:"sort"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LlmProviderTemplate struct {
+	ID pgtype.UUID `json:"id"`
+	// Template display name.
+	Name string `json:"name"`
+	// Machine-friendly short code, globally unique.
+	Code string `json:"code"`
+	// API protocol family: openai, anthropic.
+	ApiType string `json:"api_type"`
+	// Default API endpoint for this provider type.
+	ApiBaseUrl string `json:"api_base_url"`
+	// Env var name for API key injection.
+	EnvVarApiKey string `json:"env_var_api_key"`
+	// Env var name for API base URL injection.
+	EnvVarBaseUrl string `json:"env_var_base_url"`
+	// Alternative Anthropic-compatible endpoint when api_type=anthropic.
+	AnthropicApiUrl string `json:"anthropic_api_url"`
+	Sort            int32  `json:"sort"`
+	// 0=disabled, 1=enabled.
+	Status    int16              `json:"status"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Member struct {
 	ID          pgtype.UUID        `json:"id"`
 	WorkspaceID pgtype.UUID        `json:"workspace_id"`
@@ -621,6 +679,34 @@ type NotificationPreference struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	Preferences []byte             `json:"preferences"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OssObject struct {
+	ID          pgtype.UUID        `json:"id"`
+	ConfigID    pgtype.UUID        `json:"config_id"`
+	Key         string             `json:"key"`
+	Filename    string             `json:"filename"`
+	SizeBytes   int64              `json:"size_bytes"`
+	ContentType string             `json:"content_type"`
+	UploadedBy  pgtype.UUID        `json:"uploaded_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type OssProviderConfig struct {
+	ID                 pgtype.UUID        `json:"id"`
+	WorkspaceID        pgtype.UUID        `json:"workspace_id"`
+	Name               string             `json:"name"`
+	Provider           string             `json:"provider"`
+	Bucket             string             `json:"bucket"`
+	Region             string             `json:"region"`
+	Endpoint           string             `json:"endpoint"`
+	AccessKey          string             `json:"access_key"`
+	SecretKeyEncrypted []byte             `json:"secret_key_encrypted"`
+	CustomDomain       string             `json:"custom_domain"`
+	FolderPrefix       string             `json:"folder_prefix"`
+	IsDefault          bool               `json:"is_default"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type PersonalAccessToken struct {

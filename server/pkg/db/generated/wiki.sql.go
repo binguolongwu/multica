@@ -824,6 +824,41 @@ func (q *Queries) SearchWikiPages(ctx context.Context, arg SearchWikiPagesParams
 	return items, nil
 }
 
+const setWikiOperationHiddenIssue = `-- name: SetWikiOperationHiddenIssue :one
+UPDATE wiki_operation SET
+    hidden_issue_id = $2,
+    updated_at = now()
+WHERE id = $1 AND space_id = $3
+RETURNING id, space_id, operation_type, status, hidden_issue_id, agent_session_id, run_ids, cost_cents, warnings, affected_pages, metadata, created_at, updated_at
+`
+
+type SetWikiOperationHiddenIssueParams struct {
+	ID            pgtype.UUID `json:"id"`
+	HiddenIssueID pgtype.UUID `json:"hidden_issue_id"`
+	SpaceID       pgtype.UUID `json:"space_id"`
+}
+
+func (q *Queries) SetWikiOperationHiddenIssue(ctx context.Context, arg SetWikiOperationHiddenIssueParams) (WikiOperation, error) {
+	row := q.db.QueryRow(ctx, setWikiOperationHiddenIssue, arg.ID, arg.HiddenIssueID, arg.SpaceID)
+	var i WikiOperation
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.OperationType,
+		&i.Status,
+		&i.HiddenIssueID,
+		&i.AgentSessionID,
+		&i.RunIds,
+		&i.CostCents,
+		&i.Warnings,
+		&i.AffectedPages,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const setWikiPageValidationWarnings = `-- name: SetWikiPageValidationWarnings :exec
 UPDATE wiki_page SET validation_warnings = $2::jsonb
 WHERE space_id = $1 AND path = $3

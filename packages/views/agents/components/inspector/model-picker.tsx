@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
-import { runtimeModelsOptions } from "@multica/core/runtimes";
+import { runtimeModelsOptions, serverModelCatalogOptions } from "@multica/core/runtimes";
 import { Input } from "@multica/ui/components/ui/input";
 import {
   PickerItem,
@@ -46,14 +46,34 @@ export function ModelPicker({
   const modelsQuery = useQuery(
     runtimeModelsOptions(runtimeOnline ? runtimeId : null),
   );
+  const catalogQuery = useQuery(serverModelCatalogOptions());
   const supported = modelsQuery.data?.supported ?? true;
-  // Memoise the model list so every downstream useMemo gets a stable
-  // reference; `?? []` would mint a fresh array on every render and
-  // invalidate filters needlessly.
-  const models = useMemo(
-    () => modelsQuery.data?.models ?? [],
-    [modelsQuery.data],
-  );
+
+  // Merge server-side catalog with daemon-discovered models.
+  // Server catalog is always visible; daemon models supplement and
+  // override duplicates by model_id.
+  const models = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: Array<{ id: string; label: string; provider?: string; default?: boolean }> = [];
+    // Catalog entries first (server-side, always available)
+    for (const e of catalogQuery.data ?? []) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        merged.push({ id: e.id, label: e.label, provider: e.provider, default: e.default });
+      }
+    }
+    // Daemon entries second (override catalog duplicates by id)
+    for (const m of modelsQuery.data?.models ?? []) {
+      if (seen.has(m.id)) {
+        const idx = merged.findIndex((x) => x.id === m.id);
+        if (idx >= 0) merged[idx] = m;
+      } else {
+        seen.add(m.id);
+        merged.push(m);
+      }
+    }
+    return merged;
+  }, [modelsQuery.data, catalogQuery.data]);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();

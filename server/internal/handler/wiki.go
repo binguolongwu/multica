@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"unicode/utf8"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
+	"github.com/multica-ai/multica/server/internal/service"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -992,6 +994,41 @@ func (h *Handler) CreateWikiOperation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create wiki operation")
 		return
 	}
+
+	// Bridge: create hidden issue + enqueue agent task
+	agentID, agentOk := h.resolveWikiAgent(r.Context(), workspaceID, space)
+	if agentOk {
+		prompt := h.buildWikiIngestPrompt(r.Context(), space.ID)
+		result, createErr := h.IssueService.Create(r.Context(), service.IssueCreateParams{
+			WorkspaceID:  parseUUID(workspaceID),
+			Title:        fmt.Sprintf("Wiki ingest %s", uuidToString(op.ID)),
+			Description:  pgtype.Text{String: prompt, Valid: true},
+			Status:       "todo",
+			Priority:     "none",
+			AssigneeType: pgtype.Text{String: "agent", Valid: true},
+			AssigneeID:   agentID,
+			CreatorType:  "agent",
+			CreatorID:    agentID,
+		}, service.IssueCreateOpts{})
+		if createErr != nil {
+			slog.Warn("wiki: failed to create hidden issue for operation", "op_id", op.ID, "err", createErr)
+		} else {
+			// Link operation to hidden issue and enqueue for daemon
+			op, err = h.Queries.SetWikiOperationHiddenIssue(r.Context(), db.SetWikiOperationHiddenIssueParams{
+				ID:             op.ID,
+				HiddenIssueID:  result.Issue.ID,
+				SpaceID:        space.ID,
+			})
+			if err != nil {
+				slog.Warn("wiki: failed to set hidden issue for operation", "op_id", op.ID, "err", err)
+			}
+			if _, eqErr := h.TaskService.EnqueueTaskForIssue(r.Context(), result.Issue); eqErr != nil {
+				slog.Warn("wiki: failed to enqueue task for operation", "op_id", op.ID, "err", eqErr)
+			}
+		}
+	}
+	// If no agent available, op stays as pending — future cron/retry can pick it up
+
 	writeJSON(w, http.StatusCreated, wikiOperationToResponse(op))
 }
 
@@ -1250,4 +1287,156 @@ func parseStringArray(data []byte) []string {
 		return []string{}
 	}
 	return arr
+}
+
+// buildWikiIngestPrompt builds an agent prompt for the ingest operation.
+// It reads the wiki index, schema rules, and captured sources, then assembles
+// them into a markdown description capped at 6000 chars.
+func (h *Handler) buildWikiIngestPrompt(ctx context.Context, spaceID pgtype.UUID) string {
+	var b strings.Builder
+
+	// ---- instructions ----
+	b.WriteString("# Wiki Ingest Operation\n\n")
+	b.WriteString("You are a wiki knowledge engineer. Process each captured source below step by step.\n\n")
+	b.WriteString("## Step-by-step instructions\n\n")
+	b.WriteString("### Step 1: Start fresh\n")
+	b.WriteString("Run: `multica wiki list-pages` to see current wiki state.\n")
+	b.WriteString("Run: `multica wiki search --query \"customer\"` to check if any entities already exist.\n\n")
+	b.WriteString("### Step 2: For EACH source below, do the following:\n")
+	b.WriteString("1. Identify entities (customers, products, projects mentioned)\n")
+	b.WriteString("2. Identify intents (goals, requests, problems expressed)\n")
+	b.WriteString("3. Create entity page:\n")
+	b.WriteString("   `cat > /tmp/entity.md << 'EOF'`\n")
+	b.WriteString("   (paste markdown content, then EOF)\n")
+	b.WriteString("   `multica wiki write-page --path wiki/entities/<slug>.md --content-file /tmp/entity.md`\n")
+	b.WriteString("4. Create intent page:\n")
+	b.WriteString("   `cat > /tmp/intent.md << 'EOF'`\n")
+	b.WriteString("   (paste markdown content, then EOF)\n")
+	b.WriteString("   `multica wiki write-page --path wiki/intents/<slug>.md --content-file /tmp/intent.md`\n\n")
+	b.WriteString("### Step 3: After all sources\n")
+	b.WriteString("1. Run: `multica wiki write-page --path wiki/index.md --content \"$(multica wiki list-pages)\"` to rebuild index\n")
+	b.WriteString("2. Run: `multica wiki write-page --path system/update_log.md` to log changes\n\n")
+	b.WriteString("## Example\n")
+	b.WriteString("For a source titled \"客户投诉：物流延迟\" with content citing customer \"王五\":\n")
+	b.WriteString("1. Create `wiki/entities/wangwu.md`:\n")
+	b.WriteString("   ```markdown\n")
+	b.WriteString("   # 王五\n\n")
+	b.WriteString("   ## Attributes\n")
+	b.WriteString("   - type: customer\n")
+	b.WriteString("   - tier: enterprise\n")
+	b.WriteString("   - industry: manufacturing\n\n")
+	b.WriteString("   ## Related\n")
+	b.WriteString("   - [[intents/logistics_complaint]]\n")
+	b.WriteString("   ```\n")
+	b.WriteString("2. Create `wiki/intents/logistics_complaint.md`:\n")
+	b.WriteString("   ```markdown\n")
+	b.WriteString("   # 物流投诉\n\n")
+	b.WriteString("   ## Definition\n")
+	b.WriteString("   客户投诉物流配送延迟或异常\n\n")
+	b.WriteString("   ## Related\n")
+	b.WriteString("   - [[entities/wangwu]]\n")
+	b.WriteString("   - [[procedures/logistics_escalation]]\n")
+	b.WriteString("   ```\n\n")
+
+	// ---- wiki index ----
+	p, err := h.Queries.GetWikiPageByPath(ctx, db.GetWikiPageByPathParams{
+		SpaceID: spaceID, Path: "wiki/index.md",
+	})
+	if err == nil && p.Content != "" {
+		b.WriteString("## Current Wiki Index\n\n")
+		b.WriteString(truncateStr(p.Content, 1500))
+		b.WriteString("\n\n")
+	}
+
+	// ---- schema rules ----
+	b.WriteString("## Schema Rules\n\n")
+	for _, path := range []string{"schema/linking_rules.md", "schema/entity_rules.md"} {
+		p, err := h.Queries.GetWikiPageByPath(ctx, db.GetWikiPageByPathParams{
+			SpaceID: spaceID, Path: path,
+		})
+		if err == nil && p.Content != "" {
+			b.WriteString(truncateStr(p.Content, 600))
+			b.WriteString("\n")
+		}
+	}
+
+	// ---- captured sources ----
+	sources, err := h.Queries.ListWikiSources(ctx, spaceID)
+	if err == nil {
+		var captured int
+		for _, src := range sources {
+			if src.Status != "captured" {
+				continue
+			}
+			if captured >= 5 {
+				b.WriteString(fmt.Sprintf("\n(%d more captured sources — use `multica wiki list-pages` to find them)\n",
+					len(sources)-captured))
+				break
+			}
+			b.WriteString(fmt.Sprintf("## Source: %s\nPath: %s\n```\n%s\n```\n\n",
+				src.Title, src.RawPath, truncateStr(src.Content, 3000)))
+			captured++
+		}
+		if captured == 0 {
+			b.WriteString("(no captured sources — nothing to process)\n")
+		}
+	}
+
+	// ---- CLI reference ----
+	b.WriteString("## CLI Commands\n")
+	b.WriteString("- `multica wiki read-page --path <path>` — read a page\n")
+	b.WriteString("- `multica wiki write-page --path <path> --content \"<markdown>\"` — create/update\n")
+	b.WriteString("- `multica wiki search --query <q>` — full-text search\n")
+	b.WriteString("- `multica wiki list-pages` — list all pages\n\n")
+	b.WriteString("## Critical rules\n")
+	b.WriteString("- If a CLI command fails, retry once. If it still fails, write the error to system/conflict_log.md and continue.\n")
+	b.WriteString("- Do NOT ask the user for permission. Execute directly.\n")
+	b.WriteString("- Log every change: append to system/update_log.md with format `## [date] operation | summary`\n")
+
+	return truncateStr(b.String(), 6000)
+}
+
+// truncateStr truncates s to at most maxLen bytes without splitting a UTF-8
+// character, adding "..." when truncated.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	// Walk backward from maxLen to find the last valid UTF-8 boundary.
+	cut := maxLen
+	for cut > 0 && cut < len(s) {
+		r, _ := utf8.DecodeLastRuneInString(s[:cut+1])
+		if r != utf8.RuneError {
+			break
+		}
+		cut--
+	}
+	if cut == 0 {
+		cut = maxLen
+	}
+	return s[:cut] + "..."
+}
+
+// resolveWikiAgent returns the agent ID to use for wiki operations.
+// Priority: space.default_agent_id → any idle agent in workspace → invalid UUID.
+func (h *Handler) resolveWikiAgent(ctx context.Context, workspaceID string, space db.WikiSpace) (pgtype.UUID, bool) {
+	wsUUID := parseUUID(workspaceID)
+
+	// 1. Use the space's default agent
+	if space.DefaultAgentID.Valid {
+		return space.DefaultAgentID, true
+	}
+
+	// 2. Fall back to any idle agent in the workspace
+	agents, err := h.Queries.ListAgents(ctx, wsUUID)
+	if err != nil || len(agents) == 0 {
+		return pgtype.UUID{}, false
+	}
+	for _, a := range agents {
+		if a.Status == "idle" {
+			return a.ID, true
+		}
+	}
+
+	return pgtype.UUID{}, false
 }

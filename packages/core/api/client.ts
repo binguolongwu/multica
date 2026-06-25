@@ -140,6 +140,8 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
+import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry } from "../types/llm";
+import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
   CloudRuntimeNode,
@@ -2353,5 +2355,90 @@ export class ApiClient {
 
   async crawlWikiURL(wsId: string, slug: string, data: CrawlURLRequest): Promise<CrawlURLResponse> {
     return this.fetch(`/api/workspaces/${wsId}/wiki/spaces/${encodeURIComponent(slug)}/crawl`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  // ── OSS (Object Storage) ──────────────────────────────────────────────
+
+  async listOssConfigs(): Promise<OssProviderConfig[]> {
+    return this.fetch("/api/oss/configs");
+  }
+
+  async createOssConfig(data: CreateOssConfigRequest): Promise<OssProviderConfig> {
+    return this.fetch(`/api/oss/configs`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async updateOssConfig(id: string, data: UpdateOssConfigRequest): Promise<OssProviderConfig> {
+    return this.fetch(`/api/oss/configs/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async deleteOssConfig(id: string): Promise<void> {
+    return this.fetch(`/api/oss/configs/${id}`, { method: "DELETE" });
+  }
+
+  async testOssConnection(data: CreateOssConfigRequest): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/test`, { method: "POST", body: JSON.stringify(data) });
+  }
+  async testOssConfigConnection(configId: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/test`, { method: "POST" });
+  }
+  async listOssFiles(configId: string, qs?: string): Promise<string[]> {
+    return this.fetch(`/api/oss/configs/${configId}/files${qs ? `?${qs}` : ""}`);
+  }
+  async listOssDbFiles(configId: string, qs?: string): Promise<OssObject[]> {
+    return this.fetch(`/api/oss/configs/${configId}/files/db${qs ? `?${qs}` : ""}`);
+  }
+  async getOssFileDownloadUrl(configId: string, fileId: string): Promise<OssObjectWithUrl> {
+    return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`);
+  }
+  async uploadOssFile(configId: string, formData: FormData): Promise<OssObjectWithUrl> {
+    const res = await this.fetchRaw(`/api/oss/configs/${configId}/files/upload`, { method: "POST", body: formData });
+    if (res.status === 204) return undefined as unknown as OssObjectWithUrl;
+    return res.json() as Promise<OssObjectWithUrl>;
+  }
+  async deleteOssFile(configId: string, fileId: string): Promise<void> {
+    return this.fetch(`/api/oss/configs/${configId}/files/${fileId}`, { method: "DELETE" });
+  }
+  async createOssDirectory(configId: string, prefix: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/directories`, { method: "POST", body: JSON.stringify({ prefix }) });
+  }
+  async deleteOssDirectory(configId: string, prefix: string): Promise<{ deleted: number }> {
+    return this.fetch(`/api/oss/configs/${configId}/directories?prefix=${encodeURIComponent(prefix)}`, { method: "DELETE" });
+  }
+  async moveOssFile(configId: string, srcKey: string, destKey: string): Promise<{ ok: string }> {
+    return this.fetch(`/api/oss/configs/${configId}/files/move`, { method: "POST", body: JSON.stringify({ src_key: srcKey, dest_key: destKey }) });
+  }
+
+  // ── LLM Provider / Model Catalog (workspace-scoped) ────────────────
+
+  async listLLMProviderTemplates(): Promise<LLMProviderTemplate[]> {
+    return this.fetch("/api/llm-provider-templates");
+  }
+  async listLLMProviders(workspaceId: string): Promise<LLMProvider[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers`);
+  }
+  async createLLMProvider(workspaceId: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers`, { method: "POST", body: JSON.stringify(data) });
+  }
+  async updateLLMProvider(workspaceId: string, id: string, data: Partial<LLMProvider>): Promise<LLMProvider> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  async deleteLLMProvider(workspaceId: string, id: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${id}`, { method: "DELETE" });
+  }
+
+  async listLLMModels(workspaceId: string, providerId: string): Promise<LLMModel[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models`);
+  }
+  async listLLMModelCatalog(): Promise<LLMModelCatalogEntry[]> {
+    return this.fetch("/api/llm-models/catalog");
+  }
+  async createLLMModel(workspaceId: string, providerId: string, data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models`, { method: "POST", body: JSON.stringify(data) });
+  }
+  async updateLLMModel(workspaceId: string, providerId: string, id: string, data: Partial<LLMModel>): Promise<LLMModel> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+  async deleteLLMModel(workspaceId: string, providerId: string, id: string): Promise<void> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/${id}`, { method: "DELETE" });
   }
 }

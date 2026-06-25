@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, BookOpen, Search, Loader2, Download, ChevronDown, Check } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { wikiSpacesOptions, wikiPagesOptions, wikiPageDetailOptions, useCreateWikiSpace, useUpsertWikiPage, useDeleteWikiPage, useUpdateWikiSpace } from "@multica/core/wiki";
+import { api as wikiApi } from "@multica/core/api";
 import { agentListOptions } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
@@ -13,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/
 import { ActorAvatar } from "../../common/actor-avatar";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { useT } from "../../i18n";
+import { toast } from "sonner";
 import { WikiFileTree } from "./wiki-file-tree";
 import { WikiPageViewer } from "./wiki-page-viewer";
 import { WikiIngestDialog } from "./wiki-ingest-dialog";
@@ -29,29 +31,15 @@ export function WikiPage() {
   const [wikiAgentId, setWikiAgentId] = useState<string>("");
   const [selectedDir, setSelectedDir] = useState<string>("");
   const updateSpace = useUpdateWikiSpace(wsId);
-  const initialRender = useRef(true);
-
-  // Save agent selection to wiki_space
-  useEffect(() => {
-    if (initialRender.current) {
-      initialRender.current = false;
-      return;
-    }
-    if (wikiAgentId) {
-      updateSpace.mutate({ slug: spaceSlug, data: { default_agent_id: wikiAgentId } });
-    }
-  }, [wikiAgentId, spaceSlug, updateSpace]);
 
   const { data: spaces, isLoading: spacesLoading } = useQuery(wikiSpacesOptions(wsId));
 
-  // Load saved agent from wiki_space on mount
-  const agentLoaded = useRef(false);
+  // Load saved agent from wiki_space on mount.
   useEffect(() => {
-    if (!agentLoaded.current && spaces?.[0]?.default_agent_id) {
+    if (!wikiAgentId && spaces?.[0]?.default_agent_id) {
       setWikiAgentId(spaces[0].default_agent_id);
-      agentLoaded.current = true;
     }
-  }, [spaces]);
+  }, [spaces, wikiAgentId]);
 
   const enabledDirs = useMemo(() => {
     const defaultDirs = ["raw", "wiki/entities", "wiki/intents", "wiki/knowledge", "wiki/policies", "wiki/procedures", "wiki/insights", "wiki/summaries"];
@@ -83,7 +71,10 @@ export function WikiPage() {
   );
 
   const handleSelectPage = useCallback((path: string) => {
-    setSelectedPath(path);
+    // Append .md to paths without an extension so [[wiki/entities/foo]] resolves.
+    const last = path.split("/").pop() || "";
+    const resolved = last.includes(".") ? path : `${path}.md`;
+    setSelectedPath(resolved);
     setSearchQuery("");
   }, []);
 
@@ -91,12 +82,44 @@ export function WikiPage() {
     const dirPath = parentDir ? `${parentDir}/${name}` : name;
     upsertPage.mutate({
       path: `${dirPath}/.gitkeep`,
-      data: { content: "" },
+      data: { content: "." },
+    }, {
+      onSuccess: () => { setSelectedDir(dirPath); },
+      onError: () => toast.error("Failed to create directory"),
     });
   }, [upsertPage]);
 
+  const handleMove = useCallback(async (srcPath: string, destDir: string) => {
+    const basename = srcPath.split("/").pop() || srcPath;
+    const destPath = `${destDir}/${basename}`;
+    if (srcPath === destPath) return;
+    try {
+      const detail = await wikiApi.getWikiPage(wsId, spaceSlug, srcPath);
+      await wikiApi.upsertWikiPage(wsId, spaceSlug, destPath, { content: detail.content, summary: `moved from ${srcPath}` });
+      await wikiApi.deleteWikiPage(wsId, spaceSlug, srcPath);
+      setSelectedPath(destPath);
+    } catch { toast.error("移动失败"); }
+  }, [wsId, spaceSlug]);
+
+  // Protected from deletion: schema, system, templates, index, AGENTS, IDEA
+  const isProtectedPath = useCallback((path: string) => {
+    const del = [/^schema$/, /^schema\//, /^system$/, /^system\//, /\/_TEMPLATE\.md$/, /^wiki\/index\.md$/, /^wiki\/log\.md$/, /^AGENTS\.md$/, /^IDEA\.md$/];
+    return del.some((p) => p.test(path));
+  }, []);
+
+  // Read-only (not editable): raw/, schema/, system/, AGENTS.md, IDEA.md
+  // system/update_log.md is editable (append-only), wiki/* is editable
+  const isPageEditable = useCallback((path: string) => {
+    const ro = [/^raw\//, /^schema\//, /^system\/(?!update_log\.md)/, /^AGENTS\.md$/, /^IDEA\.md$/];
+    return !ro.some((p) => p.test(path));
+  }, []);
+
   const handleDelete = useCallback((targetPath: string, isFile: boolean) => {
     if (isFile) {
+      if (isProtectedPath(targetPath)) {
+        toast.error(t(($) => $.wiki_page.tree_protected));
+        return;
+      }
       if (!confirm(`Delete "${targetPath}"? This cannot be undone.`)) return;
       deletePage.mutate(targetPath, {
         onSuccess: () => {
@@ -104,6 +127,11 @@ export function WikiPage() {
         },
       });
     } else {
+      // Protected directories: schema, system are undeletable
+      if (/^(schema|system)$/.test(targetPath)) {
+        toast.error(t(($) => $.wiki_page.tree_protected));
+        return;
+      }
       // Directory: check for children first
       const hasChildren = (pages || []).some((p) =>
         p.path.startsWith(`${targetPath}/`) && !p.path.endsWith("/.gitkeep"),
@@ -167,7 +195,7 @@ export function WikiPage() {
                 <span className="flex items-center gap-1.5 truncate">
                   <ActorAvatar actorType="agent" actorId={selectedAgent.id} size={18} showStatusDot />
                   {selectedAgent.name}
-                  <span className="text-muted-foreground">({selectedAgent.runtime_mode || "cloud"})</span>
+                  <span className="text-muted-foreground">({selectedAgent.runtime_name || selectedAgent.runtime_provider || selectedAgent.runtime_mode || "cloud"})</span>
                 </span>
               ) : <span className="text-muted-foreground">{t(($) => $.wiki_page.wiki_agent)}</span>}
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -190,11 +218,16 @@ export function WikiPage() {
                   <TooltipTrigger>
                     <button
                       className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${a.id === wikiAgentId ? "bg-accent" : ""}`}
-                      onClick={() => { setWikiAgentId(a.id); setAgentOpen(false); setAgentSearch(""); }}
+                      onClick={() => {
+                        setWikiAgentId(a.id);
+                        updateSpace.mutate({ slug: spaceSlug, data: { default_agent_id: a.id } });
+                        setAgentOpen(false);
+                        setAgentSearch("");
+                      }}
                     >
                       <ActorAvatar actorType="agent" actorId={a.id} size={20} showStatusDot />
                       <span className="flex-1 truncate font-medium">{a.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">({a.runtime_mode || "cloud"})</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">({a.runtime_name || a.runtime_provider || a.runtime_mode || "cloud"})</span>
                       {a.id === wikiAgentId && <Check className="h-4 w-4 shrink-0" />}
                     </button>
                   </TooltipTrigger>
@@ -204,7 +237,7 @@ export function WikiPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => { if (!wikiAgentId) { toast.error(t(($) => $.wiki_page.ingest_need_agent)); return; } setIngestOpen(true); }}>
           <Download className="mr-1 h-4 w-4" />
           {t(($) => $.wiki_page.ingest)}
         </Button>
@@ -237,6 +270,8 @@ export function WikiPage() {
               onCreateDir={handleCreateDir}
               onDelete={handleDelete}
               enabledDirs={enabledDirs}
+              onMove={handleMove}
+              isMovable={(p) => !isProtectedPath(p)}
             />
           )}
         </div>
@@ -255,7 +290,7 @@ export function WikiPage() {
               <Skeleton className="h-4 w-5/6" />
             </div>
           ) : pageDetail ? (
-            <WikiPageViewer page={pageDetail} spaceSlug={spaceSlug} />
+            <WikiPageViewer page={pageDetail} spaceSlug={spaceSlug} onSelect={handleSelectPage} editable={isPageEditable(pageDetail.path)} />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Page not found

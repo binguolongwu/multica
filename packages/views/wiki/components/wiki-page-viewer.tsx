@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { Markdown } from "@multica/views/common/markdown";
 import { useUpsertWikiPage } from "@multica/core/wiki";
@@ -38,7 +38,38 @@ function extractHeadings(content: string): { id: string; text: string; level: nu
   return headings;
 }
 
-export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPageDetail; spaceSlug?: string }) {
+function resolveWikilinks(content: string): string {
+  // Convert [[path/to/page]] → [display](#wiki-path--encoded)
+  return content.replace(/\[\[([^\]]+)\]\]/g, (_m, path: string) => {
+    const display = path.split("/").pop() || path;
+    return `[${display}](#wiki-path--${encodeURIComponent(path)})`;
+  });
+}
+
+const WIKI_LINK_PREFIX = "#wiki-path--";
+
+export function WikiPageViewer({ page, spaceSlug = "default", onSelect, editable = true }: { page: WikiPageDetail; spaceSlug?: string; onSelect?: (path: string) => void; editable?: boolean }) {
+  const proseRef = useRef<HTMLDivElement>(null);
+
+  // Use native DOM click listener to intercept wikilink clicks BEFORE
+  // the Markdown component's React synthetic onClick handler fires.
+  useEffect(() => {
+    const el = proseRef.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") || "";
+      if (!href.startsWith(WIKI_LINK_PREFIX)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const path = decodeURIComponent(href.slice(WIKI_LINK_PREFIX.length));
+      if (path && onSelect) onSelect(path);
+    };
+    el.addEventListener("click", handler, true);
+    return () => el.removeEventListener("click", handler, true);
+  }, [onSelect]);
   const wsId = useWorkspaceId();
   const { t } = useT("layout");
   const [editing, setEditing] = useState(false);
@@ -50,7 +81,8 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
   const headings = useMemo(() => extractHeadings(body), [body]);
   // Escape HTML in content before rendering to prevent tags from being
   // interpreted as raw HTML by the markdown renderer's rehype-raw pass.
-  const safeBody = body.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Then resolve [[wikilinks]] to clickable <a> tags.
+  const safeBody = resolveWikilinks(body.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
   const displayTitle = fm.title || page.title || page.path;
 
   const handleSave = () => {
@@ -71,7 +103,7 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
         <div className="mx-auto max-w-3xl">
           <div className="mb-6 flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
-            {!editing && (
+            {editable && !editing && (
               <Button variant="outline" size="sm" onClick={() => { setEditTitle(displayTitle); setEditContent(body); setEditing(true); }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" />{t(($) => $.wiki_page.edit)}
               </Button>
@@ -109,20 +141,30 @@ export function WikiPageViewer({ page, spaceSlug = "default" }: { page: WikiPage
               </div>
             </div>
           ) : (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
+            <div ref={proseRef} className="prose prose-sm max-w-none dark:prose-invert">
               <Markdown>{safeBody}</Markdown>
             </div>
           )}
           {page.links && page.links.length > 0 && (
             <div className="mt-8 border-t pt-6">
               <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.links)}</h3>
-              <ul className="space-y-1">{page.links.map((l) => <li key={l.target} className="text-sm"><span className={l.exists ? "text-primary" : "text-muted-foreground line-through"}>{l.title || l.target}</span>{l.snippet && <span className="ml-2 text-xs text-muted-foreground">— {l.snippet}</span>}</li>)}</ul>
+              <ul className="space-y-1">{page.links.map((l) => (
+                <li key={l.target} className="text-sm">
+                  <a href="#" className={l.exists ? "text-primary hover:underline cursor-pointer" : "text-muted-foreground"} onClick={(e) => { e.preventDefault(); if (onSelect) onSelect(l.target); }}>{l.title || l.target}</a>
+                  {l.snippet && <span className="ml-2 text-xs text-muted-foreground">— {l.snippet}</span>}
+                </li>
+              ))}</ul>
             </div>
           )}
           {page.backlinks && page.backlinks.length > 0 && (
             <div className="mt-6 border-t pt-6">
               <h3 className="mb-2 text-sm font-semibold">{t(($) => $.wiki_page.backlinks)} ({page.backlinks.length})</h3>
-              <ul className="space-y-2">{page.backlinks.map((bl) => <li key={bl.source} className="text-sm"><span className="font-medium text-primary">{bl.title || bl.source}</span>{bl.context && <p className="mt-0.5 text-xs text-muted-foreground">{bl.context}</p>}</li>)}</ul>
+              <ul className="space-y-2">{page.backlinks.map((bl) => (
+                <li key={bl.source} className="text-sm">
+                  <a href="#" className="font-medium text-primary hover:underline cursor-pointer" onClick={(e) => { e.preventDefault(); if (onSelect) onSelect(bl.source); }}>{bl.title || bl.source}</a>
+                  {bl.context && <p className="mt-0.5 text-xs text-muted-foreground">{bl.context}</p>}
+                </li>
+              ))}</ul>
             </div>
           )}
         </div>

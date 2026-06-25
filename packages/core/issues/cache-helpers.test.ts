@@ -13,6 +13,7 @@ function mk(id: string, status: Issue["status"], position: number): Issue {
     title: id,
     description: null,
     status,
+    stage: null,
     priority: "none",
     assignee_type: null,
     assignee_id: null,
