@@ -68,6 +68,17 @@ func allowedOrigins() []string {
 	return origins
 }
 
+// appURLFromEnv resolves the user-facing web app URL. It prefers
+// MULTICA_APP_URL and falls back to FRONTEND_ORIGIN, matching how the backend
+// resolves the app URL elsewhere (handler.daemonSetupURLsFromEnv) and the CLI
+// login flow (cmd/multica tryResolveAppURL). Empty when neither is set.
+func appURLFromEnv() string {
+	if v := strings.TrimRight(strings.TrimSpace(os.Getenv("MULTICA_APP_URL")), "/"); v != "" {
+		return v
+	}
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_ORIGIN")), "/")
+}
+
 // parseTrustedProxies parses a comma-separated list of CIDR prefixes from the
 // MULTICA_TRUSTED_PROXIES env var. Invalid entries are dropped with a single
 // warn-line per entry rather than crashing the server — a typo in one CIDR
@@ -148,6 +159,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	}
 
 	cfSigner := auth.NewCloudFrontSignerFromEnv()
+	origins := allowedOrigins()
 
 	signupConfig := handler.Config{
 		AllowSignup:              os.Getenv("ALLOW_SIGNUP") != "false",
@@ -160,6 +172,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		CloudRuntimeFleetTimeout: envDuration("MULTICA_CLOUD_FLEET_TIMEOUT", 35*time.Second),
 		AttachmentDownloadMode:   os.Getenv("ATTACHMENT_DOWNLOAD_MODE"),
 		AttachmentDownloadURLTTL: envDuration("ATTACHMENT_DOWNLOAD_URL_TTL", 30*time.Minute),
+		AttachmentFrameAncestors: origins,
 	}
 	h := handler.New(queries, pool, hub, bus, emailSvc, store, cfSigner, analyticsClient, signupConfig, daemonHub)
 	h.Metrics = opts.BusinessMetrics
@@ -277,14 +290,20 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				patcher.SetTypingIndicatorManager(typingIndicator)
 
 				// Inbound pipeline seams: lark_inbound_audit logger and the
-				// channel-aware ChatSessionService. They back the Feishu
-				// ResolverSet that the channel-agnostic engine.Router runs
-				// through, sharing the same IssueService + TaskService that
-				// back HTTP, so /issue-created issues share counter, dup
-				// guard, project boundary, broadcast, analytics and
-				// agent-enqueue with the rest of the product.
+				// shared channel-agnostic chat-session service. They back the
+				// Feishu ResolverSet that the engine.Router runs through,
+				// sharing the same IssueService + TaskService that back HTTP, so
+				// /issue-created issues share counter, dup guard, project
+				// boundary, broadcast, analytics and agent-enqueue with the rest
+				// of the product. Feishu is just another consumer of the shared
+				// engine.ChatSession (channel_type-keyed); the Lark session
+				// titles preserve the pre-cutover wording.
 				auditLogger := lark.NewAuditLogger(queries)
-				chatSvc := lark.NewChatSessionService(queries, pool)
+				feishuSession := engine.NewChatSession(queries, pool, channel.TypeFeishu, engine.SessionTitles{
+					Group:    "Lark group chat",
+					Direct:   "Lark direct message",
+					Fallback: "Lark chat",
+				})
 
 				// OutcomeReplier wires the outbound side: NeedsBinding /
 				// AgentOffline / AgentArchived / issue-created translate to a
@@ -298,7 +317,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					BindingSvc:  h.LarkBindingTokens,
 					Credentials: installSvc,
 					Queries:     queries,
-					PublicURL:   signupConfig.PublicURL,
+					AppURL:      appURLFromEnv(),
 					Logger:      slog.Default(),
 				})
 				var resolverReplier lark.OutcomeReplier
@@ -329,7 +348,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					Logger:      slog.Default(),
 				})
 				channelRouter.Register(channel.TypeFeishu, lark.NewFeishuResolverSet(
-					cs, chatSvc, auditLogger, resolverReplier, typingIndicator,
+					cs, feishuSession, auditLogger, resolverReplier, typingIndicator,
 				))
 				slog.Info("lark inbound pipeline wired", "connector", connectorLabel)
 
@@ -476,7 +495,6 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	}
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.ContentSecurityPolicy)
-	origins := allowedOrigins()
 
 	// Share allowed origins with WebSocket origin checker.
 	realtime.SetAllowedOrigins(origins)
@@ -1150,6 +1168,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Route("/api/inbox", func(r chi.Router) {
 				r.Get("/", h.ListInbox)
 				r.Get("/unread-count", h.CountUnreadInbox)
+				// Cross-workspace unread summary: account-level, keyed on the
+				// user. Backs the workspace-switcher dot for OTHER workspaces.
+				r.Get("/unread-summary", h.UnreadInboxSummary)
 				r.Post("/mark-all-read", h.MarkAllInboxRead)
 				r.Post("/archive-all", h.ArchiveAllInbox)
 				r.Post("/archive-all-read", h.ArchiveAllReadInbox)

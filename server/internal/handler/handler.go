@@ -87,6 +87,11 @@ type Config struct {
 	CloudRuntimeFleetTimeout time.Duration
 	AttachmentDownloadMode   string
 	AttachmentDownloadURLTTL time.Duration
+	// AttachmentFrameAncestors are trusted browser origins allowed to embed
+	// attachment preview responses. In production this should mirror the
+	// frontend/CORS origin allowlist so split app/api self-hosted deployments
+	// can frame API-hosted PDFs without allowing arbitrary third-party frames.
+	AttachmentFrameAncestors []string
 }
 
 type cloudRuntimeProxy interface {
@@ -115,6 +120,7 @@ type Handler struct {
 	LocalSkillListStore   LocalSkillListStore
 	LocalSkillImportStore LocalSkillImportStore
 	DaemonFeatureFlags    *featureflagdispatch.Evaluator
+	OssService            *oss.Service
 	LivenessStore         LivenessStore
 	HeartbeatScheduler    HeartbeatScheduler
 	Storage               storage.Storage
