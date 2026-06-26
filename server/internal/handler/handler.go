@@ -120,6 +120,7 @@ type Handler struct {
 	LocalSkillListStore   LocalSkillListStore
 	LocalSkillImportStore LocalSkillImportStore
 	DaemonFeatureFlags    *featureflagdispatch.Evaluator
+	OssService            *oss.Service
 	LivenessStore         LivenessStore
 	HeartbeatScheduler    HeartbeatScheduler
 	Storage               storage.Storage
