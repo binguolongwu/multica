@@ -168,7 +168,9 @@ type Handler struct {
 	// WikiService is the wiki knowledge base service. Nil when wiki is not
 	// configured; handlers return 503 in that case.
 	WikiService *wiki.Service
-	cfg         Config
+	// OssService is the OSS cloud storage integration service.
+	OssService *oss.Service
+	cfg        Config
 }
 
 func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *events.Bus, emailService *service.EmailService, store storage.Storage, cfSigner *auth.CloudFrontSigner, analyticsClient analytics.Client, cfg Config, daemonHubs ...*daemonws.Hub) *Handler {
