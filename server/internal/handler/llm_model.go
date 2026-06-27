@@ -2,7 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"log/slog"
@@ -132,6 +135,89 @@ func (h *Handler) DeleteLLMModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Fetch Models from Provider API ──────────────────────────────────────────
+
+// remoteModelEntry represents a model returned by the provider's /v1/models endpoint.
+type remoteModelEntry struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
+	if !ok {
+		return
+	}
+
+	providerID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
+	if !ok {
+		return
+	}
+
+	provider, err := h.Queries.GetLLMProvider(r.Context(), db.GetLLMProviderParams{
+		ID:          providerID,
+		WorkspaceID: parseUUID(wsID),
+	})
+	if err != nil {
+		slog.Warn("llm: fetch models provider not found", "error", err)
+		writeError(w, http.StatusNotFound, "provider not found in this workspace")
+		return
+	}
+	if provider.ApiBaseUrl == "" || provider.ApiKey == "" {
+		writeError(w, http.StatusBadRequest, "provider is missing api_base_url or api_key")
+		return
+	}
+
+	// Use the same fallback logic as TestLLMConnection for providers whose
+	// api_base_url includes a path suffix (e.g. /anthropic).
+	resp, tried, err := llmVerifyWithFallback(r.Context(), provider.ApiBaseUrl, provider.ApiKey)
+	if err != nil {
+		slog.Warn("llm: fetch models request failed", "error", err, "tried", tried)
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to connect: %v", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB max
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read response")
+		return
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		errMsg := strings.TrimSpace(string(body))
+		if len(errMsg) > 200 {
+			errMsg = errMsg[:200] + "..."
+		}
+		slog.Warn("llm: fetch models upstream error", "status", resp.StatusCode, "body", errMsg, "tried", tried)
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("provider returned HTTP %d: %s", resp.StatusCode, errMsg))
+		return
+	}
+
+	// Parse OpenAI-compatible response: {"data": [{"id": "gpt-4", ...}, ...]}
+	var response struct {
+		Data []struct {
+			ID     string `json:"id"`
+			Object string `json:"object"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		slog.Warn("llm: fetch models parse failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to parse provider response")
+		return
+	}
+
+	entries := make([]remoteModelEntry, 0, len(response.Data))
+	for _, m := range response.Data {
+		entries = append(entries, remoteModelEntry{ID: m.ID})
+	}
+	if entries == nil {
+		entries = []remoteModelEntry{}
+	}
+	writeJSON(w, http.StatusOK, entries)
 }
 
 // ── Global Model Catalog (merged from all workspaces) ────────────────────────

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Cpu, Edit, Plus, Trash2, Loader2, ChevronRight } from "lucide-react";
+import { Edit, Plus, Trash2, Loader2, ChevronRight } from "lucide-react";
 import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
 import type { LLMProvider, LLMModel } from "@multica/core/types";
@@ -29,6 +29,8 @@ export function LlmSettingsTab() {
   const [form, setForm] = useState({ name: "", code: "", api_type: "openai", api_base_url: "", api_key: "", env_var_api_key: "OPENAI_API_KEY", env_var_base_url: "OPENAI_BASE_URL", sort: 0 });
   const [modelForm, setModelForm] = useState({ name: "", model_code: "", type: 1, temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [] as string[], sort: 0 });
   const [templateCode, setTemplateCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [fetchModelsEnabled, setFetchModelsEnabled] = useState(false);
 
   const providersQuery = useQuery({
     queryKey: llmKeys.providers(wsId),
@@ -42,6 +44,13 @@ export function LlmSettingsTab() {
     queryKey: llmKeys.models(wsId, selectedPid || ""),
     queryFn: () => api.listLLMModels(wsId, selectedPid!),
     enabled: !!selectedPid,
+  });
+
+  const remoteModelsQuery = useQuery({
+    queryKey: ["remote-models", wsId, selectedPid || ""] as const,
+    queryFn: () => api.fetchProviderModels(wsId, selectedPid!),
+    enabled: fetchModelsEnabled && !!selectedPid,
+    retry: false,
   });
 
   const selectedProvider = useMemo(
@@ -75,11 +84,21 @@ export function LlmSettingsTab() {
       name: tpl.name,
       code: tpl.code,
       api_type: tpl.api_type,
-      api_base_url: tpl.anthropic_api_url || tpl.api_base_url,
+      api_base_url: resolveTemplateBaseUrl(tpl, tpl.api_type),
       env_var_api_key: tpl.env_var_api_key,
       env_var_base_url: tpl.env_var_base_url,
       api_key: "",
     });
+  };
+
+  // resolveTemplateBaseUrl returns the appropriate base URL from a template
+  // based on the selected API format: anthropic_api_url for anthropic type,
+  // api_base_url for everything else.
+  const resolveTemplateBaseUrl = (tpl: { api_base_url: string; anthropic_api_url?: string }, apiType: string) => {
+    if (apiType === "anthropic" && tpl.anthropic_api_url) {
+      return tpl.anthropic_api_url;
+    }
+    return tpl.api_base_url;
   };
 
   const saveProviderMutation = useMutation({
@@ -114,6 +133,7 @@ export function LlmSettingsTab() {
   const openCreateModel = () => {
     setEditingModel(null);
     setModelForm({ name: "", model_code: "", type: 1, temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [], sort: 0 });
+    setFetchModelsEnabled(true);
     setModelDialog(true);
   };
 
@@ -240,8 +260,28 @@ export function LlmSettingsTab() {
               >
                 <option value="">-- 手动输入 --</option>
                 {templates.map((t) => (
-                  <option key={t.code} value={t.code}>{t.name} ({t.api_type})</option>
+                  <option key={t.code} value={t.code}>{t.name} ({t.code})</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium">API 格式</label>
+              <select
+                className="w-full border rounded px-2 py-1.5 text-sm mt-1"
+                value={form.api_type}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  const tpl = templateCode ? (templatesQuery.data || []).find((t) => t.code === templateCode) : null;
+                  setForm({
+                    ...form,
+                    api_type: newType,
+                    api_base_url: tpl ? resolveTemplateBaseUrl(tpl, newType) : form.api_base_url,
+                  });
+                }}
+              >
+                <option value="openai">Chat Completions (/chat/completions)</option>
+                <option value="anthropic">Anthropic Messages (/v1/messages)</option>
+                <option value="responses">OpenAI Responses (/responses)</option>
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -277,6 +317,28 @@ export function LlmSettingsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setProviderDialog(false)}>取消</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setVerifying(true);
+                try {
+                  const result = await api.testLLMConnection(wsId, { api_base_url: form.api_base_url, api_key: form.api_key, api_type: form.api_type });
+                  if (result.ok === "true") {
+                    toast.success("API Key 有效");
+                  } else {
+                    toast.error(result.error || "验证失败");
+                  }
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "验证失败");
+                } finally {
+                  setVerifying(false);
+                }
+              }}
+              disabled={!form.api_base_url || !form.api_key || verifying}
+            >
+              {verifying ? "验证中..." : "验证"}
+            </Button>
             <Button size="sm" onClick={() => saveProviderMutation.mutate()} disabled={!form.name || !form.code || saveProviderMutation.isPending}>
               {saveProviderMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
               保存
@@ -293,7 +355,32 @@ export function LlmSettingsTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium">名称 *</label>
-                <Input value={modelForm.name} onChange={(e) => setModelForm({ ...modelForm, name: e.target.value })} placeholder="e.g. DeepSeek-V4-Pro" />
+                <div className="relative mt-1">
+                  <Input
+                    value={modelForm.name}
+                    onChange={(e) => {
+                      setModelForm({ ...modelForm, name: e.target.value, model_code: e.target.value });
+                    }}
+                    placeholder={editingModel ? "e.g. DeepSeek-V4-Pro" : "搜索或输入模型名称..."}
+                    className="pr-8"
+                    list={editingModel ? undefined : "remote-model-list"}
+                  />
+                  {!editingModel && (
+                    <datalist id="remote-model-list">
+                      {(remoteModelsQuery.data || []).map((m) => (
+                        <option key={m.id} value={m.id} />
+                      ))}
+                    </datalist>
+                  )}
+                  {!editingModel && remoteModelsQuery.isLoading && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin opacity-50" />
+                    </div>
+                  )}
+                </div>
+                {remoteModelsQuery.isError && (
+                  <p className="text-xs text-destructive mt-0.5">获取模型列表失败，请手动输入</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium">编码 *</label>

@@ -579,20 +579,25 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// with a shared secret, the multica-cloud upstream verifies. We
 	// only forward the bytes + the Stripe-Signature header; see
 	// HandleCloudBillingStripeWebhook for the rationale).
-	r.Post("/api/webhooks/stripe", h.HandleCloudBillingStripeWebhook)
+		r.Post("/api/webhooks/stripe", h.HandleCloudBillingStripeWebhook)
 
-	// Daemon API routes (require daemon token or valid user token)
-	r.Route("/api/daemon", func(r chi.Router) {
-		r.Use(middleware.DaemonAuth(queries, patCache, daemonTokenCache, cloudPATVerifier))
+		// Self-hosted CLI update endpoints (no auth required — version
+		// info and binary are public for daemon self-update).
+		r.Get("/api/daemon/cli-version", h.HandleCLIVersion)
+		r.Get("/api/daemon/cli-binary", h.HandleCLIBinary)
+
+		// Daemon API routes (require daemon token or valid user token)
+		r.Route("/api/daemon", func(r chi.Router) {
+			r.Use(middleware.DaemonAuth(queries, patCache, daemonTokenCache, cloudPATVerifier))
 
 		r.Post("/register", h.DaemonRegister)
 		r.Post("/deregister", h.DaemonDeregister)
 		r.Post("/heartbeat", h.DaemonHeartbeat)
 		r.Get("/ws", h.DaemonWebSocket)
 		r.Get("/workspaces/{workspaceId}/repos", h.GetDaemonWorkspaceRepos)
-		r.Get("/workspaces/{workspaceId}/runtime-profiles", h.DaemonListRuntimeProfiles)
+			r.Get("/workspaces/{workspaceId}/runtime-profiles", h.DaemonListRuntimeProfiles)
 
-		r.Post("/runtimes/{runtimeId}/tasks/claim", h.ClaimTaskByRuntime)
+			r.Post("/runtimes/{runtimeId}/tasks/claim", h.ClaimTaskByRuntime)
 		r.Post("/runtimes/{runtimeId}/tasks/{taskId}/prepare-lease", h.ExtendTaskPrepareLease)
 		r.Post("/runtimes/{runtimeId}/tasks/{taskId}/skill-bundles/resolve", h.ResolveTaskSkillBundles)
 		r.Get("/runtimes/{runtimeId}/tasks/pending", h.ListPendingTasksByRuntime)
@@ -700,14 +705,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/runtime-profiles", h.CreateRuntimeProfile)
 					r.Patch("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Put("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
-					r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
-					// LLM providers and models (admin-only mutations).
+						r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
+						// SSH connect runtime (admin-only).
+						r.Post("/runtimes/ssh-connect", h.SSHConnectRuntime)
+						// LLM providers and models (admin-only mutations).
 					r.Post("/llm-providers", h.CreateLLMProvider)
 					r.Put("/llm-providers/{providerId}", h.UpdateLLMProvider)
 					r.Delete("/llm-providers/{providerId}", h.DeleteLLMProvider)
+					r.Post("/llm-providers/test", h.TestLLMConnection)
 					r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
 					r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
 					r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
+					r.Post("/llm-providers/{providerId}/fetch-models", h.FetchProviderModels)
 				})
 				// Owner-only access
 				r.With(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner")).Delete("/", h.DeleteWorkspace)

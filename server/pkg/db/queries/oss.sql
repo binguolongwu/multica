@@ -30,6 +30,12 @@ RETURNING *;
 -- name: DeleteOSSProviderConfig :exec
 DELETE FROM oss_provider_config WHERE id = $1 AND workspace_id = $2;
 
+-- name: ClearDefaultOSSProviderConfig :exec
+UPDATE oss_provider_config SET is_default = false, updated_at = now() WHERE workspace_id = $1;
+
+-- name: SetDefaultOSSProviderConfig :one
+UPDATE oss_provider_config SET is_default = true, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING *;
+
 -- name: CreateOSSObject :one
 INSERT INTO oss_object (config_id, key, filename, size_bytes, content_type, uploaded_by)
 VALUES ($1, $2, $3, $4, $5, $6)

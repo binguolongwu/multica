@@ -2471,4 +2471,16 @@ export class ApiClient {
   async deleteLLMModel(workspaceId: string, providerId: string, id: string): Promise<void> {
     return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/${id}`, { method: "DELETE" });
   }
+
+  async testLLMConnection(workspaceId: string, data: { api_base_url: string; api_key: string; api_type: string }): Promise<{ ok: string; error?: string }> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/test`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async fetchProviderModels(workspaceId: string, providerId: string): Promise<{ id: string; name?: string }[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/fetch-models`, { method: "POST" });
+  }
+
+  async sshConnectRuntime(workspaceId: string, data: { host: string; port: string; username: string; password: string; runtimes: string[] }): Promise<{ ok: string; error?: string }> {
+    return this.fetch(`/api/workspaces/${workspaceId}/runtimes/ssh-connect`, { method: "POST", body: JSON.stringify(data) });
+  }
 }

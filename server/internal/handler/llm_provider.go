@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -167,6 +171,110 @@ func (h *Handler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── LLM Provider Connection Test ────────────────────────────────────────────
+
+// testLLMConnectionRequest is the JSON body for POST /workspaces/{id}/llm-providers/test
+type testLLMConnectionRequest struct {
+	ApiBaseUrl string `json:"api_base_url"`
+	ApiKey     string `json:"api_key"`
+	ApiType    string `json:"api_type"`
+}
+
+// llmVerifyCall calls GET {url}/v1/models with the given API key and returns the response.
+func llmVerifyCall(ctx context.Context, baseURL, apiKey string) (*http.Response, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	base := strings.TrimRight(baseURL, "/")
+	modelsURL := base + "/v1/models"
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+	return client.Do(httpReq)
+}
+
+// llmVerifyWithFallback tries the exact base URL first, then falls back to the
+// host root. This handles providers whose api_base_url includes a path suffix
+// (e.g. https://api.deepseek.com/anthropic) where /v1/models may not exist
+// under the suffixed path but works at the host root.
+func llmVerifyWithFallback(ctx context.Context, baseURL, apiKey string) (*http.Response, []string, error) {
+	tried := []string{}
+
+	// Attempt 1: exact base URL + /v1/models
+	resp, err := llmVerifyCall(ctx, baseURL, apiKey)
+	if err != nil {
+		return nil, tried, err
+	}
+	tried = append(tried, strings.TrimRight(baseURL, "/")+"/v1/models")
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return resp, tried, nil
+	}
+	if resp.StatusCode != 404 {
+		resp.Body.Close()
+		return resp, tried, nil
+	}
+	resp.Body.Close()
+
+	// Attempt 2: strip path, try host root + /v1/models
+	u, parseErr := url.Parse(baseURL)
+	if parseErr == nil && u.Path != "" && u.Path != "/" {
+		u.Path = ""
+		u.RawPath = ""
+		rootURL := u.String()
+		resp2, err2 := llmVerifyCall(ctx, rootURL, apiKey)
+		if err2 != nil {
+			return nil, tried, err2
+		}
+		tried = append(tried, strings.TrimRight(rootURL, "/")+"/v1/models")
+		return resp2, tried, nil
+	}
+
+	return resp, tried, nil
+}
+
+func (h *Handler) TestLLMConnection(w http.ResponseWriter, r *http.Request) {
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
+	if !ok {
+		return
+	}
+
+	var req testLLMConnectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.ApiBaseUrl == "" || req.ApiKey == "" {
+		writeError(w, http.StatusBadRequest, "api_base_url and api_key are required")
+		return
+	}
+
+	resp, tried, err := llmVerifyWithFallback(r.Context(), req.ApiBaseUrl, req.ApiKey)
+	if err != nil {
+		slog.Warn("llm: test connection failed", "error", err, "tried", tried)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false", "error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+		return
+	}
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
+	if len(body) > 0 {
+		errMsg = strings.TrimSpace(string(body))
+		if len(errMsg) > 200 {
+			errMsg = errMsg[:200] + "..."
+		}
+	}
+	slog.Warn("llm: test connection failed", "status", resp.StatusCode, "body", errMsg, "tried", tried)
+	writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false", "error": errMsg})
 }
 
 func (h *Handler) ListLLMProviderTemplates(w http.ResponseWriter, r *http.Request) {

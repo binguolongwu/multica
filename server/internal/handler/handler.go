@@ -174,8 +174,6 @@ type Handler struct {
 	// WikiService is the wiki knowledge base service. Nil when wiki is not
 	// configured; handlers return 503 in that case.
 	WikiService *wiki.Service
-	// OssService is the OSS cloud storage integration service.
-	OssService *oss.Service
 	cfg        Config
 }
 

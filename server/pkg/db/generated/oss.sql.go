@@ -147,6 +147,46 @@ func (q *Queries) DeleteOSSProviderConfig(ctx context.Context, arg DeleteOSSProv
 	return err
 }
 
+const clearDefaultOSSProviderConfig = `-- name: ClearDefaultOSSProviderConfig :exec
+UPDATE oss_provider_config SET is_default = false, updated_at = now() WHERE workspace_id = $1
+`
+
+func (q *Queries) ClearDefaultOSSProviderConfig(ctx context.Context, workspaceID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearDefaultOSSProviderConfig, workspaceID)
+	return err
+}
+
+const setDefaultOSSProviderConfig = `-- name: SetDefaultOSSProviderConfig :one
+UPDATE oss_provider_config SET is_default = true, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, provider, bucket, region, endpoint, access_key, secret_key_encrypted, custom_domain, folder_prefix, is_default, created_at, updated_at
+`
+
+type SetDefaultOSSProviderConfigParams struct {
+	ID          pgtype.UUID `json:"id"`
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+}
+
+func (q *Queries) SetDefaultOSSProviderConfig(ctx context.Context, arg SetDefaultOSSProviderConfigParams) (OssProviderConfig, error) {
+	row := q.db.QueryRow(ctx, setDefaultOSSProviderConfig, arg.ID, arg.WorkspaceID)
+	var i OssProviderConfig
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Provider,
+		&i.Bucket,
+		&i.Region,
+		&i.Endpoint,
+		&i.AccessKey,
+		&i.SecretKeyEncrypted,
+		&i.CustomDomain,
+		&i.FolderPrefix,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getOSSObject = `-- name: GetOSSObject :one
 SELECT id, config_id, key, filename, size_bytes, content_type, uploaded_by, created_at FROM oss_object WHERE id = $1 AND config_id = $2
 `
