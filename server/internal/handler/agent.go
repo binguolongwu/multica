@@ -825,8 +825,10 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-inject LLM provider credentials when the model matches the
 	// server-side catalog. The user's explicit custom_env takes
-	// precedence — only keys not already present are set.
-	h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, req.CustomEnv)
+	// precedence — only keys not already present are set. Assign the result
+	// back so a nil custom_env (model-only request) still receives the
+	// injected credentials; autoInjectLLMEnv cannot mutate a nil map in place.
+	req.CustomEnv = h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, req.CustomEnv)
 
 	ce, _ := json.Marshal(req.CustomEnv)
 	if req.CustomEnv == nil {
