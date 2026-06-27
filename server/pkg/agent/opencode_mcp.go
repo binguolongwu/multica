@@ -109,6 +109,97 @@ func buildOpenCodeMCPConfigContent(raw json.RawMessage) (string, error) {
 	return string(data), nil
 }
 
+// opencodeInjectedProviderID is the provider id Multica injects into opencode's
+// config (via OPENCODE_CONFIG_CONTENT) to route the agent's bound LLM through
+// the Multica-configured provider instead of opencode's own auth.json. opencode
+// otherwise ignores the OPENAI_API_KEY env var and falls back to its own
+// auth.json / built-in "opencode" provider, so the agent's configured LLM never
+// reaches it. The agent's model is then passed to opencode as
+// "<id>/<model>" so opencode resolves it to this injected provider.
+const opencodeInjectedProviderID = "multica"
+
+// buildOpenCodeProviderConfig builds an opencode provider config map that
+// points opencode at the LLM provider Multica resolved for the agent. The
+// apiKey / baseURL are the literal values the daemon already injected into the
+// process env (b.cfg.Env) — resolveLLMEnvRefs in the backend populated them
+// from the agent's ${provider.api_key} / ${provider.api_base_url} custom_env
+// references at task-claim time, so they reflect the LLM provider bound to the
+// agent's model_code (rotating with the provider config, not frozen at agent
+// creation).
+//
+// The provider is declared with api:"openai" so opencode speaks the
+// OpenAI-compatible protocol that QnAIGC-style providers expose. The agent's
+// model is registered under models so `--model <id>/<model>` resolves here.
+//
+// Returns nil when the env lacks the credentials to define a provider, so the
+// caller falls back to opencode's native model/auth resolution (the previous
+// behaviour) instead of injecting a half-empty provider.
+func buildOpenCodeProviderConfig(env map[string]string, model string) map[string]any {
+	apiKey := env["OPENAI_API_KEY"]
+	baseURL := env["OPENAI_BASE_URL"]
+	if apiKey == "" || baseURL == "" || model == "" {
+		return nil
+	}
+	return map[string]any{
+		"provider": map[string]any{
+			opencodeInjectedProviderID: map[string]any{
+				"api":  "openai",
+				"name": "Multica LLM",
+				"options": map[string]any{
+					"apiKey":  apiKey,
+					"baseURL": baseURL,
+				},
+				"models": map[string]any{
+					model: map[string]any{
+						"name":      model,
+						"tool_call": true,
+					},
+				},
+			},
+		},
+	}
+}
+
+// buildOpenCodeConfigContent assembles the OPENCODE_CONFIG_CONTENT env value by
+// merging the agent's MCP config with the injected LLM provider config. Either
+// side may be absent (no MCP, or no resolved LLM creds); the result is "" only
+// when both are absent so the caller skips the env entry entirely instead of
+// injecting an empty config that could clobber a user-set
+// OPENCODE_CONFIG_CONTENT in agent.custom_env.
+func buildOpenCodeConfigContent(mcpRaw json.RawMessage, providerCfg map[string]any) (string, error) {
+	cfg := map[string]any{}
+	if len(mcpRaw) > 0 {
+		servers, err := translateMCPConfigForOpenCode(mcpRaw)
+		if err != nil {
+			return "", err
+		}
+		if len(servers) > 0 {
+			cfg["mcp"] = servers
+		}
+	}
+	if providerCfg != nil {
+		if pm, ok := providerCfg["provider"].(map[string]any); ok && len(pm) > 0 {
+			existing, _ := cfg["provider"].(map[string]any)
+			if existing == nil {
+				cfg["provider"] = pm
+			} else {
+				for k, v := range pm {
+					existing[k] = v
+				}
+				cfg["provider"] = existing
+			}
+		}
+	}
+	if len(cfg) == 0 {
+		return "", nil
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("opencode config content: marshal: %w", err)
+	}
+	return string(data), nil
+}
+
 // translateMCPConfigForOpenCode converts an agent.mcp_config payload into the
 // shape OpenCode expects under its `mcp` key. Two input shapes are accepted:
 //

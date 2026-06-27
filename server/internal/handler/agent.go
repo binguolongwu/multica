@@ -828,7 +828,9 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	// precedence — only keys not already present are set. Assign the result
 	// back so a nil custom_env (model-only request) still receives the
 	// injected credentials; autoInjectLLMEnv cannot mutate a nil map in place.
-	req.CustomEnv = h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, req.CustomEnv)
+	// Pass the runtime provider so creds land in the env var the CLI actually
+	// reads (llmEnvVarsForRuntime), not just the provider's configured name.
+	req.CustomEnv = h.autoInjectLLMEnv(r.Context(), workspaceID, req.Model, runtime.Provider, req.CustomEnv)
 
 	ce, _ := json.Marshal(req.CustomEnv)
 	if req.CustomEnv == nil {
