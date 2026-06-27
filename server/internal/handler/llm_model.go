@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"log/slog"
 
+	"github.com/multica-ai/multica/server/internal/llm"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -69,6 +72,11 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 	if req.ModelCode == "" {
 		writeError(w, http.StatusBadRequest, "model_code is required")
 		return
+	}
+	// Currency defaults to CNY when omitted so newly created models always
+	// carry a usable pricing currency.
+	if req.Currency == "" {
+		req.Currency = "CNY"
 	}
 	// Override with URL-path provider ID; ignore any body-supplied value.
 	req.ProviderID = providerID
@@ -139,12 +147,63 @@ func (h *Handler) DeleteLLMModel(w http.ResponseWriter, r *http.Request) {
 
 // ── Fetch Models from Provider API ──────────────────────────────────────────
 
-// remoteModelEntry represents a model returned by the provider's /v1/models endpoint.
-type remoteModelEntry struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
+// remoteModelPricing mirrors the OpenRouter `pricing` object on /v1/models
+// entries: per-token USD strings for prompt (input) and completion (output).
+type remoteModelPricing struct {
+	Prompt     string `json:"prompt"`
+	Completion string `json:"completion"`
 }
 
+// remotePricing is the decoded, per-million-token representation used to fill
+// llm_model.input_price / output_price. currency is the ISO code "USD" for
+// OpenRouter-style USD quotes; providers that omit pricing leave this nil
+// (preserving any user-entered price on conflict, or the column default on
+// insert).
+type remotePricing struct {
+	currency string
+	input    float64
+	output   float64
+}
+
+// parseRemotePricing decodes an OpenRouter-style per-token pricing object into
+// per-million-token prices. Returns nil when pricing is absent or unusable so
+// the caller passes NULL sqlc.narg values (preserving existing DB pricing).
+func parseRemotePricing(p *remoteModelPricing) *remotePricing {
+	if p == nil {
+		return nil
+	}
+	in, errIn := strconv.ParseFloat(strings.TrimSpace(p.Prompt), 64)
+	out, errOut := strconv.ParseFloat(strings.TrimSpace(p.Completion), 64)
+	if errIn != nil || errOut != nil {
+		return nil
+	}
+	// OpenRouter quotes USD per token; convert to per-million-token.
+	const perM = 1_000_000
+	if in <= 0 && out <= 0 {
+		return nil
+	}
+	return &remotePricing{currency: "USD", input: in * perM, output: out * perM}
+}
+
+// remoteModelCandidate is a model discovered at the provider, enriched with
+// inferred capabilities/type/pricing. FetchProviderModels returns these
+// WITHOUT persisting — the UI shows them in a multi-select dialog and only
+// the user's selection is imported via ImportLLMModels.
+type remoteModelCandidate struct {
+	ModelCode     string   `json:"model_code"`
+	Name          string   `json:"name"`
+	Type          int16    `json:"type"`
+	ContextWindow int32    `json:"context_window"`
+	Capabilities  []string `json:"capabilities"`
+	Currency      string   `json:"currency"`
+	InputPrice    float64  `json:"input_price"`
+	OutputPrice   float64  `json:"output_price"`
+}
+
+// FetchProviderModels fetches the model catalog from a provider's /v1/models
+// endpoint, infers capabilities/type/pricing from exposed metadata (OpenRouter)
+// and naming heuristics, and returns the candidates WITHOUT persisting. The UI
+// presents them in a multi-select dialog; only the selection is imported.
 func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
 	wsID := h.resolveWorkspaceID(r)
 	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
@@ -156,10 +215,11 @@ func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	wsUUID := parseUUID(wsID)
 
 	provider, err := h.Queries.GetLLMProvider(r.Context(), db.GetLLMProviderParams{
 		ID:          providerID,
-		WorkspaceID: parseUUID(wsID),
+		WorkspaceID: wsUUID,
 	})
 	if err != nil {
 		slog.Warn("llm: fetch models provider not found", "error", err)
@@ -197,11 +257,20 @@ func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse OpenAI-compatible response: {"data": [{"id": "gpt-4", ...}, ...]}
+	// Parse OpenAI-compatible response. Optional OpenRouter fields:
+	// architecture (input/output modalities), supported_parameters, context_length,
+	// and pricing (per-token USD strings).
 	var response struct {
 		Data []struct {
-			ID     string `json:"id"`
-			Object string `json:"object"`
+			ID            string              `json:"id"`
+			Name          string              `json:"name"`
+			ContextLength int64               `json:"context_length"`
+			Pricing       *remoteModelPricing `json:"pricing"`
+			Architecture *struct {
+				InputModalities  []string `json:"input_modalities"`
+				OutputModalities []string `json:"output_modalities"`
+			} `json:"architecture"`
+			SupportedParameters []string `json:"supported_parameters"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -210,23 +279,181 @@ func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries := make([]remoteModelEntry, 0, len(response.Data))
+	candidates := make([]remoteModelCandidate, 0, len(response.Data))
 	for _, m := range response.Data {
-		entries = append(entries, remoteModelEntry{ID: m.ID})
+		if m.ID == "" {
+			continue
+		}
+		name := m.Name
+		if name == "" {
+			name = m.ID
+		}
+		// Build structured metadata for capability inference where the
+		// provider exposes it; nil for bare OpenAI-shape providers.
+		var meta *llm.RemoteModelMeta
+		if m.Architecture != nil || len(m.SupportedParameters) > 0 || m.ContextLength > 0 {
+			meta = &llm.RemoteModelMeta{
+				ContextLength:   m.ContextLength,
+				SupportedParams: m.SupportedParameters,
+			}
+			if m.Architecture != nil {
+				meta.InputModalities = m.Architecture.InputModalities
+				meta.OutputModalities = m.Architecture.OutputModalities
+			}
+		}
+		caps := llm.InferCapabilities(m.ID, int32(m.ContextLength), meta)
+		c := remoteModelCandidate{
+			ModelCode:     m.ID,
+			Name:          name,
+			Type:          llm.InferType(caps),
+			ContextWindow: int32(m.ContextLength),
+			Capabilities:  caps,
+			Currency:      "CNY",
+		}
+		if p := parseRemotePricing(m.Pricing); p != nil {
+			c.Currency = p.currency
+			c.InputPrice = p.input
+			c.OutputPrice = p.output
+		}
+		candidates = append(candidates, c)
 	}
-	if entries == nil {
-		entries = []remoteModelEntry{}
+	slog.Info("llm: fetched model candidates",
+		"provider", provider.Code, "count", len(candidates))
+	writeJSON(w, http.StatusOK, candidates)
+}
+
+// importLLMModelsRequest is the body for POST .../models/bulk: the candidates
+// the user selected from the fetch dialog.
+type importLLMModelsRequest struct {
+	Models []struct {
+		ModelCode     string   `json:"model_code"`
+		Name          string   `json:"name"`
+		Type          int16    `json:"type"`
+		ContextWindow int32    `json:"context_window"`
+		Capabilities  []string `json:"capabilities"`
+		Currency      string   `json:"currency"`
+		InputPrice    float64  `json:"input_price"`
+		OutputPrice   float64  `json:"output_price"`
+	} `json:"models"`
+}
+
+// ImportLLMModels upserts the user-selected candidate models into llm_model.
+// Capabilities are merged with any existing tags (manual curation preserved);
+// pricing is applied only when the candidate carries non-zero values, else the
+// existing price is preserved. Returns the full refreshed model list (all
+// statuses) for the provider so the UI can re-render switches/badges.
+func (h *Handler) ImportLLMModels(w http.ResponseWriter, r *http.Request) {
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, wsID, "forbidden", "owner", "admin")
+	if !ok {
+		return
 	}
-	writeJSON(w, http.StatusOK, entries)
+	providerID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "providerId"), "provider_id")
+	if !ok {
+		return
+	}
+	wsUUID := parseUUID(wsID)
+
+	// Validate the provider belongs to this workspace (defense against
+	// cross-workspace IDOR via a forged providerId).
+	if _, err := h.Queries.GetLLMProvider(r.Context(), db.GetLLMProviderParams{
+		ID:          providerID,
+		WorkspaceID: wsUUID,
+	}); err != nil {
+		writeError(w, http.StatusNotFound, "provider not found in this workspace")
+		return
+	}
+
+	var req importLLMModelsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Pre-fetch existing models so capabilities can be merged (manual tags
+	// preserved across re-import) instead of overwritten.
+	existing, err := h.Queries.ListLLMModelsByProvider(r.Context(), db.ListLLMModelsByProviderParams{
+		ProviderID:  providerID,
+		WorkspaceID: wsUUID,
+	})
+	if err != nil {
+		slog.Warn("llm: list existing models for import failed", "error", err)
+		existing = nil
+	}
+	existingCaps := make(map[string][]string, len(existing))
+	for _, em := range existing {
+		existingCaps[em.ModelCode] = em.Capabilities
+	}
+
+	imported := 0
+	for _, m := range req.Models {
+		if m.ModelCode == "" {
+			continue
+		}
+		name := m.Name
+		if name == "" {
+			name = m.ModelCode
+		}
+		merged := llm.MergeCapabilities(existingCaps[m.ModelCode], m.Capabilities)
+		arg := db.UpsertLLMModelParams{
+			WorkspaceID:   wsUUID,
+			ProviderID:    providerID,
+			Name:          name,
+			ModelCode:     m.ModelCode,
+			Type:          m.Type,
+			Temperature:   0.7,
+			MaxTokens:     4096,
+			ContextWindow: m.ContextWindow,
+			Capabilities:  merged,
+			Sort:          0,
+		}
+		// Apply pricing only when the candidate carries real values; a NULL
+		// narg preserves any existing price on conflict and the column
+		// default (0 / CNY) applies on insert.
+		if m.InputPrice > 0 || m.OutputPrice > 0 {
+			cur := m.Currency
+			if cur == "" {
+				cur = "CNY"
+			}
+			arg.Currency = pgtype.Text{String: cur, Valid: true}
+			arg.InputPrice = pgtype.Float8{Float64: m.InputPrice, Valid: true}
+			arg.OutputPrice = pgtype.Float8{Float64: m.OutputPrice, Valid: true}
+		}
+		if _, err := h.Queries.UpsertLLMModel(r.Context(), arg); err != nil {
+			slog.Warn("llm: import model failed", "model_code", m.ModelCode, "error", err)
+			continue
+		}
+		imported++
+	}
+
+	// Return the full refreshed model list (all statuses) for this provider.
+	models, err := h.Queries.ListLLMModelsByProvider(r.Context(), db.ListLLMModelsByProviderParams{
+		ProviderID:  providerID,
+		WorkspaceID: wsUUID,
+	})
+	if err != nil {
+		slog.Warn("llm: list models after import failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list llm models")
+		return
+	}
+	if models == nil {
+		models = []db.LlmModel{}
+	}
+	slog.Info("llm: imported models",
+		"provider_id", providerID, "requested", len(req.Models), "imported", imported, "total", len(models))
+	writeJSON(w, http.StatusOK, models)
 }
 
 // ── Global Model Catalog (merged from all workspaces) ────────────────────────
 
 type LLMModelCatalogEntry struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Provider string `json:"provider"`
-	Default  bool   `json:"default"`
+	ID            string   `json:"id"`
+	Label         string   `json:"label"`
+	Provider      string   `json:"provider"`
+	Default       bool     `json:"default"`
+	Type          int16    `json:"type"`
+	ContextWindow int32    `json:"context_window"`
+	Capabilities  []string `json:"capabilities"`
 }
 
 func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
@@ -235,11 +462,6 @@ func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.workspaceMember(w, r, workspaceID)
 	if !ok {
 		return
-	}
-	type catalogRow struct {
-		ModelCode    string `json:"model_code"`
-		Name         string `json:"name"`
-		ProviderName string `json:"provider_name"`
 	}
 	rows, err := h.Queries.ListLLMModelsForCatalog(r.Context())
 	if err != nil {
@@ -255,11 +477,18 @@ func (h *Handler) ListLLMModelCatalog(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		seen[r.ModelCode] = true
+		caps := r.Capabilities
+		if caps == nil {
+			caps = []string{}
+		}
 		entries = append(entries, LLMModelCatalogEntry{
-			ID:       r.ModelCode,
-			Label:    coalesceStr(r.Name, r.ModelCode),
-			Provider: coalesceStr(r.ProviderName, "Unknown"),
-			Default:  false,
+			ID:            r.ModelCode,
+			Label:         coalesceStr(r.Name, r.ModelCode),
+			Provider:      coalesceStr(r.ProviderName, "Unknown"),
+			Default:       false,
+			Type:          r.Type,
+			ContextWindow: r.ContextWindow,
+			Capabilities:  caps,
 		})
 	}
 	writeJSON(w, http.StatusOK, entries)

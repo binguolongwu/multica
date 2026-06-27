@@ -182,11 +182,10 @@ type testLLMConnectionRequest struct {
 	ApiType    string `json:"api_type"`
 }
 
-// llmVerifyCall calls GET {url}/v1/models with the given API key and returns the response.
-func llmVerifyCall(ctx context.Context, baseURL, apiKey string) (*http.Response, error) {
+// llmVerifyCall calls GET modelsURL with the given API key and returns the
+// response. The caller chooses the exact models endpoint URL.
+func llmVerifyCall(ctx context.Context, modelsURL, apiKey string) (*http.Response, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	base := strings.TrimRight(baseURL, "/")
-	modelsURL := base + "/v1/models"
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
 	if err != nil {
 		return nil, err
@@ -196,19 +195,54 @@ func llmVerifyCall(ctx context.Context, baseURL, apiKey string) (*http.Response,
 	return client.Do(httpReq)
 }
 
-// llmVerifyWithFallback tries the exact base URL first, then falls back to the
-// host root. This handles providers whose api_base_url includes a path suffix
-// (e.g. https://api.deepseek.com/anthropic) where /v1/models may not exist
-// under the suffixed path but works at the host root.
+// endsWithVersionSegment reports whether the URL path ends with a version
+// segment like /v1, /v2 — the OpenAI convention where the base URL already
+// includes the version and the models endpoint is base + "/models" (not
+// base + "/v1/models", which would double the version, e.g.
+// https://opencode.ai/zen/v1/v1/models).
+func endsWithVersionSegment(rawURL string) bool {
+	p := strings.TrimRight(rawURL, "/")
+	if i := strings.IndexByte(p, '?'); i >= 0 {
+		p = p[:i]
+	}
+	idx := strings.LastIndex(p, "/")
+	if idx < 0 {
+		return false
+	}
+	seg := p[idx+1:]
+	if len(seg) < 2 || seg[0] != 'v' {
+		return false
+	}
+	for _, c := range seg[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// llmVerifyWithFallback resolves the provider's models endpoint. For
+// OpenAI-style bases that already carry a version segment (e.g.
+// https://opencode.ai/zen/v1, https://api.openai.com/v1) it appends "/models";
+// otherwise it appends "/v1/models" and, on 404, falls back to the host root.
+// This covers versioned bases, host-root bases, and path-suffixed bases like
+// https://api.deepseek.com/anthropic.
 func llmVerifyWithFallback(ctx context.Context, baseURL, apiKey string) (*http.Response, []string, error) {
 	tried := []string{}
+	base := strings.TrimRight(baseURL, "/")
 
-	// Attempt 1: exact base URL + /v1/models
-	resp, err := llmVerifyCall(ctx, baseURL, apiKey)
+	// Primary candidate depends on whether the base already carries /v1.
+	var primary string
+	if endsWithVersionSegment(base) {
+		primary = base + "/models"
+	} else {
+		primary = base + "/v1/models"
+	}
+	resp, err := llmVerifyCall(ctx, primary, apiKey)
 	if err != nil {
 		return nil, tried, err
 	}
-	tried = append(tried, strings.TrimRight(baseURL, "/")+"/v1/models")
+	tried = append(tried, primary)
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return resp, tried, nil
 	}
@@ -218,17 +252,18 @@ func llmVerifyWithFallback(ctx context.Context, baseURL, apiKey string) (*http.R
 	}
 	resp.Body.Close()
 
-	// Attempt 2: strip path, try host root + /v1/models
+	// Fallback: strip the path and try host root + /v1/models.
 	u, parseErr := url.Parse(baseURL)
 	if parseErr == nil && u.Path != "" && u.Path != "/" {
 		u.Path = ""
 		u.RawPath = ""
-		rootURL := u.String()
-		resp2, err2 := llmVerifyCall(ctx, rootURL, apiKey)
+		rootURL := strings.TrimRight(u.String(), "/")
+		fallback := rootURL + "/v1/models"
+		resp2, err2 := llmVerifyCall(ctx, fallback, apiKey)
 		if err2 != nil {
 			return nil, tried, err2
 		}
-		tried = append(tried, strings.TrimRight(rootURL, "/")+"/v1/models")
+		tried = append(tried, fallback)
 		return resp2, tried, nil
 	}
 

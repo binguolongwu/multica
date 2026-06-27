@@ -141,7 +141,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
-import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry } from "../types/llm";
+import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry, LLMModelCandidate } from "../types/llm";
 import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
@@ -2476,8 +2476,14 @@ export class ApiClient {
     return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/test`, { method: "POST", body: JSON.stringify(data) });
   }
 
-  async fetchProviderModels(workspaceId: string, providerId: string): Promise<{ id: string; name?: string }[]> {
+  async fetchProviderModels(workspaceId: string, providerId: string): Promise<LLMModelCandidate[]> {
     return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/fetch-models`, { method: "POST" });
+  }
+
+  // Import the user-selected candidate models (multi-select from the fetch
+  // dialog) into llm_model. Only the supplied models are upserted.
+  async importLLMModels(workspaceId: string, providerId: string, models: LLMModelCandidate[]): Promise<LLMModel[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models/bulk`, { method: "POST", body: JSON.stringify({ models }) });
   }
 
   async sshConnectRuntime(workspaceId: string, data: { host: string; port: string; username: string; password: string; runtimes: string[] }): Promise<{ ok: string; error?: string }> {

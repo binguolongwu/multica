@@ -716,6 +716,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
 					r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
 					r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
+					r.Post("/llm-providers/{providerId}/models/bulk", h.ImportLLMModels)
 					r.Post("/llm-providers/{providerId}/fetch-models", h.FetchProviderModels)
 				})
 				// Owner-only access
