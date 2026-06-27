@@ -568,3 +568,71 @@ func splitFrontmatter(content string) (map[string]string, string, bool) {
 	}
 	return fm, body, true
 }
+
+// TestWikiDistillSkillCoversContract pins the task-agent knowledge-distill
+// skill: it must be a non-user-invocable, multica-CLI-fenced skill that
+// teaches agents to write raw notes under raw/learnings/ (the staging tier)
+// and only touch wiki/ for a high-value pointer to an EXISTING page (curation
+// is the wiki admin's job, not the task agent's).
+func TestWikiDistillSkillCoversContract(t *testing.T) {
+	skill, ok := findSkill(t, "multica-wiki-distill")
+	if !ok {
+		t.Fatal("multica-wiki-distill skill not loaded; embed glob or directory missing")
+	}
+	fm, body, _ := splitFrontmatter(skill.Content)
+
+	if got := strings.TrimSpace(fm["user-invocable"]); got != "false" {
+		t.Errorf("user-invocable = %q, want false (context-triggered after a valuable task)", got)
+	}
+	if got := strings.TrimSpace(fm["allowed-tools"]); !strings.Contains(got, "Bash(multica *)") {
+		t.Errorf("allowed-tools = %q, want Bash(multica *) for wiki CLI access", got)
+	}
+
+	mustContain := []string{
+		"raw/learnings/",                       // the staging path convention
+		"multica wiki write-page",              // the write primitive
+		"multica wiki read-page",               // read-before-pointer
+		"Pitfalls",                             // the pitfall section is mandatory
+		"wiki admin",                           // names the curator tier so agents don't curate
+		"Do NOT create new `wiki/` pages here", // forbids task-agent curation
+	}
+		for _, want := range mustContain {
+			if !strings.Contains(body, want) {
+				t.Errorf("multica-wiki-distill skill missing %q", want)
+			}
+		}
+	}
+
+// TestWikiCurrateSkillCoversContract pins the wiki-admin curation skill: it
+// reads raw/learnings/ notes, deduplicates + merges them by topic, and writes
+// the polished wiki/<topic>.md + wiki/pitfalls/<topic>.md. It is the A-tier
+// curator in the two-tier pipeline (raw notes from task agents → curated wiki).
+func TestWikiCurrateSkillCoversContract(t *testing.T) {
+	skill, ok := findSkill(t, "multica-wiki-currate")
+	if !ok {
+		t.Fatal("multica-wiki-currate skill not loaded; embed glob or directory missing")
+	}
+	fm, body, _ := splitFrontmatter(skill.Content)
+
+	if got := strings.TrimSpace(fm["user-invocable"]); got != "false" {
+		t.Errorf("user-invocable = %q, want false (triggered by the ingest operation)", got)
+	}
+	if got := strings.TrimSpace(fm["allowed-tools"]); !strings.Contains(got, "Bash(multica *)") {
+		t.Errorf("allowed-tools = %q, want Bash(multica *) for wiki CLI access", got)
+	}
+
+	mustContain := []string{
+		"raw/learnings/",          // reads the staging tier
+		"wiki/<topic>.md",         // writes the curated topic page
+		"wiki/pitfalls/<topic>.md", // writes the curated pitfalls page
+		"multica wiki list-pages", // discovers notes to curate
+		"multica wiki read-page",  // read-before-merge
+		"multica wiki write-page", // the write primitive
+		"Deduplicate",             // the curation contract (merge, don't duplicate)
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(body, want) {
+			t.Errorf("multica-wiki-currate skill missing %q", want)
+		}
+	}
+}

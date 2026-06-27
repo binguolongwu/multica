@@ -31,6 +31,7 @@ import { cn } from "@multica/ui/lib/utils";
 import { PageHeader } from "../../layout/page-header";
 import { ConnectRemoteDialog } from "./connect-remote-dialog";
 import { CloudRuntimeDialog } from "./cloud-runtime-dialog";
+import { SSHConnectDialog } from "./ssh-connect-dialog";
 import { RuntimeProfilesDialog } from "./runtime-profiles-dialog";
 import { ProviderLogo } from "./provider-logo";
 import { RuntimeList, buildWorkloadIndex } from "./runtime-list";
@@ -117,6 +118,7 @@ export function RuntimesPage({
   }, []);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [showCloudRuntimeDialog, setShowCloudRuntimeDialog] = useState(false);
+  const [showSSHDialog, setShowSSHDialog] = useState(false);
   const [pendingProfiles, setPendingProfiles] = useState<PendingRuntimeProfile[]>(
     [],
   );
@@ -256,6 +258,7 @@ export function RuntimesPage({
         onOpenCloudRuntime={() => setShowCloudRuntimeDialog(true)}
         canManageProfiles={canManageProfiles}
         onAddRuntime={() => setShowProfilesDialog(true)}
+        onSSHConnect={() => setShowSSHDialog(true)}
       />
 
       {showEmpty ? (
@@ -335,6 +338,9 @@ export function RuntimesPage({
       {cloudRuntimeEnabled && showCloudRuntimeDialog && (
         <CloudRuntimeDialog onClose={() => setShowCloudRuntimeDialog(false)} />
       )}
+      {showSSHDialog && (
+        <SSHConnectDialog onClose={() => setShowSSHDialog(false)} />
+      )}
       {canManageProfiles && showProfilesDialog && (
         <RuntimeProfilesDialog
           wsId={wsId}
@@ -363,6 +369,7 @@ function PageHeaderBar({
   onOpenCloudRuntime,
   canManageProfiles,
   onAddRuntime,
+  onSSHConnect,
 }: {
   totalCount: number;
   onConnectRemote: () => void;
@@ -370,6 +377,7 @@ function PageHeaderBar({
   onOpenCloudRuntime: () => void;
   canManageProfiles: boolean;
   onAddRuntime: () => void;
+  onSSHConnect: () => void;
 }) {
   const { t } = useT("runtimes");
   return (
@@ -418,6 +426,17 @@ function PageHeaderBar({
             </span>
           </Button>
         )}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 w-8 gap-1 px-0 md:w-auto md:px-2.5"
+          aria-label="添加SSH服务器"
+          onClick={onSSHConnect}
+        >
+          <Server className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">添加SSH服务器</span>
+        </Button>
         <Button
           type="button"
           size="sm"

@@ -609,3 +609,119 @@ func parseJSONString(t *testing.T, s string) map[string]any {
 	}
 	return out
 }
+
+// TestBuildOpenCodeProviderConfig verifies the injected opencode provider config
+// is built from the daemon env (resolved LLM creds) + the agent model, and that
+// it is skipped when any credential is missing — so opencode falls back to its
+// native auth instead of receiving a half-empty provider that would break
+// model resolution.
+func TestBuildOpenCodeProviderConfig(t *testing.T) {
+	t.Parallel()
+	env := map[string]string{
+		"OPENAI_API_KEY":  "sk-test-secret",
+		"OPENAI_BASE_URL": "https://api.example.com/v1",
+	}
+	got := buildOpenCodeProviderConfig(env, "glm-4.5")
+	if got == nil {
+		t.Fatal("expected provider config, got nil")
+	}
+	pm, ok := got["provider"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider map, got %T", got["provider"])
+	}
+	prov, ok := pm["multica"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected provider.multica, got %v", pm)
+	}
+	if prov["api"] != "openai" {
+		t.Fatalf("api = %v, want openai", prov["api"])
+	}
+	opts, _ := prov["options"].(map[string]any)
+	if opts["apiKey"] != "sk-test-secret" {
+		t.Fatalf("options.apiKey = %v, want sk-test-secret (resolved cred must land here)", opts["apiKey"])
+	}
+	if opts["baseURL"] != "https://api.example.com/v1" {
+		t.Fatalf("options.baseURL = %v, want https://api.example.com/v1", opts["baseURL"])
+	}
+	models, _ := prov["models"].(map[string]any)
+	if _, ok := models["glm-4.5"]; !ok {
+		t.Fatalf("models missing glm-4.5 entry, got %v", models)
+	}
+
+	// Missing any of key/baseURL/model → nil (graceful fallback to opencode's
+	// own auth, no half-empty provider injected).
+	if buildOpenCodeProviderConfig(map[string]string{"OPENAI_BASE_URL": "u"}, "m") != nil {
+		t.Fatal("expected nil when OPENAI_API_KEY missing")
+	}
+	if buildOpenCodeProviderConfig(map[string]string{"OPENAI_API_KEY": "k"}, "m") != nil {
+		t.Fatal("expected nil when OPENAI_BASE_URL missing")
+	}
+	if buildOpenCodeProviderConfig(env, "") != nil {
+		t.Fatal("expected nil when model empty")
+	}
+}
+
+// TestBuildOpenCodeConfigContent_Merge verifies the merged OPENCODE_CONFIG_CONTENT
+// carries both the MCP servers and the injected LLM provider in one env value.
+func TestBuildOpenCodeConfigContent_Merge(t *testing.T) {
+	t.Parallel()
+	mcpRaw := json.RawMessage(`{"mcpServers":{"mcpbase":{"url":"https://mcp.example/mcp"}}}`)
+	providerCfg := buildOpenCodeProviderConfig(map[string]string{
+		"OPENAI_API_KEY":  "sk-test",
+		"OPENAI_BASE_URL": "https://api.example.com/v1",
+	}, "glm-4.5")
+	got, err := buildOpenCodeConfigContent(mcpRaw, providerCfg)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	cfg := parseJSONString(t, got)
+	if _, ok := cfg["mcp"]; !ok {
+		t.Fatal("merged config missing mcp")
+	}
+	pm, ok := cfg["provider"].(map[string]any)
+	if !ok {
+		t.Fatal("merged config missing provider")
+	}
+	if _, ok := pm["multica"]; !ok {
+		t.Fatal("merged config missing provider.multica")
+	}
+}
+
+// TestBuildOpenCodeConfigContent_ProviderOnly verifies that with no MCP config
+// the content still carries the injected provider alone (the common case for an
+// agent with LLM creds but no MCP servers).
+func TestBuildOpenCodeConfigContent_ProviderOnly(t *testing.T) {
+	t.Parallel()
+	providerCfg := buildOpenCodeProviderConfig(map[string]string{
+		"OPENAI_API_KEY":  "sk-test",
+		"OPENAI_BASE_URL": "https://api.example.com/v1",
+	}, "glm-4.5")
+	got, err := buildOpenCodeConfigContent(nil, providerCfg)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got == "" {
+		t.Fatal("expected non-empty content for provider-only")
+	}
+	cfg := parseJSONString(t, got)
+	if _, ok := cfg["mcp"]; ok {
+		t.Fatal("expected no mcp key for provider-only")
+	}
+	if _, ok := cfg["provider"].(map[string]any)["multica"]; !ok {
+		t.Fatal("expected provider.multica")
+	}
+}
+
+// TestBuildOpenCodeConfigContent_Empty verifies that with no MCP and no
+// provider the content is "" so the caller skips the env entry entirely
+// (preserving any user-set OPENCODE_CONFIG_CONTENT in agent.custom_env).
+func TestBuildOpenCodeConfigContent_Empty(t *testing.T) {
+	t.Parallel()
+	got, err := buildOpenCodeConfigContent(nil, nil)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty content, got %q", got)
+	}
+}

@@ -221,7 +221,59 @@ func verifyAssetSHA256(data []byte, expectedHex, assetName string) error {
 	return nil
 }
 
+// updateViaSelfHosted downloads the binary from a self-hosted Multica server.
+func updateViaSelfHosted(baseURL, targetVersion, exePath string, timeout time.Duration) (string, error) {
+	tag := normalizeReleaseTag(targetVersion)
+	downloadURL := baseURL + "/api/daemon/cli-binary?version=" + tag + "&os=" + runtime.GOOS + "&arch=" + runtime.GOARCH
+
+	binaryData, err := fetchURLBytes(downloadURL, timeout)
+	if err != nil {
+		return "", fmt.Errorf("download from %s: %w", downloadURL, err)
+	}
+
+	output := fmt.Sprintf("Downloaded %d bytes from %s", len(binaryData), baseURL)
+
+	// Write to temp file, set permissions, then atomic rename
+	tmpPath, err := writeTempBinary(binaryData, exePath)
+	if err != nil {
+		return "", fmt.Errorf("write temp binary: %w", err)
+	}
+	if err := replaceBinary(tmpPath, exePath); err != nil {
+		return "", fmt.Errorf("replace binary: %w", err)
+	}
+
+	return output, nil
+}
+
+// writeTempBinary writes binary data to a temp file and sets executable permissions.
+func writeTempBinary(data []byte, exePath string) (string, error) {
+	info, err := os.Stat(exePath)
+	if err != nil {
+		return "", fmt.Errorf("stat executable: %w", err)
+	}
+	tmpFile, err := os.CreateTemp(filepath.Dir(exePath), ".multica-update-*")
+	if err != nil {
+		return "", err
+	}
+	tmpPath := tmpFile.Name()
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return "", err
+	}
+	tmpFile.Close()
+	if err := os.Chmod(tmpPath, info.Mode()); err != nil {
+		os.Remove(tmpPath)
+		return "", err
+	}
+	return tmpPath, nil
+}
+
+// fetchReleaseByTag fetches release metadata from GitHub or self-hosted.
 func fetchReleaseByTag(tag string) (*GitHubRelease, error) {
+	if baseURL := getUpdateBaseURL(); baseURL != "" {
+		return fetchReleaseFromServer(baseURL, tag)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/multica-ai/multica/releases/tags/"+tag, nil)
 	if err != nil {
@@ -248,6 +300,9 @@ func fetchReleaseByTag(tag string) (*GitHubRelease, error) {
 
 // FetchLatestRelease fetches the latest release tag from the multica GitHub repo.
 func FetchLatestRelease() (*GitHubRelease, error) {
+	if baseURL := getUpdateBaseURL(); baseURL != "" {
+		return fetchReleaseFromServer(baseURL, "latest")
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/multica-ai/multica/releases/latest", nil)
 	if err != nil {
@@ -268,6 +323,39 @@ func FetchLatestRelease() (*GitHubRelease, error) {
 	var release GitHubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return nil, err
+	}
+	return &release, nil
+}
+
+// getUpdateBaseURL returns the configured update server base URL, or "" for GitHub.
+func getUpdateBaseURL() string {
+	return strings.TrimRight(os.Getenv("MULTICA_UPDATE_BASE_URL"), "/")
+}
+
+// fetchReleaseFromServer fetches release metadata from a self-hosted Multica server.
+func fetchReleaseFromServer(baseURL, tag string) (*GitHubRelease, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	url := baseURL + "/api/daemon/cli-version"
+	if tag != "" && tag != "latest" {
+		url += "?version=" + tag
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch version from %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("self-hosted API returned %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("parse version response: %w", err)
 	}
 	return &release, nil
 }
@@ -370,6 +458,13 @@ func UpdateViaDownloadWithTimeout(targetVersion string, downloadTimeout time.Dur
 		return "", fmt.Errorf("resolve symlink: %w", err)
 	}
 
+	timeout := updateDownloadTimeoutOrDefault(downloadTimeout)
+
+	// Self-hosted path: download binary directly from the Multica server.
+	if baseURL := getUpdateBaseURL(); baseURL != "" {
+		return updateViaSelfHosted(baseURL, targetVersion, exePath, timeout)
+	}
+
 	tag := normalizeReleaseTag(targetVersion)
 	release, err := fetchReleaseByTag(tag)
 	if err != nil {
@@ -388,8 +483,8 @@ func UpdateViaDownloadWithTimeout(targetVersion string, downloadTimeout time.Dur
 
 	// Pull the checksum manifest first so a release that is half-published
 	// (archives uploaded but checksums.txt not yet) fails before we eat the
-	// archive's bandwidth.
-	timeout := updateDownloadTimeoutOrDefault(downloadTimeout)
+		// archive's bandwidth.
+		timeout = updateDownloadTimeoutOrDefault(downloadTimeout)
 	manifestData, err := fetchURLBytes(manifestAsset.BrowserDownloadURL, timeout)
 	if err != nil {
 		return "", fmt.Errorf("download checksum manifest: %w", err)

@@ -86,8 +86,20 @@ func (b *opencodeBackend) Execute(ctx context.Context, prompt string, opts ExecO
 	if opts.Cwd != "" {
 		args = append(args, "--dir", opts.Cwd)
 	}
-	if opts.Model != "" {
-		args = append(args, "--model", opts.Model)
+	// Build the injected LLM provider config (when the daemon env carries the
+	// resolved LLM credentials). opencode ignores OPENAI_API_KEY and falls back
+	// to its own auth.json / built-in "opencode" provider, so the agent's
+	// configured LLM never reaches it without an explicit provider entry. We
+	// inject one via OPENCODE_CONFIG_CONTENT and prefix the model as
+	// "<id>/<model>" so opencode resolves it to the injected provider. See
+	// buildOpenCodeProviderConfig / buildOpenCodeConfigContent.
+	providerCfg := buildOpenCodeProviderConfig(b.cfg.Env, opts.Model)
+	modelArg := opts.Model
+	if providerCfg != nil && opts.Model != "" && !strings.Contains(opts.Model, "/") {
+		modelArg = opencodeInjectedProviderID + "/" + opts.Model
+	}
+	if modelArg != "" {
+		args = append(args, "--model", modelArg)
 	}
 	if opts.ThinkingLevel != "" {
 		args = append(args, "--variant", opts.ThinkingLevel)
@@ -140,27 +152,27 @@ func (b *opencodeBackend) Execute(ctx context.Context, prompt string, opts ExecO
 	if opts.Cwd != "" {
 		env = append(env, "PWD="+opts.Cwd)
 	}
-	// Project agent.mcp_config into OpenCode via OPENCODE_CONFIG_CONTENT —
-	// OpenCode's general inline-config injection mechanism that merges at
-	// "local" scope (after the project-config loop, before remote / managed
-	// configs). MCP is the only field we currently project there; if a
-	// future Multica field needs the same channel it would assemble a
-	// combined OpenCode config slice before the env append.
+	// Project agent.mcp_config AND the injected LLM provider into OpenCode via
+	// OPENCODE_CONFIG_CONTENT — OpenCode's general inline-config injection
+	// mechanism that merges at "local" scope (after the project-config loop,
+	// before remote / managed configs). MCP comes from agent.mcp_config; the
+	// provider entry routes the agent's bound LLM through the Multica-configured
+	// provider instead of opencode's own auth.json.
 	//
 	// This deliberately leaves <workdir>/opencode.json untouched — the
 	// workdir is reused across turns for the same (agent, issue), and any
 	// agent- or user-written model / tools / permission settings in it must
 	// survive across runs.
-	mcpContent, err := buildOpenCodeMCPConfigContent(opts.McpConfig)
+	configContent, err := buildOpenCodeConfigContent(opts.McpConfig, providerCfg)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
-	if mcpContent != "" {
+	if configContent != "" {
 		if _, dup := b.cfg.Env["OPENCODE_CONFIG_CONTENT"]; dup {
-			b.cfg.Logger.Warn("agent.custom_env sets OPENCODE_CONFIG_CONTENT but agent.mcp_config takes precedence and overrides it")
+			b.cfg.Logger.Warn("agent.custom_env sets OPENCODE_CONFIG_CONTENT but agent.mcp_config / injected LLM provider take precedence and override it")
 		}
-		env = append(env, "OPENCODE_CONFIG_CONTENT="+mcpContent)
+		env = append(env, "OPENCODE_CONFIG_CONTENT="+configContent)
 	}
 	cmd.Env = env
 

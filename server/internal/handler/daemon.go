@@ -1294,6 +1294,12 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("failed to unmarshal agent custom_env", "agent_id", uuidToString(agent.ID), "error", err)
 			}
 		}
+		// Resolve ${provider.api_key} / ${provider.api_base_url} / ${model.code}
+		// references in custom_env against the LLM provider matched by the
+		// agent's model, so the daemon receives concrete credential values at
+		// claim time. Literal values pass through unchanged. See
+		// resolveLLMEnvRefs for the supported reference vocabulary.
+		customEnv = h.resolveLLMEnvRefs(r.Context(), customEnv, runtimeWorkspaceID, agent.Model.String)
 		var customArgs []string
 		if agent.CustomArgs != nil {
 			if err := json.Unmarshal(agent.CustomArgs, &customArgs); err != nil {

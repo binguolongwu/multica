@@ -13,6 +13,7 @@ import { useT } from "../../i18n";
 
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/multica-ai/multica/releases/latest";
+const LOCAL_VERSION_URL = "/api/daemon/cli-version";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 let cachedLatestVersion: string | null = null;
@@ -21,6 +22,18 @@ let cachedAt = 0;
 async function fetchLatestVersion(): Promise<string | null> {
   if (cachedLatestVersion && Date.now() - cachedAt < CACHE_TTL_MS) {
     return cachedLatestVersion;
+  }
+  // Try local server first (self-hosted), fall back to GitHub.
+  try {
+    const localResp = await fetch(LOCAL_VERSION_URL);
+    if (localResp.ok) {
+      const data = await localResp.json();
+      cachedLatestVersion = data.tag_name ?? null;
+      cachedAt = Date.now();
+      return cachedLatestVersion;
+    }
+  } catch {
+    // Local server not available, try GitHub
   }
   try {
     const resp = await fetch(GITHUB_RELEASES_URL, {

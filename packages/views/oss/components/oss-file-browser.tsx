@@ -45,16 +45,26 @@ export function OssFileBrowser() {
     queryFn: () => api.listOssConfigs(),
   });
 
+  const folderPrefix = configs?.find(c => c.id === selectedConfig)?.folder_prefix || "";
+
   const { data: keys, isLoading } = useQuery<string[]>({
     queryKey: ["oss", "keys", wsId, selectedConfig, search],
     queryFn: () => api.listOssFiles(selectedConfig, search ? `prefix=${encodeURIComponent(search)}` : undefined) as Promise<string[]>,
     enabled: !!selectedConfig,
   });
 
-  const tree = useMemo(() => buildTree(keys || []), [keys]);
+  // ListProviderKeys returns full storage keys including folder_prefix, but the
+  // backend re-applies folder_prefix in every operation (UploadFile,
+  // CreateDirectory, MoveFile, DeleteDirectory all call resolveKey). Strip the
+  // prefix here so the tree works in relative paths — otherwise every key sent
+  // to the API gets the prefix concatenated twice.
+  const relativeKeys = useMemo(
+    () => (keys || []).map(k => (folderPrefix && k.startsWith(folderPrefix) ? k.slice(folderPrefix.length) : k)),
+    [keys, folderPrefix],
+  );
+  const tree = useMemo(() => buildTree(relativeKeys), [relativeKeys]);
 
   const currentKey = (filename: string) => {
-    const prefix = configs?.find(c => c.id === selectedConfig)?.folder_prefix || "";
     return selectedDir ? `${selectedDir}/${filename}` : filename;
   };
 
@@ -81,9 +91,12 @@ export function OssFileBrowser() {
   const handleDeleteFile = async (filePath: string) => {
     if (!selectedConfig) return;
     try {
-      // Find the file ID from the oss_object table via the DB endpoint
-      const resp = await api.listOssDbFiles(selectedConfig, `prefix=${encodeURIComponent(filePath)}`);
-      const match = Array.isArray(resp) ? resp.find((f: any) => f.key === filePath) : null;
+      // DB stores the full key (folder_prefix + relative path). Re-apply the
+      // prefix so the lookup matches. ListOSSFilesFromDB filters by SQL LIKE
+      // on the Key column.
+      const fullKey = folderPrefix + filePath;
+      const resp = await api.listOssDbFiles(selectedConfig, `prefix=${encodeURIComponent(fullKey)}`);
+      const match = Array.isArray(resp) ? resp.find((f: any) => f.key === fullKey) : null;
       if (match) await api.deleteOssFile(selectedConfig, match.id);
       qc.invalidateQueries({ queryKey: ["oss", "keys", wsId, selectedConfig] });
     } catch { toast.error("删除文件失败"); }
@@ -92,8 +105,9 @@ export function OssFileBrowser() {
   const handleDownload = async (filePath: string) => {
     if (!selectedConfig) return;
     try {
-      const resp = await api.listOssDbFiles(selectedConfig, `prefix=${encodeURIComponent(filePath)}`);
-      const match = Array.isArray(resp) ? resp.find((f: any) => f.key === filePath) : null;
+      const fullKey = folderPrefix + filePath;
+      const resp = await api.listOssDbFiles(selectedConfig, `prefix=${encodeURIComponent(fullKey)}`);
+      const match = Array.isArray(resp) ? resp.find((f: any) => f.key === fullKey) : null;
       if (match?.id) {
         const urlResp = await api.getOssFileDownloadUrl(selectedConfig, match.id);
         window.open(urlResp.url, "_blank");

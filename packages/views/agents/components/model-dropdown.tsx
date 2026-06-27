@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Cpu, Loader2, Plus, Check, Info } from "lucide-react";
 import { runtimeModelsOptions, serverModelCatalogOptions } from "@multica/core/runtimes";
 import type { RuntimeModel } from "@multica/core/types";
+import { CapabilityBadges } from "../../common/capability-badges";
 import {
   Popover,
   PopoverTrigger,
@@ -45,16 +46,26 @@ export function ModelDropdown({
   const catalogQuery = useQuery(serverModelCatalogOptions());
 
   const supported = modelsQuery.data?.supported ?? true;
-  // Merge server-side catalog with daemon-discovered models.
+  // Merge server-side catalog (carries capabilities) with daemon-discovered
+  // models. When a daemon entry overrides a catalog entry, keep the catalog's
+  // capabilities (the daemon doesn't know them).
   const models = useMemo(() => {
     const seen = new Set<string>();
-    const merged: Array<{ id: string; label: string; provider?: string; default?: boolean }> = [];
+    const merged: ModelOption[] = [];
     for (const e of catalogQuery.data ?? []) {
-      if (!seen.has(e.id)) { seen.add(e.id); merged.push({ id: e.id, label: e.label, provider: e.provider, default: e.default }); }
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        merged.push({ id: e.id, label: e.label, provider: e.provider, default: e.default, capabilities: e.capabilities });
+      }
     }
     for (const m of modelsQuery.data?.models ?? []) {
-      if (seen.has(m.id)) { const idx = merged.findIndex((x) => x.id === m.id); if (idx >= 0) merged[idx] = m; }
-      else { seen.add(m.id); merged.push(m); }
+      if (seen.has(m.id)) {
+        const idx = merged.findIndex((x) => x.id === m.id);
+        if (idx >= 0) merged[idx] = { ...m, capabilities: merged[idx]?.capabilities };
+      } else {
+        seen.add(m.id);
+        merged.push(m);
+      }
     }
     return merged;
   }, [modelsQuery.data, catalogQuery.data]);
@@ -72,7 +83,7 @@ export function ModelDropdown({
   const filtered = useMemo(() => {
     if (!search.trim()) return grouped;
     const needle = search.toLowerCase();
-    const out: Record<string, RuntimeModel[]> = {};
+    const out: Record<string, ModelOption[]> = {};
     for (const [provider, list] of Object.entries(grouped)) {
       const matches = list.filter(
         (m) =>
@@ -199,6 +210,7 @@ export function ModelDropdown({
                             {m.id}
                           </div>
                         )}
+                        <CapabilityBadges capabilities={m.capabilities} className="mt-1" />
                       </div>
                       {m.id === value && (
                         <Check className="h-4 w-4 shrink-0 text-primary" />
@@ -245,8 +257,13 @@ export function ModelDropdown({
   );
 }
 
-function groupByProvider(models: RuntimeModel[]): Record<string, RuntimeModel[]> {
-  const out: Record<string, RuntimeModel[]> = {};
+// A merged model option: daemon-discovered RuntimeModel shape plus the
+// capabilities carried by the server-side catalog (the daemon doesn't know
+// capabilities, so only catalog-sourced entries populate the field).
+type ModelOption = RuntimeModel & { capabilities?: string[] };
+
+function groupByProvider(models: ModelOption[]): Record<string, ModelOption[]> {
+  const out: Record<string, ModelOption[]> = {};
   for (const m of models) {
     const key = m.provider ?? "";
     if (!out[key]) out[key] = [];
@@ -255,7 +272,7 @@ function groupByProvider(models: RuntimeModel[]): Record<string, RuntimeModel[]>
   return out;
 }
 
-function modelLabel(models: RuntimeModel[], id: string): string {
+function modelLabel(models: ModelOption[], id: string): string {
   const found = models.find((m) => m.id === id);
   if (!found) return "custom";
   return found.provider ? found.provider : "model";
