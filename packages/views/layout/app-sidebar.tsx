@@ -38,6 +38,7 @@ import {
   Users,
   Cloud,
   Cpu,
+  Library,
 } from "lucide-react";
 import { WorkspaceAvatar } from "../workspace/workspace-avatar";
 import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
@@ -123,7 +124,8 @@ type NavKey =
   | "settings"
   | "wiki"
   | "oss"
-  | "llm";
+  | "llm"
+  | "templates";
 
 // Static schema (key + icon) — labels resolved at render via useT("layout").
 type NavLabelKey =
@@ -140,7 +142,8 @@ type NavLabelKey =
   | "settings"
   | "wiki"
   | "oss"
-  | "llm";
+  | "llm"
+  | "templates";
 
 const personalNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[] = [
   { key: "inbox", labelKey: "inbox", icon: Inbox },
@@ -163,6 +166,7 @@ const configureNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[]
   { key: "skills", labelKey: "skills", icon: BookOpenText },
   { key: "settings", labelKey: "settings", icon: Settings },
   { key: "llm", labelKey: "llm", icon: Cpu },
+  { key: "templates", labelKey: "templates", icon: Library },
 ];
 
 function DraftDot() {

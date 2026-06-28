@@ -13,7 +13,8 @@
     "wiki": "Wiki",
     "oss": "Cloud Storage",
     "settings": "Settings",
-    "llm": "LLM Models"
+    "llm": "LLM Models",
+    "templates": "Templates"
   },
   "help": {
     "trigger": "Help",

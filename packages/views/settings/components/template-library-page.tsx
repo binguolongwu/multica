@@ -13,9 +13,9 @@ import type { AgentTemplate, CreateAgentTemplateRequest, UpdateAgentTemplateRequ
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Badge } from "@multica/ui/components/ui/badge";
-import { Card, CardContent } from "@multica/ui/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@multica/ui/components/ui/sheet";
 import { Label } from "@multica/ui/components/ui/label";
+import { DataTable } from "@multica/ui/components/ui/data-table";
 import { toast } from "sonner";
 
 function TemplateEditForm({
@@ -32,8 +32,6 @@ function TemplateEditForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
-  const [icon, setIcon] = useState(initial?.icon ?? "");
-  const [accent, setAccent] = useState(initial?.accent ?? "");
   const [tagsInput, setTagsInput] = useState((initial?.tags ?? []).join(", "));
   const [instructions, setInstructions] = useState(initial?.instructions ?? "");
   const [model, setModel] = useState(initial?.model ?? "");
@@ -42,20 +40,8 @@ function TemplateEditForm({
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      const tags = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-      await onSave({
-        name,
-        description,
-        category,
-        icon,
-        accent,
-        tags,
-        instructions,
-        model,
-      });
+      const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+      await onSave({ name, description, category, tags, instructions, model });
       toast.success(isCreating ? "Template created" : "Template updated");
       onCancel();
     } catch (err) {
@@ -79,16 +65,6 @@ function TemplateEditForm({
         <div>
           <Label className="text-sm font-medium">Category</Label>
           <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Engineering" />
-        </div>
-        <div>
-          <Label className="text-sm font-medium">Icon (lucide name)</Label>
-          <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="e.g. Code2" />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-sm font-medium">Accent</Label>
-          <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="info/success/warning/primary" />
         </div>
         <div>
           <Label className="text-sm font-medium">Model</Label>
@@ -129,14 +105,6 @@ export function TemplateLibraryPage() {
   const [editing, setEditing] = useState<AgentTemplate | null>(null);
   const [creating, setCreating] = useState(false);
 
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        Platform admin access required.
-      </div>
-    );
-  }
-
   const filtered = templates.filter(
     (t) =>
       !search ||
@@ -146,81 +114,117 @@ export function TemplateLibraryPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0 px-5 py-3 border-b">
         <div>
-          <h2 className="text-lg font-semibold">Agent Template Library</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage platform-level agent templates available to all workspaces.
+          <h1 className="text-sm font-semibold">Agent Templates</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {filtered.length} template{filtered.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-1" /> New Template
-        </Button>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Search templates..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {isLoading ? (
-        <div className="text-center text-muted-foreground py-12">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((t) => (
-            <Card key={t.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold truncate">{t.name}</h3>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(t)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={async () => {
-                        if (confirm(`Delete template "${t.name}"?`)) {
-                          try {
-                            await deleteMutation.mutateAsync(t.id);
-                            toast.success("Template deleted");
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Delete failed");
-                          }
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {t.description}
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {t.category && <Badge variant="secondary">{t.category}</Badge>}
-                  {t.tags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {filtered.length === 0 && !isLoading && (
-            <div className="col-span-full text-center text-muted-foreground py-12">
-              No templates found.
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9 w-64"
+              placeholder="Search templates..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {isAdmin && (
+            <Button onClick={() => setCreating(true)}>
+              <Plus className="h-4 w-4 mr-1" /> New Template
+            </Button>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50 text-muted-foreground text-xs">
+              <th className="text-left font-medium px-5 py-2 w-[200px]">Name</th>
+              <th className="text-left font-medium px-3 py-2">Description</th>
+              <th className="text-left font-medium px-3 py-2 w-[100px]">Category</th>
+              <th className="text-left font-medium px-3 py-2 w-[200px]">Tags</th>
+              <th className="text-left font-medium px-3 py-2 w-[60px]">Skills</th>
+              <th className="text-left font-medium px-3 py-2 w-[120px]">Created</th>
+              <th className="text-right font-medium px-5 py-2 w-[80px]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b animate-pulse">
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <td key={j} className="px-3 py-3">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+            {!isLoading && filtered.map((row) => (
+              <tr key={row.id} className="border-b hover:bg-muted/50 transition-colors">
+                <td className="px-5 py-3 font-medium truncate max-w-[200px]">{row.name}</td>
+                <td className="px-3 py-3 text-muted-foreground truncate max-w-[300px]">{row.description}</td>
+                <td className="px-3 py-3">
+                  {row.category && <Badge variant="secondary" className="text-xs">{row.category}</Badge>}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {row.tags.slice(0, 3).map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                    ))}
+                    {row.tags.length > 3 && (
+                      <span className="text-xs text-muted-foreground">+{row.tags.length - 3}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-muted-foreground">{row.skill_urls.length}</td>
+                <td className="px-3 py-3 text-muted-foreground text-xs">
+                  {new Date(row.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-5 py-3">
+                  {isAdmin && (
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon-sm" onClick={() => setEditing(row)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={async () => {
+                          if (confirm('Delete template "' + row.name + '"?')) {
+                            try {
+                              await deleteMutation.mutateAsync(row.id);
+                              toast.success("Template deleted");
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : "Delete failed");
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!isLoading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center text-muted-foreground py-12">
+                  No templates found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Create sheet */}
       <Sheet open={creating} onOpenChange={(v) => { if (!v) setCreating(false); }}>
