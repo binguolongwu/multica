@@ -1017,12 +1017,24 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			})
 
 			// Agent templates catalog (browse + detail). The Create flow
-			// lives under /api/agents/from-template above; this route is for
-			// the picker UI to list available templates.
-			r.Route("/api/agent-templates", func(r chi.Router) {
-				r.Get("/", h.ListAgentTemplates)
-				r.Get("/{slug}", h.GetAgentTemplate)
-			})
+				// lives under /api/agents/from-template above; this route is for
+				// the picker UI to list available templates.
+				r.Route("/api/agent-templates", func(r chi.Router) {
+					r.Get("/", h.ListAgentTemplates)
+					r.Get("/{id}", h.GetAgentTemplate)
+				})
+
+				// Admin: agent template management (platform admin only)
+				r.Route("/api/admin", func(r chi.Router) {
+					r.Get("/", h.CheckPlatformAdmin)
+					r.Route("/agent-templates", func(r chi.Router) {
+						r.Post("/", h.CreateAgentTemplateAdmin)
+						r.Route("/{id}", func(r chi.Router) {
+							r.Put("/", h.UpdateAgentTemplateAdmin)
+							r.Delete("/", h.DeleteAgentTemplateAdmin)
+						})
+					})
+				})
 
 			// Skills
 			r.Route("/api/skills", func(r chi.Router) {
