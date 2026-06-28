@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	version = "dev"
+	version = "dev" // 版本号by 65
 	commit  = "unknown"
 )
 
