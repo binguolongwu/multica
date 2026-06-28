@@ -1,4 +1,4 @@
-import { TemplateLibraryPage } from "@multica/views/settings/components/template-library-page";
+import { TemplateLibraryPage } from "@multica/views/settings";
 
 export default function TemplatesRoute() {
   return <TemplateLibraryPage />;
