@@ -11,10 +11,29 @@ import (
 )
 
 var (
-	version = "dev"	    //版本号 by 65
+	// Version is resolved at runtime from the binary's own modification time
+	// so it matches the server's resolveCLIVersion format. Binaries built via
+	// make/deploy.sh carry an accurate mtime; `go run` binaries produce the
+	// compile-time timestamp (which is still a valid point-in-time identifier).
+	version = resolveVersion()
 	commit  = "unknown"
 	date    = "unknown"
 )
+
+// resolveVersion returns the binary's modification time formatted as a compact
+// timestamp (2006.01.021504). This is the same format the self-hosted server
+// returns from GET /api/daemon/cli-version, keeping both paths consistent.
+func resolveVersion() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "unknown"
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		return "unknown"
+	}
+	return info.ModTime().Format("2006.01.021504")
+}
 
 // debugFlag is bound to the persistent --debug flag and, when set, makes
 // FormatError emit the full original error chain instead of just the
@@ -30,7 +49,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)\ngo: %s, os/arch: %s/%s", version, commit, date, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	rootCmd.Version = fmt.Sprintf("%s (commit: %s)\ngo: %s, os/arch: %s/%s", version, commit, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	rootCmd.SetVersionTemplate("multica {{.Version}}\n")
 
 	// Tag every CLI HTTP request with this binary's build version so the

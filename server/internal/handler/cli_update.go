@@ -46,17 +46,16 @@ func (h *Handler) HandleCLIBinary(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, binaryPath)
 }
 
-// resolveCLIVersion returns the CLI version based on the binary's modification time.
+// resolveCLIVersion returns the CLI version based on the running binary's
+// modification time, matching the format used by `multica --version`.
 func resolveCLIVersion() string {
-	binPath, err := findMulticaCLIBinary()
+	exe, err := os.Executable()
 	if err != nil {
 		return "unknown"
 	}
-
-	info, err := os.Stat(binPath)
+	info, err := os.Stat(exe)
 	if err != nil {
 		return "unknown"
 	}
-
 	return info.ModTime().Format("2006.01.021504")
 }

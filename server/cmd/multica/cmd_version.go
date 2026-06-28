@@ -26,7 +26,6 @@ func runVersion(cmd *cobra.Command, _ []string) error {
 		info := map[string]string{
 			"version": version,
 			"commit":  commit,
-			"date":    date,
 			"go":      runtime.Version(),
 			"os":      runtime.GOOS,
 			"arch":    runtime.GOARCH,
@@ -36,7 +35,7 @@ func runVersion(cmd *cobra.Command, _ []string) error {
 		return enc.Encode(info)
 	}
 
-	fmt.Printf("multica %s (commit: %s, built: %s)\n", version, commit, date)
+	fmt.Printf("multica %s (commit: %s)\n", version, commit)
 	fmt.Printf("go: %s, os/arch: %s/%s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	return nil
 }
