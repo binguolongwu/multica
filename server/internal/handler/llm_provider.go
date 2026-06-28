@@ -286,6 +286,10 @@ func (h *Handler) TestLLMConnection(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "api_base_url and api_key are required")
 		return
 	}
+	if err := validateAPIBaseURL(req.ApiBaseUrl); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid api_base_url: "+err.Error())
+		return
+	}
 
 	resp, tried, err := llmVerifyWithFallback(r.Context(), req.ApiBaseUrl, req.ApiKey)
 	if err != nil {
