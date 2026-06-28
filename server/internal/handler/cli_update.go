@@ -18,7 +18,7 @@ func (h *Handler) HandleCLIVersion(w http.ResponseWriter, r *http.Request) {
 
 	// Build a response compatible with the cli.GitHubRelease shape
 	resp := map[string]interface{}{
-		"tag_name": "v" + version,
+		"tag_name": version,
 		"html_url": "",
 		"assets":   []interface{}{},
 	}
