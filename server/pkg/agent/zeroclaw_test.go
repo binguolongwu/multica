@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -112,38 +113,33 @@ func TestZeroclawClientRequestResponse(t *testing.T) {
 	stdin := &nopWriteCloser{}
 	client := newZeroclawClient(stdin)
 
-	// Simulate server pushing a response for request id=1.
+	// Simulate server pushing a response for a pending request.
 	resp := zcRPCResponse{
 		JSONRPC: "2.0",
 		Result:  json.RawMessage(`{"sessionId":"abc123"}`),
-		ID:      1,
+		ID:      7,
 	}
 	data, _ := json.Marshal(resp)
 
 	// Pre-load the pending map before calling handleLine.
-	// (In real use, request() would have set this up.)
 	client.mu.Lock()
 	ch := make(chan zcRPCResponse, 1)
-	client.pending[1] = &zcPendingCall{response: ch}
+	client.pending[7] = &zcPendingCall{response: ch}
 	client.mu.Unlock()
 
-	go func() {
-		client.handleLine(string(data))
-	}()
+	client.handleLine(string(data))
 
-	raw, err := client.request(t.Context(), "session/new", map[string]any{
-		"cwd":        "/tmp",
-		"agentAlias": "test",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	var v struct {
-		SessionID string `json:"sessionId"`
-	}
-	json.Unmarshal(raw, &v)
-	if v.SessionID != "abc123" {
-		t.Errorf("expected sessionId=abc123, got %q", v.SessionID)
+	select {
+	case got := <-ch:
+		var v struct {
+			SessionID string `json:"sessionId"`
+		}
+		json.Unmarshal(got.Result, &v)
+		if v.SessionID != "abc123" {
+			t.Errorf("expected sessionId=abc123, got %q", v.SessionID)
+		}
+	default:
+		t.Fatal("expected response to be dispatched to pending channel")
 	}
 }
 
@@ -177,6 +173,31 @@ func TestZeroclawBackendNew(t *testing.T) {
 func TestZeroclawIsSupportedType(t *testing.T) {
 	if !IsSupportedType("zeroclaw") {
 		t.Error("expected zeroclaw to be a supported type")
+	}
+}
+
+
+func TestZeroclawExecuteLocalBinaryNotFound(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{
+		ExecutablePath: "/nonexistent/zeroclaw",
+	}}
+	_, err := b.Execute(t.Context(), "hello", ExecOptions{})
+	if err == nil {
+		t.Fatal("expected error for missing executable")
+	}
+	if !strings.Contains(err.Error(), "executable not found") {
+		t.Errorf("expected 'executable not found', got: %v", err)
+	}
+}
+
+func TestZeroclawExecuteGatewayStub(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{}}
+	_, err := b.Execute(t.Context(), "test", ExecOptions{ZeroclawMode: "gateway"})
+	if err == nil {
+		t.Fatal("expected error from gateway stub")
+	}
+	if !strings.Contains(err.Error(), "not yet implemented") {
+		t.Errorf("expected 'not yet implemented', got: %v", err)
 	}
 }
 

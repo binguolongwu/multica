@@ -160,7 +160,7 @@ func (c *zeroclawClient) handleLine(line string) {
 
 	// Try as a response first (has "id" field).
 	var resp zcRPCResponse
-	if err := json.Unmarshal([]byte(line), &resp); err == nil && resp.JSONRPC == "2.0" && resp.ID != 0 {
+	if err := json.Unmarshal([]byte(line), &resp); err == nil && resp.JSONRPC == "2.0" && (resp.Error != nil || resp.Result != nil) {
 		c.mu.Lock()
 		pc, ok := c.pending[resp.ID]
 		if ok {
