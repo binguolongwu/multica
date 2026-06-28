@@ -137,6 +137,18 @@ func (s *Service) DeleteConfig(ctx context.Context, id, workspaceID pgtype.UUID)
 	return s.Queries.DeleteOSSProviderConfig(ctx, db.DeleteOSSProviderConfigParams{ID: id, WorkspaceID: workspaceID})
 }
 
+// SetDefaultConfig clears any existing default for the workspace, then marks
+// the specified config as the single default.
+func (s *Service) SetDefaultConfig(ctx context.Context, id, workspaceID pgtype.UUID) (db.OssProviderConfig, error) {
+	if err := s.Queries.ClearDefaultOSSProviderConfig(ctx, workspaceID); err != nil {
+		return db.OssProviderConfig{}, fmt.Errorf("clear default oss config: %w", err)
+	}
+	return s.Queries.SetDefaultOSSProviderConfig(ctx, db.SetDefaultOSSProviderConfigParams{
+		ID:          id,
+		WorkspaceID: workspaceID,
+	})
+}
+
 // --- File Operations ---
 
 func (s *Service) UploadFile(ctx context.Context, configID, workspaceID pgtype.UUID, key, filename string, body io.Reader, size int64, contentType string, uploadedBy pgtype.UUID) (db.OssObject, error) {

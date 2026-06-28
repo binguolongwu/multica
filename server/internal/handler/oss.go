@@ -91,6 +91,30 @@ func (h *Handler) UpdateOSSConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, cfg)
 }
 
+// SetDefaultOSSConfig handles POST /api/oss/configs/{configId}/set-default
+func (h *Handler) SetDefaultOSSConfig(w http.ResponseWriter, r *http.Request) {
+	if h.OssService == nil {
+		writeError(w, http.StatusServiceUnavailable, "oss integration is not configured")
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.requireWorkspaceRole(w, r, workspaceID, "forbidden", "owner", "admin")
+	if !ok {
+		return
+	}
+	configID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "configId"), "config_id")
+	if !ok {
+		return
+	}
+	cfg, err := h.OssService.SetDefaultConfig(r.Context(), configID, parseUUID(workspaceID))
+	if err != nil {
+		slog.Warn("oss: failed to set default config", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to set default oss config")
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
 // DeleteOSSConfig handles DELETE /api/workspaces/{id}/oss/configs/{configId}
 func (h *Handler) DeleteOSSConfig(w http.ResponseWriter, r *http.Request) {
 	if h.OssService == nil {

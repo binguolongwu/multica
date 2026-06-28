@@ -39,7 +39,7 @@ export function LlmSettingsTab() {
   const [providerDialog, setProviderDialog] = useState(false);
   const [modelDialog, setModelDialog] = useState(false);
   const [form, setForm] = useState({ name: "", code: "", api_type: "openai", api_base_url: "", api_key: "", env_var_api_key: "OPENAI_API_KEY", env_var_base_url: "OPENAI_BASE_URL", sort: 0 });
-  const [modelForm, setModelForm] = useState({ name: "", model_code: "", type: 1, temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [] as string[], sort: 0, currency: "CNY", input_price: 0, output_price: 0 });
+  const [modelForm, setModelForm] = useState({ name: "", model_code: "", temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [] as string[], sort: 0, currency: "CNY", input_price: 0, output_price: 0 });
   const [templateCode, setTemplateCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   // Fetch-models dialog: provider returns candidates; the user multi-selects
@@ -142,13 +142,13 @@ export function LlmSettingsTab() {
 
   const openCreateModel = () => {
     setEditingModel(null);
-    setModelForm({ name: "", model_code: "", type: 1, temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [], sort: 0, currency: "CNY", input_price: 0, output_price: 0 });
+    setModelForm({ name: "", model_code: "", temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [], sort: 0, currency: "CNY", input_price: 0, output_price: 0 });
     setModelDialog(true);
   };
 
   const openEditModel = (m: LLMModel) => {
     setEditingModel(m);
-    setModelForm({ name: m.name, model_code: m.model_code, type: m.type, temperature: m.temperature, max_tokens: m.max_tokens, context_window: m.context_window, capabilities: m.capabilities || [], sort: m.sort, currency: m.currency || "CNY", input_price: m.input_price ?? 0, output_price: m.output_price ?? 0 });
+    setModelForm({ name: m.name, model_code: m.model_code, temperature: m.temperature, max_tokens: m.max_tokens, context_window: m.context_window, capabilities: m.capabilities || [], sort: m.sort, currency: m.currency || "CNY", input_price: m.input_price ?? 0, output_price: m.output_price ?? 0 });
     setModelDialog(true);
   };
 
@@ -286,7 +286,6 @@ export function LlmSettingsTab() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{m.name}</span>
                         <span className="text-xs text-muted-foreground font-mono">{m.model_code}</span>
-                        <span className="text-xs px-1 rounded bg-muted">{m.type === 1 ? "LLM" : m.type === 2 ? "视觉" : `类型${m.type}`}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         temp: {m.temperature} | max tokens: {m.max_tokens} | context: {m.context_window > 0 ? `${m.context_window}` : "-"}
@@ -454,17 +453,7 @@ export function LlmSettingsTab() {
                 <Input value={modelForm.model_code} onChange={(e) => setModelForm({ ...modelForm, model_code: e.target.value })} placeholder="deepseek-v4-pro" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs font-medium">类型</label>
-                <select className="w-full border rounded px-2 py-1.5 text-sm" value={modelForm.type} onChange={(e) => setModelForm({ ...modelForm, type: Number(e.target.value) })}>
-                  <option value={1}>LLM 对话</option>
-                  <option value={2}>视觉</option>
-                  <option value={3}>生图</option>
-                  <option value={4}>嵌入</option>
-                  <option value={5}>语音</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium">Temperature</label>
                 <Input type="number" step="0.1" min="0" max="2" value={modelForm.temperature} onChange={(e) => setModelForm({ ...modelForm, temperature: Number(e.target.value) })} />

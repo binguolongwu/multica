@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Server } from "lucide-react";
+import { Plus, Trash2, Server, Star } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { api } from "@multica/core/api";
 import { Button } from "@multica/ui/components/ui/button";
@@ -66,6 +66,14 @@ export function OssSettingsTab() {
     } catch { toast.error("删除失败"); }
   };
 
+  const handleSetDefault = async (id: string, name: string) => {
+    try {
+      await api.setDefaultOssConfig(id);
+      qc.invalidateQueries({ queryKey: ossKeys.configs(wsId) });
+      toast.success(`已将 "${name}" 设为默认存储空间`);
+    } catch { toast.error("设置默认失败"); }
+  };
+
   return (
     <div className="space-y-4">
       {isLoading ? (
@@ -77,10 +85,16 @@ export function OssSettingsTab() {
               <CardContent className="flex items-center gap-3 p-4">
                 <Server className="h-5 w-5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{c.name}</p>
+                  <p className="text-sm font-medium inline-flex items-center gap-1">
+                    {c.name}
+                    {c.is_default && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">{providerLabel(c.provider)} · {c.bucket}{c.custom_domain ? ` · ${c.custom_domain}` : ""}</p>
                   {c.folder_prefix && <p className="text-xs text-muted-foreground">prefix: {c.folder_prefix}</p>}
                 </div>
+                {!c.is_default && (
+                  <Button variant="outline" size="sm" onClick={() => handleSetDefault(c.id, c.name)}>设为默认</Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => openEdit(c)}>编辑</Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(c.id, c.name)}><Trash2 className="h-4 w-4" /></Button>
               </CardContent>

@@ -78,6 +78,12 @@ func (h *Handler) CreateLLMModel(w http.ResponseWriter, r *http.Request) {
 	if req.Currency == "" {
 		req.Currency = "CNY"
 	}
+	// Auto-infer type from capabilities when the UI doesn't send it (type
+	// is now derived from capabilities; the standalone type field is removed
+	// from the edit form to avoid conflicting with capabilities).
+	if req.Type == 0 && len(req.Capabilities) > 0 {
+		req.Type = llm.InferType(req.Capabilities)
+	}
 	// Override with URL-path provider ID; ignore any body-supplied value.
 	req.ProviderID = providerID
 	req.WorkspaceID = parseUUID(wsID)

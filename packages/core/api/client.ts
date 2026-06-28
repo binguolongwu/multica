@@ -2405,6 +2405,10 @@ export class ApiClient {
     return this.fetch(`/api/oss/configs/${id}`, { method: "DELETE" });
   }
 
+  async setDefaultOssConfig(id: string): Promise<OssProviderConfig> {
+    return this.fetch(`/api/oss/configs/${id}/set-default`, { method: "POST" });
+  }
+
   async testOssConnection(data: CreateOssConfigRequest): Promise<{ ok: string }> {
     return this.fetch(`/api/oss/configs/test`, { method: "POST", body: JSON.stringify(data) });
   }
