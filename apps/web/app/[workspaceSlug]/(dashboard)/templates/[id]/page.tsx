@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import {
@@ -9,13 +9,14 @@ import {
   useDeleteAgentTemplate,
   usePlatformAdmin,
 } from "@multica/core/agents/queries";
-import type { UpdateAgentTemplateRequest } from "@multica/core/types";
+import type { AgentTemplate, UpdateAgentTemplateRequest } from "@multica/core/types";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";
 import { Badge } from "@multica/ui/components/ui/badge";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@multica/ui/components/ui/tabs";
 import { toast } from "sonner";
 
 export default function TemplateDetailPage() {
@@ -35,6 +36,8 @@ export default function TemplateDetailPage() {
   const [tagsInput, setTagsInput] = useState("");
   const [instructions, setInstructions] = useState("");
   const [model, setModel] = useState("");
+  const [skillUrlsInput, setSkillUrlsInput] = useState("");
+  const [mcpConfigInput, setMcpConfigInput] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -46,26 +49,50 @@ export default function TemplateDetailPage() {
       setTagsInput((template.tags ?? []).join(", "));
       setInstructions(template.instructions);
       setModel(template.model);
+      setSkillUrlsInput((template.skill_urls ?? []).join("\n"));
+      setMcpConfigInput(template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "");
       setDirty(false);
     }
   }, [template]);
 
   const markDirty = () => setDirty(true);
 
-  const handleSave = useCallback(async () => {
+  const buildUpdate = (): UpdateAgentTemplateRequest => {
+    if (!template) return {};
+    const data: UpdateAgentTemplateRequest = {};
+    if (name !== template.name) data.name = name;
+    if (description !== template.description) data.description = description;
+    if (category !== template.category) data.category = category;
+    if (instructions !== template.instructions) data.instructions = instructions;
+    if (model !== template.model) data.model = model;
+
+    const newTags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const oldTags = template.tags ?? [];
+    if (newTags.join(",") !== oldTags.join(",")) data.tags = newTags;
+
+    const newSkillUrls = skillUrlsInput.split("\n").map((s) => s.trim()).filter(Boolean);
+    const oldSkillUrls = template.skill_urls ?? [];
+    if (newSkillUrls.join(",") !== oldSkillUrls.join(",")) data.skill_urls = newSkillUrls;
+
+    if (mcpConfigInput.trim()) {
+      try {
+        const parsed = JSON.parse(mcpConfigInput);
+        data.mcp_config = parsed;
+      } catch {
+        // invalid JSON, skip
+      }
+    } else if (template.mcp_config) {
+      data.mcp_config = null as unknown as undefined;
+    }
+
+    return data;
+  };
+
+  const handleSave = async () => {
     if (!template) return;
     setSaving(true);
     try {
-      const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
-      const data: UpdateAgentTemplateRequest = {};
-      if (name !== template.name) data.name = name;
-      if (description !== template.description) data.description = description;
-      if (category !== template.category) data.category = category;
-      if (instructions !== template.instructions) data.instructions = instructions;
-      if (model !== template.model) data.model = model;
-      if (tagsInput !== (template.tags ?? []).join(", ")) data.tags = tags;
-
-      await updateMutation.mutateAsync({ id: template.id, data });
+      await updateMutation.mutateAsync({ id: template.id, data: buildUpdate() });
       toast.success("Template updated");
       setDirty(false);
     } catch (err) {
@@ -73,10 +100,10 @@ export default function TemplateDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [template, name, description, category, tagsInput, instructions, model, updateMutation]);
+  };
 
   const handleDelete = async () => {
-    if (!template || !confirm(`Delete template "${template.name}"?`)) return;
+    if (!template || !confirm('Delete template "' + template.name + '"?')) return;
     try {
       await deleteMutation.mutateAsync(template.id);
       toast.success("Template deleted");
@@ -88,9 +115,9 @@ export default function TemplateDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col flex-1 min-h-0 gap-4 p-6">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-96 w-full" />
+      <div className="flex flex-1 min-h-0 gap-4 p-6">
+        <Skeleton className="w-80 h-full rounded-lg" />
+        <Skeleton className="flex-1 h-full rounded-lg" />
       </div>
     );
   }
@@ -119,7 +146,7 @@ export default function TemplateDetailPage() {
         <div className="flex items-center gap-2">
           {dirty && (
             <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving..." : "Save"}
             </Button>
           )}
           {isAdmin && (
@@ -130,111 +157,154 @@ export default function TemplateDetailPage() {
         </div>
       </div>
 
-      {/* Body — two column layout */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-6 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-6 md:overflow-hidden">
-        {/* Left: Edit form */}
-        <div className="space-y-5 md:overflow-y-auto md:pr-2">
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground">Name</Label>
-            <Input
-              className="mt-1"
-              value={name}
-              onChange={(e) => { setName(e.target.value); markDirty(); }}
-            />
-          </div>
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground">Description</Label>
-            <Input
-              className="mt-1"
-              value={description}
-              onChange={(e) => { setDescription(e.target.value); markDirty(); }}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground">Category</Label>
-              <Input
-                className="mt-1"
-                value={category}
-                onChange={(e) => { setCategory(e.target.value); markDirty(); }}
-                placeholder="e.g. Engineering"
+      {/* Body -- two column layout, matching agent detail pattern */}
+      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-3 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-4 md:overflow-hidden md:p-6">
+
+        {/* Left sidebar */}
+        <aside className="flex w-full flex-col rounded-lg border bg-background md:h-full md:min-h-0 md:overflow-y-auto">
+
+          {/* Identity */}
+          <div className="flex flex-col gap-3 border-b px-5 pb-5 pt-5">
+            <div className="flex flex-col gap-1">
+              <input
+                className="w-full bg-transparent text-base font-semibold leading-tight outline-none"
+                value={name}
+                onChange={(e) => { setName(e.target.value); markDirty(); }}
+                placeholder="Template name"
+              />
+              <input
+                className="w-full bg-transparent text-xs leading-relaxed text-muted-foreground outline-none"
+                value={description}
+                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
+                placeholder="Description"
               />
             </div>
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground">Model</Label>
-              <Input
-                className="mt-1"
-                value={model}
-                onChange={(e) => { setModel(e.target.value); markDirty(); }}
-                placeholder="claude-sonnet-4-5"
-              />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                Active
+              </span>
             </div>
           </div>
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground">Tags (comma-separated)</Label>
+
+          {/* Properties */}
+          <div className="border-b px-5 py-4">
+            <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Properties
+            </div>
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Category</span>
+                <Input
+                  className="h-7 text-xs"
+                  value={category}
+                  onChange={(e) => { setCategory(e.target.value); markDirty(); }}
+                  placeholder="e.g. Engineering"
+                />
+              </div>
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Model</span>
+                <Input
+                  className="h-7 text-xs"
+                  value={model}
+                  onChange={(e) => { setModel(e.target.value); markDirty(); }}
+                  placeholder="claude-sonnet-4-5"
+                />
+              </div>
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Visibility</span>
+                <span className="text-xs">{template.visibility}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tags section */}
+          <div className="border-b px-5 py-4">
+            <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Tags
+            </div>
             <Input
-              className="mt-1"
+              className="h-7 text-xs mt-1"
               value={tagsInput}
               onChange={(e) => { setTagsInput(e.target.value); markDirty(); }}
               placeholder="backend, api, go"
             />
-          </div>
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground">Instructions</Label>
-            <textarea
-              className="w-full min-h-[300px] mt-1 rounded-md border p-3 font-mono text-sm bg-background resize-y"
-              value={instructions}
-              onChange={(e) => { setInstructions(e.target.value); markDirty(); }}
-              placeholder="Agent instructions (markdown)..."
-            />
-          </div>
-        </div>
-
-        {/* Right: Info / preview */}
-        <div className="space-y-4 md:overflow-y-auto md:pl-2 mt-6 md:mt-0">
-          <div className="rounded-lg border p-4 space-y-3">
-            <h3 className="text-sm font-medium">Template Info</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-xs text-muted-foreground">Skills</span>
-                <p className="font-medium">{template.skill_urls.length}</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Created</span>
-                <p className="font-medium">{new Date(template.created_at).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Updated</span>
-                <p className="font-medium">{new Date(template.updated_at).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Visibility</span>
-                <p className="font-medium">{template.visibility}</p>
-              </div>
-            </div>
-          </div>
-
-          {template.tags.length > 0 && (
-            <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground">Tags</h3>
-              <div className="flex flex-wrap gap-1">
-                {template.tags.map((tag) => (
+            {tagsInput && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {tagsInput.split(",").map((t) => t.trim()).filter(Boolean).map((tag) => (
                   <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {template.skill_urls.length > 0 && (
-            <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground">Skill URLs</h3>
-              <ul className="space-y-1">
-                {template.skill_urls.map((url, i) => (
-                  <li key={i} className="text-xs text-muted-foreground truncate">{url}</li>
-                ))}
-              </ul>
+          {/* Details -- read-only */}
+          <div className="px-5 py-4">
+            <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Details
             </div>
-          )}
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Skills</span>
+                <span className="text-xs">{(template.skill_urls ?? []).length}</span>
+              </div>
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Created</span>
+                <span className="text-xs">{new Date(template.created_at).toLocaleDateString()}</span>
+              </div>
+              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
+                <span className="text-xs text-muted-foreground">Updated</span>
+                <span className="text-xs">{new Date(template.updated_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Right content -- Tabs */}
+        <div className="flex flex-1 flex-col min-h-0">
+          <Tabs defaultValue="instructions" className="flex flex-1 flex-col min-h-0">
+            <TabsList className="w-fit shrink-0">
+              <TabsTrigger value="instructions">Instructions</TabsTrigger>
+              <TabsTrigger value="skills">Skills</TabsTrigger>
+              <TabsTrigger value="mcp">MCP</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="instructions" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
+              <Label className="text-xs text-muted-foreground mb-2">
+                Define the agent&apos;s identity and working style. Injected into every task context. Supports Markdown.
+              </Label>
+              <textarea
+                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={instructions}
+                onChange={(e) => { setInstructions(e.target.value); markDirty(); }}
+                placeholder="Agent instructions (markdown)..."
+              />
+            </TabsContent>
+
+            <TabsContent value="skills" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
+              <Label className="text-xs text-muted-foreground mb-2">
+                External skill URLs (one per line). Imported when an agent is created from this template.
+              </Label>
+              <textarea
+                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={skillUrlsInput}
+                onChange={(e) => { setSkillUrlsInput(e.target.value); markDirty(); }}
+                placeholder="https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices"
+              />
+            </TabsContent>
+
+            <TabsContent value="mcp" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
+              <Label className="text-xs text-muted-foreground mb-2">
+                MCP server configuration (JSON format).
+              </Label>
+              <textarea
+                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={mcpConfigInput}
+                onChange={(e) => { setMcpConfigInput(e.target.value); markDirty(); }}
+                placeholder='{"servers": {}}'
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
