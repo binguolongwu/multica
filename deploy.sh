@@ -40,7 +40,7 @@ log "=== Building Go backend ==="
 cd "$SOURCE_DIR/server"
 $GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/server" ./cmd/server
 $GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/migrate" ./cmd/migrate
-$GO_BIN build -ldflags "-s -w -X main.version=$(git rev-parse --short HEAD)" -o "$TARGET_DIR/multica" ./cmd/multica
+$GO_BIN build -ldflags "-s -w -X main.version=$(date -u '+%Y.%m.%d%H%M')" -o "$TARGET_DIR/multica" ./cmd/multica
 log "Backend + CLI built"
 
 # ==================== STEP 3: Database migrations ====================
