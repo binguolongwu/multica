@@ -10,9 +10,11 @@ import { SkillMultiSelect } from "./skill-multi-select";
 import { AvatarPicker } from "./avatar-picker";
 import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
+import { useAgentTemplates } from "@multica/core/agents/queries";
 import { workspaceKeys } from "@multica/core/workspace/queries";
 import type {
   Agent,
+  AgentTemplate,
   AgentVisibility,
   RuntimeDevice,
   MemberWithUser,
@@ -29,6 +31,8 @@ import {
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";
+import { Badge } from "@multica/ui/components/ui/badge";
+import { Card, CardContent } from "@multica/ui/components/ui/card";
 import { toast } from "sonner";
 import {
   AGENT_DESCRIPTION_MAX_LENGTH,
@@ -77,6 +81,10 @@ export function CreateAgentDialog({
   const isDuplicate = !!template;
   const queryClient = useQueryClient();
   const wsId = useWorkspaceId();
+
+  // Template picker state
+  const [mode, setMode] = useState<"custom" | "template">(template ? "custom" : "custom");
+  const { data: templates = [] } = useAgentTemplates();
 
   // Name defaults: duplicate uses "<original> copy". Manual-create starts blank.
   const [name, setName] = useState(
@@ -146,6 +154,16 @@ export function CreateAgentDialog({
         }),
       );
     }
+  };
+
+  const handleSelectTemplate = (tmpl: AgentTemplate) => {
+    setName(tmpl.name);
+    setDescription(tmpl.description);
+    setInstructions(tmpl.instructions);
+    setVisibility(tmpl.visibility);
+    setModel(tmpl.model);
+    if (tmpl.avatar_url) setAvatarUrl(tmpl.avatar_url);
+    setMode("custom");
   };
 
   const handleSubmit = async () => {
@@ -238,6 +256,70 @@ export function CreateAgentDialog({
           )}
         </DialogHeader>
 
+        {/* Mode tabs — only shown for manual create (not duplicate) */}
+        {!isDuplicate && (
+          <div className="flex border-b px-5">
+            <button
+              type="button"
+              onClick={() => setMode("custom")}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                mode === "custom"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t(($) => $.create_dialog.title_create)}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("template")}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                mode === "template"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              From Template
+            </button>
+          </div>
+        )}
+
+        {/* Template picker grid */}
+        {mode === "template" && !isDuplicate && (
+          <div className="flex-1 overflow-y-auto p-5">
+            <div className="grid grid-cols-2 gap-3">
+              {templates.map((tmpl) => (
+                <Card
+                  key={tmpl.id}
+                  className="cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => handleSelectTemplate(tmpl)}
+                >
+                  <CardContent className="p-3 space-y-2">
+                    <h4 className="font-medium text-sm">{tmpl.name}</h4>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {tmpl.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {tmpl.category && (
+                        <Badge variant="secondary" className="text-xs">
+                          {tmpl.category}
+                        </Badge>
+                      )}
+                      {tmpl.tags.slice(0, 3).map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Custom create form */}
+        {(mode === "custom" || isDuplicate) && (
         <div className="flex-1 overflow-y-auto p-5">
           <div className="space-y-4 min-w-0">
             {/* Identity row: avatar (left) + name & description stack
@@ -361,6 +443,7 @@ export function CreateAgentDialog({
             />
           </div>
         </div>
+        )}
 
         {/* Inline footer instead of <DialogFooter>: the shipped
             DialogFooter applies `-mx-4 -mb-4` assuming a padded

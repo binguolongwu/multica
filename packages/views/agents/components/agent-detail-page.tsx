@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
+  Bookmark,
   Lock,
   MoreHorizontal,
   Trash2,
@@ -15,6 +16,7 @@ import {
   type AgentPresenceDetail,
   useWorkspacePresenceMap,
 } from "@multica/core/agents";
+import { usePlatformAdmin, useCreateAgentTemplate } from "@multica/core/agents/queries";
 import { api, ApiError } from "@multica/core/api";
 import { useAuthStore } from "@multica/core/auth";
 import { useWorkspaceId } from "@multica/core/hooks";
@@ -367,6 +369,8 @@ function DetailHeader({
 }) {
   const { t } = useT("agents");
   const isArchived = !!agent.archived_at;
+  const { data: isAdmin } = usePlatformAdmin();
+  const createTemplateMutation = useCreateAgentTemplate();
   const av = presence
     ? { ...availabilityConfig[presence.availability], label: t(($) => $.availability[presence.availability]) }
     : null;
@@ -400,6 +404,34 @@ function DetailHeader({
               <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-auto">
+              {isAdmin && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    createTemplateMutation.mutate(
+                      {
+                        name: agent.name,
+                        description: agent.description,
+                        instructions: agent.instructions,
+                        avatar_url: agent.avatar_url ?? undefined,
+                        model: agent.model,
+                        thinking_level: agent.thinking_level,
+                        visibility: agent.visibility,
+                        max_concurrent_tasks: agent.max_concurrent_tasks,
+                        custom_args: agent.custom_args,
+                        mcp_config: agent.mcp_config,
+                      },
+                      {
+                        onSuccess: () => toast.success("Template saved to library"),
+                        onError: (err) =>
+                          toast.error(err instanceof Error ? err.message : "Save failed"),
+                      },
+                    );
+                  }}
+                >
+                  <Bookmark className="h-3.5 w-3.5" />
+                  Save as Template
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 variant="destructive"
                 onClick={onArchive}
