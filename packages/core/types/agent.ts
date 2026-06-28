@@ -339,71 +339,94 @@ export interface CreateAgentRequest {
   template?: string;
 }
 
-/** Agent template summary — fields needed by the picker grid. Does NOT
- *  include `instructions` to keep the list payload small; the detail
- *  endpoint or the create flow returns the full template body. */
-export interface AgentTemplateSummary {
-  slug: string;
+// ---------------------------------------------------------------------------
+// Agent Templates (DB-backed, platform-level)
+//
+// Replaces the old file-based agenttmpl system. Templates are stored in the
+// agent_template table and managed via admin CRUD endpoints.
+// ---------------------------------------------------------------------------
+
+/** Full agent template — DB-backed, platform-level. Includes all agent
+ *  configuration fields that are safe to template (no secrets, no runtime). */
+export interface AgentTemplate {
+  id: string;
   name: string;
   description: string;
-  /** Optional grouping for the picker UI ("Engineering" / "Writing" / …). */
-  category?: string;
-  /** Optional lucide-react icon name (e.g. "Search"). Frontend falls back
-   *  to a generic icon when empty. */
-  icon?: string;
-  /** Optional semantic color token for the icon badge — one of "info" /
-   *  "success" / "warning" / "primary" / "secondary". Frontend has a
-   *  static class map so Tailwind can JIT-scan all variants. */
-  accent?: string;
-  skills: AgentTemplateSkillRef[];
-}
-
-/** Full agent template — same as `AgentTemplateSummary` plus the
- *  instructions block. Returned by `GET /api/agent-templates/:slug`. */
-export interface AgentTemplate extends AgentTemplateSummary {
+  category: string;
+  icon: string;
+  accent: string;
+  tags: string[];
   instructions: string;
+  avatar_url: string | null;
+  model: string;
+  thinking_level: string;
+  visibility: AgentVisibility;
+  max_concurrent_tasks: number;
+  custom_args: string[];
+  mcp_config?: unknown | null;
+  skill_urls: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-/** Skill reference inside an agent template. `source_url` is the upstream
- *  GitHub / skills.sh URL fetched on create; `cached_*` mirror the upstream
- *  frontmatter at template-author time and let the picker render without
- *  HTTP fetches. */
-export interface AgentTemplateSkillRef {
-  source_url: string;
-  cached_name: string;
-  cached_description: string;
+/** Request body for POST /api/admin/agent-templates */
+export interface CreateAgentTemplateRequest {
+  name: string;
+  description?: string;
+  category?: string;
+  icon?: string;
+  accent?: string;
+  tags?: string[];
+  instructions?: string;
+  avatar_url?: string;
+  model?: string;
+  thinking_level?: string;
+  visibility?: AgentVisibility;
+  max_concurrent_tasks?: number;
+  custom_args?: string[];
+  mcp_config?: unknown | null;
+  skill_urls?: string[];
+}
+
+/** Request body for PUT /api/admin/agent-templates/:id */
+export interface UpdateAgentTemplateRequest {
+  name?: string;
+  description?: string;
+  category?: string;
+  icon?: string;
+  accent?: string;
+  tags?: string[];
+  instructions?: string;
+  avatar_url?: string;
+  model?: string;
+  thinking_level?: string;
+  visibility?: AgentVisibility;
+  max_concurrent_tasks?: number;
+  custom_args?: string[];
+  mcp_config?: unknown | null;
+  skill_urls?: string[];
 }
 
 export interface CreateAgentFromTemplateRequest {
-  template_slug: string;
+  template_id: string;
   name: string;
   runtime_id: string;
   model?: string;
   visibility?: AgentVisibility;
   max_concurrent_tasks?: number;
-  /** Optional overrides applied to the template before creation. nil/omit
-   *  uses the template's own value. */
   description?: string;
   instructions?: string;
   avatar_url?: string;
-  /** Workspace skill IDs attached **in addition to** the template's
-   *  skills. Server dedupes against template skills automatically. */
   extra_skill_ids?: string[];
 }
 
 export interface CreateAgentFromTemplateResponse {
   agent: Agent;
-  /** Skill IDs that were newly created in the workspace from upstream URLs. */
   imported_skill_ids: string[];
-  /** Skill IDs that already existed in the workspace (same name) and were
-   *  reused rather than re-imported. The UI can surface this as a toast so
-   *  the user knows their pre-existing skill wasn't overwritten. */
-  reused_skill_ids: string[];
+  reused_skill_ids?: string[];
 }
 
-/** 422 body returned by `POST /api/agents/from-template` when one or more
- *  template skill URLs cannot be reached. The transaction is rolled back —
- *  no partial workspace state. */
 export interface CreateAgentFromTemplateFailure {
   error: string;
   failed_urls: string[];

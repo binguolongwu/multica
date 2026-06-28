@@ -245,51 +245,46 @@ describe("ApiClient schema fallback", () => {
       expect(tmpls).toEqual([]);
     });
 
-    it("defaults skills to [] when the field is missing from a template", async () => {
-      // Future server: drops `skills` because the picker no longer reads
-      // them. Picker code calls `template.skills.length` — must not throw.
-      stubFetchJson([{ slug: "x", name: "X" }]);
-      const client = new ApiClient("https://api.example.test");
-      const tmpls = await client.listAgentTemplates();
-      expect(tmpls).toHaveLength(1);
-      expect(tmpls[0]?.skills).toEqual([]);
-    });
+	    it("defaults skill_urls to [] when the field is missing from a template", async () => {
+	      // Future server: drops `skill_urls`. Picker code must not throw.
+	      stubFetchJson([{ id: "uuid-1", name: "X" }]);
+	      const client = new ApiClient("https://api.example.test");
+	      const tmpls = await client.listAgentTemplates();
+	      expect(tmpls).toHaveLength(1);
+	      expect(tmpls[0]?.skill_urls).toEqual([]);
+	    });
 
-    it("accepts the bare-array shape (current contract)", async () => {
-      stubFetchJson([
-        { slug: "a", name: "A", description: "", skills: [] },
-        { slug: "b", name: "B", description: "", skills: [] },
-      ]);
-      const client = new ApiClient("https://api.example.test");
-      const tmpls = await client.listAgentTemplates();
-      expect(tmpls.map((t) => t.slug)).toEqual(["a", "b"]);
-    });
+	    it("accepts the bare-array shape (current contract)", async () => {
+	      stubFetchJson([
+	        { id: "uuid-a", name: "A", description: "", skill_urls: [] },
+	        { id: "uuid-b", name: "B", description: "", skill_urls: [] },
+	      ]);
+	      const client = new ApiClient("https://api.example.test");
+	      const tmpls = await client.listAgentTemplates();
+	      expect(tmpls.map((t) => t.id)).toEqual(["uuid-a", "uuid-b"]);
+	    });
 
-    it("accepts a future {templates: [...]} envelope without breaking", async () => {
-      // Server migrates to a paginated envelope. We unwrap so the picker
-      // keeps working on the older bare-array consumer.
-      stubFetchJson({
-        templates: [{ slug: "a", name: "A", description: "", skills: [] }],
-        total: 1,
-      });
-      const client = new ApiClient("https://api.example.test");
-      const tmpls = await client.listAgentTemplates();
-      expect(tmpls).toHaveLength(1);
-      expect(tmpls[0]?.slug).toBe("a");
-    });
+	    it("accepts a future {templates: [...]} envelope without breaking", async () => {
+	      stubFetchJson({
+	        templates: [{ id: "uuid-a", name: "A", description: "", skill_urls: [] }],
+	        total: 1,
+	      });
+	      const client = new ApiClient("https://api.example.test");
+	      const tmpls = await client.listAgentTemplates();
+	      expect(tmpls).toHaveLength(1);
+	      expect(tmpls[0]?.id).toBe("uuid-a");
+	    });
   });
 
-  describe("getAgentTemplate", () => {
-    it("falls back to a minimal record carrying the requested slug", async () => {
-      // Slug is part of the URL the user clicked — the fallback round-
-      // trips it so the page header still makes sense after a parse miss.
-      stubFetchJson({ wrong: "shape" });
-      const client = new ApiClient("https://api.example.test");
-      const detail = await client.getAgentTemplate("code-reviewer");
-      expect(detail.slug).toBe("code-reviewer");
-      expect(detail.skills).toEqual([]);
-      expect(detail.instructions).toBe("");
-    });
+	  describe("getAgentTemplate", () => {
+	    it("falls back to a minimal record carrying the requested id", async () => {
+	      stubFetchJson({ wrong: "shape" });
+	      const client = new ApiClient("https://api.example.test");
+	      const detail = await client.getAgentTemplate("tmpl-1");
+	      expect(detail.id).toBe("tmpl-1");
+	      expect(detail.skill_urls).toEqual([]);
+	      expect(detail.instructions).toBe("");
+	    });
 
     it("defaults instructions to '' when the field is missing", async () => {
       stubFetchJson({
@@ -374,7 +369,7 @@ describe("ApiClient schema fallback", () => {
       stubFetchJson({ unexpected: "shape" });
       const client = new ApiClient("https://api.example.test");
       const resp = await client.createAgentFromTemplate({
-        template_slug: "x",
+        template_id: "tmpl-1",
         name: "X",
         runtime_id: "rt-1",
       });
@@ -387,7 +382,7 @@ describe("ApiClient schema fallback", () => {
       stubFetchJson({ agent: { id: "agent-1" } });
       const client = new ApiClient("https://api.example.test");
       const resp = await client.createAgentFromTemplate({
-        template_slug: "x",
+        template_id: "tmpl-1",
         name: "X",
         runtime_id: "rt-1",
       });

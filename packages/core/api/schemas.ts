@@ -2,7 +2,6 @@ import { z } from "zod";
 import type {
   Agent,
   AgentTemplate,
-  AgentTemplateSummary,
   Attachment,
   BillingBalance,
   BillingBatchesPage,
@@ -575,55 +574,57 @@ export const EMPTY_CANCEL_TASK_RESPONSE: CancelTaskResponse = {
 // through unchanged.
 // ---------------------------------------------------------------------------
 
-const AgentTemplateSkillRefSchema = z.object({
-  source_url: z.string(),
-  cached_name: z.string().default(""),
-  cached_description: z.string().default(""),
-}).loose();
+	// DB-backed agent template (platform-level). Replaces the old file-based
+	// AgentTemplateSummary / AgentTemplate types.
+	const AgentTemplateSchemaBase = z.object({
+	  id: z.string(),
+	  name: z.string(),
+	  description: z.string().default(""),
+	  category: z.string().default(""),
+	  icon: z.string().default(""),
+	  accent: z.string().default(""),
+	  tags: z.array(z.string()).default([]),
+	  instructions: z.string().default(""),
+	  avatar_url: z.string().nullable().default(null),
+	  model: z.string().default(""),
+	  thinking_level: z.string().default(""),
+	  visibility: z.string().default("workspace"),
+	  max_concurrent_tasks: z.number().default(6),
+	  custom_args: z.array(z.string()).default([]),
+	  mcp_config: z.unknown().nullable().default(null),
+	  skill_urls: z.array(z.string()).default([]),
+	  created_by: z.string().nullable().default(null),
+	  created_at: z.string().default(""),
+	  updated_at: z.string().default(""),
+	}).loose();
 
-const AgentTemplateSummarySchemaBase = z.object({
-  slug: z.string(),
-  name: z.string(),
-  description: z.string().default(""),
-  category: z.string().optional(),
-  icon: z.string().optional(),
-  accent: z.string().optional(),
-  // skills MUST default to [] — picker code reads `template.skills.length`
-  // and `.map(...)`, both of which crash on `undefined`. The most common
-  // future drift (field renamed / wrapped) lands here.
-  skills: z.array(AgentTemplateSkillRefSchema).default([]),
-}).loose();
+	export const AgentTemplateSchema = AgentTemplateSchemaBase;
 
-export const AgentTemplateSummarySchema = AgentTemplateSummarySchemaBase;
+	export const AgentTemplateListSchema = z.array(AgentTemplateSchemaBase);
 
-// List endpoint historically returns a bare array. Server could legitimately
-// migrate to `{templates: [...]}` later — we accept either shape so an old
-// desktop survives the upgrade.
-export const AgentTemplateSummaryListSchema = z.union([
-  z.array(AgentTemplateSummarySchemaBase),
-  z.object({ templates: z.array(AgentTemplateSummarySchemaBase).default([]) })
-    .loose()
-    .transform((v) => v.templates),
-]);
+	export const EMPTY_AGENT_TEMPLATE_LIST: AgentTemplate[] = [];
 
-export const EMPTY_AGENT_TEMPLATE_SUMMARY_LIST: AgentTemplateSummary[] = [];
-
-export const AgentTemplateSchema = AgentTemplateSummarySchemaBase.extend({
-  // Detail-only field. Default "" so a malformed detail still renders the
-  // header + skill list; the user just sees an empty Instructions block.
-  instructions: z.string().default(""),
-}).loose();
-
-// Used as the parse fallback for `GET /api/agent-templates/:slug`. Slug comes
-// from the URL, so we round-trip the requested one back into the fallback
-// at the call site (see `getAgentTemplate` in client.ts).
-export const EMPTY_AGENT_TEMPLATE_DETAIL: AgentTemplate = {
-  slug: "",
-  name: "",
-  description: "",
-  skills: [],
-  instructions: "",
-};
+	export const EMPTY_AGENT_TEMPLATE: AgentTemplate = {
+	  id: "",
+	  name: "",
+	  description: "",
+	  category: "",
+	  icon: "",
+	  accent: "",
+	  tags: [],
+	  instructions: "",
+	  avatar_url: null,
+	  model: "",
+	  thinking_level: "",
+	  visibility: "workspace",
+	  max_concurrent_tasks: 6,
+	  custom_args: [],
+	  mcp_config: null,
+	  skill_urls: [],
+	  created_by: null,
+	  created_at: "",
+	  updated_at: "",
+	};
 
 // `agent` is a full Agent record — schematising every field would duplicate
 // a 50-field interface and bit-rot fast. We keep it loose and require only

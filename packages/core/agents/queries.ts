@@ -1,5 +1,6 @@
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
+import type { CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from "../types";
 
 export const agentTaskSnapshotKeys = {
   all: (wsId: string) => ["workspaces", wsId, "agent-task-snapshot"] as const,
@@ -83,29 +84,83 @@ export function agentTasksOptions(wsId: string, agentId: string) {
   });
 }
 
-// Agent templates are workspace-independent: a static catalog served from
-// the server's embedded JSON. Cache effectively forever — the only way the
-// list / detail change is a server deploy, and a hard reload picks that up.
+// Agent templates — DB-backed, platform-level catalog.
+// Cache for 5 minutes (shorter than the old Infinity because admin can mutate).
 export const agentTemplateKeys = {
   all: () => ["agent-templates"] as const,
-  list: () => [...agentTemplateKeys.all(), "list"] as const,
-  detail: (slug: string) => [...agentTemplateKeys.all(), "detail", slug] as const,
+  list: (category?: string, tags?: string) =>
+    [...agentTemplateKeys.all(), "list", { category, tags }] as const,
+  detail: (id: string) => [...agentTemplateKeys.all(), "detail", id] as const,
 };
 
-export function agentTemplateListOptions() {
+export function agentTemplateListOptions(category?: string, tags?: string) {
   return queryOptions({
-    queryKey: agentTemplateKeys.list(),
-    queryFn: () => api.listAgentTemplates(),
-    staleTime: Infinity,
+    queryKey: agentTemplateKeys.list(category, tags),
+    queryFn: () => api.listAgentTemplates({ category, tags }),
+    staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 }
 
-export function agentTemplateDetailOptions(slug: string) {
+export function agentTemplateDetailOptions(id: string) {
   return queryOptions({
-    queryKey: agentTemplateKeys.detail(slug),
-    queryFn: () => api.getAgentTemplate(slug),
-    staleTime: Infinity,
+    queryKey: agentTemplateKeys.detail(id),
+    queryFn: () => api.getAgentTemplate(id),
+    staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useAgentTemplates(category?: string, tags?: string) {
+  return useQuery(agentTemplateListOptions(category, tags));
+}
+
+export function useAgentTemplate(id: string) {
+  return useQuery(agentTemplateDetailOptions(id));
+}
+
+// Admin mutations
+export function useCreateAgentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateAgentTemplateRequest) =>
+      api.createAgentTemplate(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: agentTemplateKeys.all() });
+    },
+  });
+}
+
+export function useUpdateAgentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateAgentTemplateRequest;
+    }) => api.updateAgentTemplate(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: agentTemplateKeys.all() });
+    },
+  });
+}
+
+export function useDeleteAgentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteAgentTemplate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: agentTemplateKeys.all() });
+    },
+  });
+}
+
+export function usePlatformAdmin() {
+  return useQuery({
+    queryKey: ["platform-admin"],
+    queryFn: () => api.checkPlatformAdmin(),
+    staleTime: 5 * 60 * 1000,
   });
 }
