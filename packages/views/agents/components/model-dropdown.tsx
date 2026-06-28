@@ -204,7 +204,7 @@ export function ModelDropdown({
                       }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{m.label}</div>
+                        <div className="truncate font-medium">{m.provider ? `${m.provider} — ${m.label}` : m.label}</div>
                         {m.label !== m.id && (
                           <div className="truncate text-xs text-muted-foreground">
                             {m.id}

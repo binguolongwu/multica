@@ -175,7 +175,7 @@ export function ModelPicker({
                 `<span block text-left>` to keep layout deterministic —
                 matches the fix already applied in thinking-picker.tsx. */}
             <span className="block min-w-0 flex-1 text-left">
-              <span className="block truncate text-[13px] font-medium">{m.label}</span>
+              <span className="block truncate text-[13px] font-medium">{m.provider ? `${m.provider} — ${m.label}` : m.label}</span>
               {m.label !== m.id && (
                 <span className="mt-0.5 block truncate font-mono text-[10px] leading-snug text-muted-foreground">
                   {m.id}
