@@ -46,14 +46,17 @@ func (h *Handler) HandleCLIBinary(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, binaryPath)
 }
 
-// resolveCLIVersion returns the CLI version based on the running binary's
+// resolveCLIVersion returns the CLI version based on the multica CLI binary's
 // modification time, matching the format used by `multica --version`.
+// Uses findMulticaCLIBinary() because the server process's own os.Executable()
+// points to the 'server' binary, not the CLI binary — their mtimes differ when
+// built separately, causing a false "update available" indicator.
 func resolveCLIVersion() string {
-	exe, err := os.Executable()
+	binPath, err := findMulticaCLIBinary()
 	if err != nil {
 		return "unknown"
 	}
-	info, err := os.Stat(exe)
+	info, err := os.Stat(binPath)
 	if err != nil {
 		return "unknown"
 	}
