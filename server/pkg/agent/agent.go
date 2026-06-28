@@ -57,6 +57,12 @@ type ExecOptions struct {
 	// ignore this field, mirroring ThinkingLevel's renderer-side fall-through
 	// pattern. See issue #3260.
 	OpenclawMode string
+	// ZeroclawMode chooses between local (ACP stdio) and gateway (WebSocket)
+	// routing for the zeroclaw backend. "" or "local" keeps the default
+	// behaviour — the daemon spawns `zeroclaw acp` and the agent loop runs
+	// in-process on the daemon host. "gateway" connects to a remote zeroclaw
+	// gateway via WebSocket. Other backends ignore this field.
+	ZeroclawMode string
 }
 
 // runContext derives the execution context for an agent subprocess from the
@@ -154,6 +160,7 @@ var SupportedTypes = []string{
 	"kimi",
 	"kiro",
 	"antigravity",
+	"zeroclaw",
 }
 
 // IsSupportedType reports whether agentType is in the SupportedTypes whitelist.
@@ -198,6 +205,8 @@ func New(agentType string, cfg Config) (Backend, error) {
 		return &kiroBackend{cfg: cfg}, nil
 	case "antigravity":
 		return &antigravityBackend{cfg: cfg}, nil
+	case "zeroclaw":
+		return &zeroclawBackend{cfg: cfg}, nil
 	case "qoder":
 		return &qoderBackend{cfg: cfg}, nil
 	default:
@@ -230,6 +239,7 @@ var launchHeaders = map[string]string{
 	"opencode":    "opencode run (json)",
 	"pi":          "pi (json mode)",
 	"qoder":       "qodercli --acp",
+	"zeroclaw":    "zeroclaw acp",
 }
 
 // LaunchHeader returns the user-visible launch skeleton for agentType, or an
