@@ -327,6 +327,20 @@ func (b *zeroclawBackend) executeGateway(ctx context.Context, prompt string, opt
 		return nil, fmt.Errorf("zeroclaw gateway URL not configured — set ZEROCLAW_GATEWAY_URL in agent custom_env")
 	}
 
+	// Append agent alias and optional session id as query parameters.
+	agentAlias := strings.TrimSpace(opts.Model)
+	if agentAlias == "" {
+		agentAlias = "default"
+	}
+	if strings.Contains(gatewayURL, "?") {
+		gatewayURL += "&agent=" + agentAlias
+	} else {
+		gatewayURL += "?agent=" + agentAlias
+	}
+	if opts.ResumeSessionID != "" {
+		gatewayURL += "&session_id=" + opts.ResumeSessionID
+	}
+
 	msgCh := make(chan Message, 256)
 	resCh := make(chan Result, 1)
 
@@ -408,6 +422,7 @@ func (b *zeroclawBackend) executeGateway(ctx context.Context, prompt string, opt
 				resCh <- Result{
 					Status:     finalStatus,
 					Output:     output.String(),
+					Error:      finalError,
 					DurationMs: time.Since(startTime).Milliseconds(),
 					SessionID:  sessionID,
 				}
@@ -635,6 +650,15 @@ func (b *zeroclawBackend) executeLocal(ctx context.Context, prompt string, opts 
 
 		duration := time.Since(startTime)
 		b.cfg.Logger.Info("zeroclaw finished", "pid", cmd.Process.Pid, "status", finalStatus, "duration", duration.Round(time.Millisecond).String())
+
+		// Graceful teardown: send session/stop before closing stdin.
+		if sessionID != "" {
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, _ = client.request(stopCtx, "session/stop", map[string]any{
+				"sessionId": sessionID,
+			})
+			stopCancel()
+		}
 
 		stdin.Close()
 		cancel()
