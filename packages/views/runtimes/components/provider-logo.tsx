@@ -247,6 +247,41 @@ function KiroLogo({ className }: { className: string }) {
   );
 }
 
+// ZeroClaw — crab mascot, vector version based on official favicon
+function ZeroClawLogo({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className}>
+      {/* Body */}
+      <ellipse cx="32" cy="34" rx="14" ry="10" fill="#E8453A" />
+      {/* Left claw */}
+      <path d="M14 22C10 18 6 20 8 26s10 4 10-1" fill="#FF6B5A" stroke="#E8453A" strokeWidth="1" />
+      {/* Right claw */}
+      <path d="M50 22c4-4 8-2 6 4s-10 4-10-1" fill="#FF6B5A" stroke="#E8453A" strokeWidth="1" />
+      {/* Left arm */}
+      <path d="M20 30Q16 26 14 26" stroke="#E8453A" strokeWidth="3" strokeLinecap="round" />
+      {/* Right arm */}
+      <path d="M44 30q4-4 6-4" stroke="#E8453A" strokeWidth="3" strokeLinecap="round" />
+      {/* Eye stalks */}
+      <line x1="26" y1="28" x2="24" y2="20" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <line x1="38" y1="28" x2="40" y2="20" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      {/* Eyes */}
+      <circle cx="24" cy="18" r="3" fill="#050810" />
+      <circle cx="40" cy="18" r="3" fill="#050810" />
+      <circle cx="25" cy="17" r="1.2" fill="#00E5CC" />
+      <circle cx="41" cy="17" r="1.2" fill="#00E5CC" />
+      {/* Mouth */}
+      <path d="M28 38Q32 42 36 38" stroke="#050810" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      {/* Legs */}
+      <path d="M18 36L10 42" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M20 40L12 48" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M24 42L18 52" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M46 36L54 42" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M44 40L52 48" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M40 42L46 52" stroke="#E8453A" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ProviderLogo({
   provider,
   className = "h-4 w-4",
@@ -279,9 +314,11 @@ export function ProviderLogo({
       return <KiroLogo className={className} />;
     case "qoder":
       return <QoderLogo className={className} />;
-    case "antigravity":
-      return <AntigravityLogo className={className} />;
-    default:
+	    case "antigravity":
+	      return <AntigravityLogo className={className} />;
+	    case "zeroclaw":
+	      return <ZeroClawLogo className={className} />;
+	    default:
       return <Monitor className={className} />;
   }
 }

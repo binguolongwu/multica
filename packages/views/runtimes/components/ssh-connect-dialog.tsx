@@ -34,6 +34,7 @@ const AVAILABLE_RUNTIMES: { id: string; label: string }[] = [
   { id: "kimi", label: "Kimi (Moonshot)" },
   { id: "kiro", label: "Kiro CLI" },
   { id: "antigravity", label: "Antigravity (Google)" },
+  { id: "zeroclaw", label: "ZeroClaw" },
 ];
 
 export function SSHConnectDialog({ onClose }: { onClose: () => void }) {
