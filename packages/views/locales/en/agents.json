@@ -499,5 +499,25 @@
     "selected_one": "{{count}} selected",
     "selected_other": "{{count}} selected",
     "clear_selection": "Clear selection"
+  },
+  "template_editor": {
+    "save": "Save",
+    "saving": "Saving...",
+    "template": "Template",
+    "not_found": "Template not found",
+    "updated": "Updated",
+    "deleted": "Template deleted",
+    "delete_confirm": "Delete template \"{{name}}\"?",
+    "update_failed": "Update failed",
+    "delete_failed": "Delete failed",
+    "active": "Active",
+    "properties": "Properties",
+    "tags": "Tags",
+    "details": "Details",
+    "category": "Category",
+    "model": "Model",
+    "visibility": "Visibility",
+    "skills": "Skills",
+    "created": "Created"
   }
 }

@@ -9,7 +9,7 @@ import {
   useDeleteAgentTemplate,
   usePlatformAdmin,
 } from "@multica/core/agents/queries";
-import type { AgentTemplate, UpdateAgentTemplateRequest } from "@multica/core/types";
+import type { UpdateAgentTemplateRequest } from "@multica/core/types";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
@@ -18,12 +18,14 @@ import { Badge } from "@multica/ui/components/ui/badge";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@multica/ui/components/ui/tabs";
 import { toast } from "sonner";
+import { useT } from "@multica/views/i18n";
 
 export default function TemplateDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const p = useWorkspacePaths();
   const id = params.id;
+  const { t } = useT("agents");
 
   const { data: template, isLoading } = useAgentTemplate(id);
   const { data: isAdmin } = usePlatformAdmin();
@@ -35,7 +37,6 @@ export default function TemplateDetailPage() {
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [model, setModel] = useState("");
   const [skillUrlsInput, setSkillUrlsInput] = useState("");
   const [mcpConfigInput, setMcpConfigInput] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -48,7 +49,6 @@ export default function TemplateDetailPage() {
       setCategory(template.category);
       setTagsInput((template.tags ?? []).join(", "));
       setInstructions(template.instructions);
-      setModel(template.model);
       setSkillUrlsInput((template.skill_urls ?? []).join("\n"));
       setMcpConfigInput(template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "");
       setDirty(false);
@@ -64,13 +64,12 @@ export default function TemplateDetailPage() {
     if (description !== template.description) data.description = description;
     if (category !== template.category) data.category = category;
     if (instructions !== template.instructions) data.instructions = instructions;
-    if (model !== template.model) data.model = model;
 
-    const newTags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const newTags = tagsInput.split(",").map((x) => x.trim()).filter(Boolean);
     const oldTags = template.tags ?? [];
     if (newTags.join(",") !== oldTags.join(",")) data.tags = newTags;
 
-    const newSkillUrls = skillUrlsInput.split("\n").map((s) => s.trim()).filter(Boolean);
+    const newSkillUrls = skillUrlsInput.split("\n").map((x) => x.trim()).filter(Boolean);
     const oldSkillUrls = template.skill_urls ?? [];
     if (newSkillUrls.join(",") !== oldSkillUrls.join(",")) data.skill_urls = newSkillUrls;
 
@@ -78,9 +77,7 @@ export default function TemplateDetailPage() {
       try {
         const parsed = JSON.parse(mcpConfigInput);
         data.mcp_config = parsed;
-      } catch {
-        // invalid JSON, skip
-      }
+      } catch { /* skip invalid */ }
     } else if (template.mcp_config) {
       data.mcp_config = null as unknown as undefined;
     }
@@ -93,23 +90,24 @@ export default function TemplateDetailPage() {
     setSaving(true);
     try {
       await updateMutation.mutateAsync({ id: template.id, data: buildUpdate() });
-      toast.success("Template updated");
+      toast.success(t(($) => $.template_editor.updated));
       setDirty(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : t(($) => $.template_editor.update_failed));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!template || !confirm('Delete template "' + template.name + '"?')) return;
+    if (!template) return;
+    if (!confirm(t(($) => $.template_editor.delete_confirm, { name: template.name }))) return;
     try {
       await deleteMutation.mutateAsync(template.id);
-      toast.success("Template deleted");
+      toast.success(t(($) => $.template_editor.deleted));
       router.push(p.templates());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : t(($) => $.template_editor.delete_failed));
     }
   };
 
@@ -125,7 +123,7 @@ export default function TemplateDetailPage() {
   if (!template) {
     return (
       <div className="flex items-center justify-center flex-1 text-muted-foreground">
-        Template not found.
+        {t(($) => $.template_editor.not_found)}
       </div>
     );
   }
@@ -140,13 +138,13 @@ export default function TemplateDetailPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold truncate">{template.name}</h1>
-            <p className="text-xs text-muted-foreground">Template</p>
+            <p className="text-xs text-muted-foreground">{t(($) => $.template_editor.template)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {dirty && (
             <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
+              {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
             </Button>
           )}
           {isAdmin && (
@@ -157,7 +155,6 @@ export default function TemplateDetailPage() {
         </div>
       </div>
 
-      {/* Body -- two column layout, matching agent detail pattern */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-3 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-4 md:overflow-hidden md:p-6">
 
         {/* Left sidebar */}
@@ -182,7 +179,7 @@ export default function TemplateDetailPage() {
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                Active
+                {t(($) => $.template_editor.active)}
               </span>
             </div>
           </div>
@@ -190,70 +187,55 @@ export default function TemplateDetailPage() {
           {/* Properties */}
           <div className="border-b px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Properties
+              {t(($) => $.template_editor.properties)}
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Category</span>
-                <Input
-                  className="h-7 text-xs"
-                  value={category}
+                <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.category)}</span>
+                <Input className="h-7 text-xs" value={category}
                   onChange={(e) => { setCategory(e.target.value); markDirty(); }}
-                  placeholder="e.g. Engineering"
-                />
+                  placeholder="e.g. Engineering" />
               </div>
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Model</span>
-                <Input
-                  className="h-7 text-xs"
-                  value={model}
-                  onChange={(e) => { setModel(e.target.value); markDirty(); }}
-                  placeholder="claude-sonnet-4-5"
-                />
-              </div>
-              <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Visibility</span>
+                <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.visibility)}</span>
                 <span className="text-xs">{template.visibility}</span>
               </div>
             </div>
           </div>
 
-          {/* Tags section */}
+          {/* Tags */}
           <div className="border-b px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Tags
+              {t(($) => $.template_editor.tags)}
             </div>
-            <Input
-              className="h-7 text-xs mt-1"
-              value={tagsInput}
+            <Input className="h-7 text-xs mt-1" value={tagsInput}
               onChange={(e) => { setTagsInput(e.target.value); markDirty(); }}
-              placeholder="backend, api, go"
-            />
+              placeholder="backend, api, go" />
             {tagsInput && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {tagsInput.split(",").map((t) => t.trim()).filter(Boolean).map((tag) => (
+                {tagsInput.split(",").map((x) => x.trim()).filter(Boolean).map((tag) => (
                   <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Details -- read-only */}
+          {/* Details */}
           <div className="px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Details
+              {t(($) => $.template_editor.details)}
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Skills</span>
+                <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.skills)}</span>
                 <span className="text-xs">{(template.skill_urls ?? []).length}</span>
               </div>
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Created</span>
+                <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.created)}</span>
                 <span className="text-xs">{new Date(template.created_at).toLocaleDateString()}</span>
               </div>
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
-                <span className="text-xs text-muted-foreground">Updated</span>
+                <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.updated)}</span>
                 <span className="text-xs">{new Date(template.updated_at).toLocaleDateString()}</span>
               </div>
             </div>
@@ -277,8 +259,7 @@ export default function TemplateDetailPage() {
                 className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
                 value={instructions}
                 onChange={(e) => { setInstructions(e.target.value); markDirty(); }}
-                placeholder="Agent instructions (markdown)..."
-              />
+                placeholder="Agent instructions (markdown)..." />
             </TabsContent>
 
             <TabsContent value="skills" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
@@ -289,8 +270,7 @@ export default function TemplateDetailPage() {
                 className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
                 value={skillUrlsInput}
                 onChange={(e) => { setSkillUrlsInput(e.target.value); markDirty(); }}
-                placeholder="https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices"
-              />
+                placeholder="https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices" />
             </TabsContent>
 
             <TabsContent value="mcp" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
@@ -301,8 +281,7 @@ export default function TemplateDetailPage() {
                 className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
                 value={mcpConfigInput}
                 onChange={(e) => { setMcpConfigInput(e.target.value); markDirty(); }}
-                placeholder='{"servers": {}}'
-              />
+                placeholder='{"servers": {}}' />
             </TabsContent>
           </Tabs>
         </div>

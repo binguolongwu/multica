@@ -487,5 +487,25 @@
     "selected_one": "已选 {{count}} 项",
     "selected_other": "已选 {{count}} 项",
     "clear_selection": "清除选择"
+  },
+  "template_editor": {
+    "save": "保存",
+    "saving": "保存中...",
+    "template": "模板",
+    "not_found": "模板未找到",
+    "updated": "更新时间",
+    "deleted": "模板已删除",
+    "delete_confirm": "删除模板 \"{{name}}\"？",
+    "update_failed": "更新失败",
+    "delete_failed": "删除失败",
+    "active": "活跃",
+    "properties": "属性",
+    "tags": "标签",
+    "details": "详情",
+    "category": "分类",
+    "model": "模型",
+    "visibility": "可见性",
+    "skills": "技能",
+    "created": "创建时间"
   }
 }
