@@ -190,14 +190,63 @@ func TestZeroclawExecuteLocalBinaryNotFound(t *testing.T) {
 	}
 }
 
-func TestZeroclawExecuteGatewayStub(t *testing.T) {
-	b := &zeroclawBackend{cfg: Config{}}
-	_, err := b.Execute(t.Context(), "test", ExecOptions{ZeroclawMode: "gateway"})
-	if err == nil {
-		t.Fatal("expected error from gateway stub")
+
+func TestZeroclawResolveGatewayURL(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{
+		Env: map[string]string{
+			"ZEROCLAW_GATEWAY_URL":   "ws://192.168.1.100:42617",
+			"ZEROCLAW_GATEWAY_TOKEN": "test-token-123",
+		},
+	}}
+
+	url := b.resolveGatewayURL()
+	if url != "ws://192.168.1.100:42617" {
+		t.Errorf("expected gateway URL, got %q", url)
 	}
-	if !strings.Contains(err.Error(), "not yet implemented") {
-		t.Errorf("expected 'not yet implemented', got: %v", err)
+
+	headers := b.gatewayHeaders()
+	if got := headers.Get("Authorization"); got != "Bearer test-token-123" {
+		t.Errorf("expected Bearer token, got %q", got)
+	}
+}
+
+func TestZeroclawResolveGatewayURLMissing(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{}}
+	url := b.resolveGatewayURL()
+	if url != "" {
+		t.Errorf("expected empty URL when not configured, got %q", url)
+	}
+}
+
+func TestZeroclawExecuteGatewayNoURL(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{}}
+	_, err := b.Execute(t.Context(), "test prompt", ExecOptions{ZeroclawMode: "gateway"})
+	if err == nil {
+		t.Fatal("expected error when gateway URL is not configured")
+	}
+	if !strings.Contains(err.Error(), "gateway URL not configured") {
+		t.Errorf("expected 'gateway URL not configured' error, got: %v", err)
+	}
+}
+
+func TestZeroclawExecuteModeDispatch(t *testing.T) {
+	b := &zeroclawBackend{cfg: Config{
+		ExecutablePath: "/nonexistent/zeroclaw",
+	}}
+
+	// gateway mode with no URL should fail fast with config error.
+	_, err := b.Execute(t.Context(), "hello", ExecOptions{ZeroclawMode: "gateway"})
+	if err == nil {
+		t.Fatal("expected error for gateway mode without URL")
+	}
+
+	// local mode with nonexistent binary should fail with "not found".
+	_, err = b.Execute(t.Context(), "hello", ExecOptions{})
+	if err == nil {
+		t.Fatal("expected error for missing executable")
+	}
+	if !strings.Contains(err.Error(), "executable not found") {
+		t.Errorf("expected 'executable not found', got: %v", err)
 	}
 }
 

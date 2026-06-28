@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os/exec"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // zeroclawBlockedArgs are flags hardcoded by the daemon that must not be
@@ -77,6 +80,27 @@ type zcACPSessionUpdateParams struct {
 // zcACPPromptResult is the success response from session/prompt.
 type zcACPPromptResult struct {
 	StopReason string `json:"stopReason"`
+}
+
+// ── Gateway WebSocket message types ──────────────────────────────
+
+type zcGWMessage struct {
+	Type         string          `json:"type"`
+	Content      string          `json:"content,omitempty"`
+	Name         string          `json:"name,omitempty"`
+	Args         json.RawMessage `json:"args,omitempty"`
+	CallID       string          `json:"call_id,omitempty"`
+	Output       string          `json:"output,omitempty"`
+	FullResponse string          `json:"full_response,omitempty"`
+	SessionID    string          `json:"session_id,omitempty"`
+	Resumed      bool            `json:"resumed,omitempty"`
+	Error        string          `json:"error,omitempty"`
+	// Approval fields
+	RequestID        string `json:"request_id,omitempty"`
+	Tool             string `json:"tool,omitempty"`
+	ArgumentsSummary string `json:"arguments_summary,omitempty"`
+	TimeoutSecs      int    `json:"timeout_secs,omitempty"`
+	Decision         string `json:"decision,omitempty"`
 }
 
 // zeroclawClient manages JSON-RPC 2.0 communication over stdin/stdout
@@ -298,7 +322,142 @@ func (b *zeroclawBackend) Execute(ctx context.Context, prompt string, opts ExecO
 }
 
 func (b *zeroclawBackend) executeGateway(ctx context.Context, prompt string, opts ExecOptions) (*Session, error) {
-	return nil, fmt.Errorf("zeroclaw: gateway mode not yet implemented")
+	gatewayURL := b.resolveGatewayURL()
+	if gatewayURL == "" {
+		return nil, fmt.Errorf("zeroclaw gateway URL not configured — set ZEROCLAW_GATEWAY_URL in agent custom_env")
+	}
+
+	msgCh := make(chan Message, 256)
+	resCh := make(chan Result, 1)
+
+	go func() {
+		defer close(msgCh)
+		defer close(resCh)
+
+		startTime := time.Now()
+		finalStatus := "completed"
+		var finalError string
+		var output strings.Builder
+		var sessionID string
+
+		// Connect to gateway.
+		conn, _, err := websocket.DefaultDialer.DialContext(ctx, gatewayURL, b.gatewayHeaders())
+		if err != nil {
+			resCh <- Result{
+				Status:     "failed",
+				Error:      fmt.Sprintf("zeroclaw gateway unreachable: %v", err),
+				DurationMs: time.Since(startTime).Milliseconds(),
+			}
+			return
+		}
+		defer conn.Close()
+
+		// Send the prompt.
+		sendMsg := zcGWMessage{
+			Type:    "message",
+			Content: prompt,
+		}
+		if err := conn.WriteJSON(sendMsg); err != nil {
+			resCh <- Result{
+				Status:     "failed",
+				Error:      fmt.Sprintf("zeroclaw gateway write failed: %v", err),
+				DurationMs: time.Since(startTime).Milliseconds(),
+			}
+			return
+		}
+
+		// Read loop.
+		for {
+			var msg zcGWMessage
+			if err := conn.ReadJSON(&msg); err != nil {
+				if finalStatus == "completed" {
+					finalStatus = "failed"
+					finalError = fmt.Sprintf("zeroclaw gateway connection lost: %v", err)
+				}
+				break
+			}
+
+			switch msg.Type {
+			case "session_start":
+				sessionID = msg.SessionID
+				b.cfg.Logger.Info("zeroclaw gateway session started", "session_id", sessionID)
+			case "chunk":
+				output.WriteString(msg.Content)
+				trySend(msgCh, Message{Type: MessageText, Content: msg.Content})
+			case "tool_call":
+				var args map[string]any
+				if len(msg.Args) > 0 {
+					json.Unmarshal(msg.Args, &args)
+				}
+				trySend(msgCh, Message{
+					Type:   MessageToolUse,
+					Tool:   msg.Name,
+					CallID: msg.CallID,
+					Input:  args,
+				})
+			case "tool_result":
+				trySend(msgCh, Message{
+					Type:   MessageToolResult,
+					Tool:   msg.Name,
+					CallID: msg.CallID,
+					Output: msg.Output,
+				})
+			case "thinking":
+				trySend(msgCh, Message{Type: MessageThinking, Content: msg.Content})
+			case "done":
+				resCh <- Result{
+					Status:     finalStatus,
+					Output:     output.String(),
+					DurationMs: time.Since(startTime).Milliseconds(),
+					SessionID:  sessionID,
+				}
+				return
+			case "error":
+				finalStatus = "failed"
+				finalError = msg.Error
+				if finalError == "" {
+					finalError = msg.Content
+				}
+				trySend(msgCh, Message{Type: MessageError, Content: finalError})
+			case "approval_request":
+				// Auto-approve in daemon context.
+				_ = conn.WriteJSON(zcGWMessage{
+					Type:      "approval_response",
+					RequestID: msg.RequestID,
+					Decision:  "always",
+				})
+			}
+		}
+
+		// If we exit the loop without a "done" message, send the result.
+		select {
+		case resCh <- Result{
+			Status:     finalStatus,
+			Output:     output.String(),
+			Error:      finalError,
+			DurationMs: time.Since(startTime).Milliseconds(),
+			SessionID:  sessionID,
+		}:
+		default:
+		}
+	}()
+
+	return &Session{Messages: msgCh, Result: resCh}, nil
+}
+
+// resolveGatewayURL reads the gateway WebSocket URL from agent custom_env.
+func (b *zeroclawBackend) resolveGatewayURL() string {
+	return b.cfg.Env["ZEROCLAW_GATEWAY_URL"]
+}
+
+// gatewayHeaders builds HTTP headers for the gateway WebSocket handshake,
+// including an optional bearer token from custom_env.
+func (b *zeroclawBackend) gatewayHeaders() http.Header {
+	h := http.Header{}
+	if token := b.cfg.Env["ZEROCLAW_GATEWAY_TOKEN"]; token != "" {
+		h.Set("Authorization", "Bearer "+token)
+	}
+	return h
 }
 
 func (b *zeroclawBackend) executeLocal(ctx context.Context, prompt string, opts ExecOptions) (*Session, error) {
