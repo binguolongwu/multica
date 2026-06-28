@@ -1,10 +1,17 @@
 package agent
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"os"
+	"os/exec"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestBuildZeroclawArgs(t *testing.T) {
@@ -247,6 +254,210 @@ func TestZeroclawExecuteModeDispatch(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "executable not found") {
 		t.Errorf("expected 'executable not found', got: %v", err)
+	}
+}
+
+
+func TestZeroclawIntegrationACP(t *testing.T) {
+	execPath := "/home/longwu/.cargo/bin/zeroclaw"
+	if _, err := exec.LookPath(execPath); err != nil {
+		t.Skipf("zeroclaw not found at %s", execPath)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Start zeroclaw acp.
+	cmd := exec.CommandContext(ctx, execPath, "acp")
+	hideAgentWindow(cmd)
+	cmd.Env = append(os.Environ(), "ZEROCLAW_UNSUPERVISED=1")
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("stdout pipe: %v", err)
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatalf("stdin pipe: %v", err)
+	}
+	cmd.Stderr = newLogWriter(slog.Default(), "[zeroclaw-int:stderr] ")
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start zeroclaw acp: %v", err)
+	}
+	defer func() {
+		stdin.Close()
+		cmd.Wait()
+	}()
+
+	client := newZeroclawClient(stdin)
+
+	// Read stdout in background.
+	readerDone := make(chan struct{})
+	go func() {
+		defer close(readerDone)
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
+		for scanner.Scan() {
+			client.handleLine(scanner.Text())
+		}
+		client.closeAllPending(fmt.Errorf("process exited"))
+	}()
+
+	// 1. Initialize
+	initResult, err := client.request(ctx, "initialize", map[string]any{
+		"protocolVersion": 1,
+		"clientInfo": map[string]any{
+			"name":    "multica-test",
+			"version": "0.1.0",
+		},
+	})
+	if err != nil {
+		t.Fatalf("initialize failed: %v", err)
+	}
+	t.Logf("initialize response: %s", initResult)
+
+	// Verify protocol version in response.
+	var initResp struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	if err := json.Unmarshal(initResult, &initResp); err != nil {
+		t.Fatalf("parse initialize response: %v", err)
+	}
+	if initResp.ProtocolVersion < 1 {
+		t.Errorf("protocolVersion = %d, want >= 1", initResp.ProtocolVersion)
+	}
+
+	// 2. Create session.
+	sessionResult, err := client.request(ctx, "session/new", map[string]any{
+		"cwd":        "/tmp",
+		"agentAlias": "default",
+	})
+	if err != nil {
+		t.Fatalf("session/new failed: %v", err)
+	}
+	var sessionResp struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.Unmarshal(sessionResult, &sessionResp); err != nil {
+		t.Fatalf("parse session/new response: %v", err)
+	}
+	sessionID := sessionResp.SessionID
+	if sessionID == "" {
+		t.Fatal("session/new returned empty sessionId")
+	}
+	t.Logf("session created: %s", sessionID)
+
+	// 3. Send prompt and collect streaming events.
+	var (
+		gotText   bool
+		gotChunks []string
+		msgMu     sync.Mutex
+	)
+	client.onMessage = func(m Message) {
+		msgMu.Lock()
+		defer msgMu.Unlock()
+		if m.Type == MessageText {
+			gotText = true
+			gotChunks = append(gotChunks, m.Content)
+		}
+	}
+
+	_, err = client.request(ctx, "session/prompt", map[string]any{
+		"sessionId": sessionID,
+		"prompt": []map[string]any{
+			{"type": "text", "text": "Say exactly 'HELLO ZEROCLAW' and nothing else."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("session/prompt failed: %v", err)
+	}
+
+	msgMu.Lock()
+	hasText := gotText
+	allChunks := strings.Join(gotChunks, "")
+	msgMu.Unlock()
+
+	if !hasText {
+		t.Error("session/prompt did not produce any text chunks")
+	} else {
+		t.Logf("received text: %q", allChunks)
+	}
+
+	// 4. Stop session.
+	_, err = client.request(ctx, "session/stop", map[string]any{
+		"sessionId": sessionID,
+	})
+	if err != nil {
+		t.Logf("session/stop returned error (non-fatal): %v", err)
+	} else {
+		t.Log("session/stop succeeded")
+	}
+
+	// Clean shutdown.
+	stdin.Close()
+	cancel()
+	<-readerDone
+}
+
+
+func TestZeroclawIntegrationGateway(t *testing.T) {
+	gatewayURL := os.Getenv("ZEROCLAW_TEST_GATEWAY_URL")
+	if gatewayURL == "" {
+		t.Skip("ZEROCLAW_TEST_GATEWAY_URL not set — skipping gateway integration test")
+	}
+
+	cfg := Config{
+		Logger: slog.Default(),
+		Env: map[string]string{
+			"ZEROCLAW_GATEWAY_URL":   gatewayURL,
+			"ZEROCLAW_GATEWAY_TOKEN": os.Getenv("ZEROCLAW_TEST_GATEWAY_TOKEN"),
+		},
+	}
+	b := &zeroclawBackend{cfg: cfg}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	session, err := b.Execute(ctx, "Say exactly 'HELLO GW TEST' and nothing else.", ExecOptions{
+		ZeroclawMode: "gateway",
+	})
+	if err != nil {
+		t.Fatalf("Execute(gateway): %v", err)
+	}
+
+	var (
+		gotText  bool
+		allChunks []string
+		mu       sync.Mutex
+	)
+	go func() {
+		for msg := range session.Messages {
+			mu.Lock()
+			if msg.Type == MessageText {
+				gotText = true
+				allChunks = append(allChunks, msg.Content)
+			}
+			mu.Unlock()
+		}
+	}()
+
+	result := <-session.Result
+	mu.Lock()
+	hasText := gotText
+	fullText := strings.Join(allChunks, "")
+	mu.Unlock()
+
+	t.Logf("status=%s output=%q session_id=%s duration=%dms error=%s",
+		result.Status, result.Output, result.SessionID, result.DurationMs, result.Error)
+
+	if result.Status != "completed" {
+		t.Errorf("expected status=completed, got %s", result.Status)
+	}
+	if !hasText {
+		t.Error("no text chunks received from gateway")
+	} else {
+		t.Logf("received chunks: %q", fullText)
 	}
 }
 

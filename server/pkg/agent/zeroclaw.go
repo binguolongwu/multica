@@ -355,11 +355,15 @@ func (b *zeroclawBackend) executeGateway(ctx context.Context, prompt string, opt
 		var sessionID string
 
 		// Connect to gateway.
-		conn, _, err := websocket.DefaultDialer.DialContext(ctx, gatewayURL, b.gatewayHeaders())
+		conn, httpResp, err := websocket.DefaultDialer.DialContext(ctx, gatewayURL, b.gatewayHeaders())
 		if err != nil {
+			errMsg := fmt.Sprintf("zeroclaw gateway unreachable: %v", err)
+			if httpResp != nil {
+				errMsg = fmt.Sprintf("zeroclaw gateway unreachable: HTTP %d: %v", httpResp.StatusCode, err)
+			}
 			resCh <- Result{
 				Status:     "failed",
-				Error:      fmt.Sprintf("zeroclaw gateway unreachable: %v", err),
+				Error:      errMsg,
 				DurationMs: time.Since(startTime).Milliseconds(),
 			}
 			return
