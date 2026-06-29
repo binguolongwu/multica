@@ -245,19 +245,19 @@ describe("ApiClient schema fallback", () => {
       expect(tmpls).toEqual([]);
     });
 
-	    it("defaults skill_urls to [] when the field is missing from a template", async () => {
-	      // Future server: drops `skill_urls`. Picker code must not throw.
+	    it("defaults skill_ids to [] when the field is missing from a template", async () => {
+	      // Future server: drops `skill_ids`. Picker code must not throw.
 	      stubFetchJson([{ id: "uuid-1", name: "X" }]);
 	      const client = new ApiClient("https://api.example.test");
 	      const tmpls = await client.listAgentTemplates();
 	      expect(tmpls).toHaveLength(1);
-	      expect(tmpls[0]?.skill_urls).toEqual([]);
+	      expect(tmpls[0]?.skill_ids).toEqual([]);
 	    });
 
 	    it("accepts the bare-array shape (current contract)", async () => {
 	      stubFetchJson([
-	        { id: "uuid-a", name: "A", description: "", skill_urls: [] },
-	        { id: "uuid-b", name: "B", description: "", skill_urls: [] },
+	        { id: "uuid-a", name: "A", description: "", skill_ids: [] },
+	        { id: "uuid-b", name: "B", description: "", skill_ids: [] },
 	      ]);
 	      const client = new ApiClient("https://api.example.test");
 	      const tmpls = await client.listAgentTemplates();
@@ -266,7 +266,7 @@ describe("ApiClient schema fallback", () => {
 
 	    it("accepts a future {templates: [...]} envelope without breaking", async () => {
 	      stubFetchJson({
-	        templates: [{ id: "uuid-a", name: "A", description: "", skill_urls: [] }],
+	        templates: [{ id: "uuid-a", name: "A", description: "", skill_ids: [] }],
 	        total: 1,
 	      });
 	      const client = new ApiClient("https://api.example.test");
@@ -282,7 +282,7 @@ describe("ApiClient schema fallback", () => {
 	      const client = new ApiClient("https://api.example.test");
 	      const detail = await client.getAgentTemplate("tmpl-1");
 	      expect(detail.id).toBe("tmpl-1");
-	      expect(detail.skill_urls).toEqual([]);
+	      expect(detail.skill_ids).toEqual([]);
 	      expect(detail.instructions).toBe("");
 	    });
 

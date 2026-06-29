@@ -112,7 +112,7 @@ export function TemplateLibraryPage() {
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-muted-foreground">{row.skill_urls.length}</td>
+                <td className="px-3 py-3 text-muted-foreground">{row.skill_ids.length}</td>
                 <td className="px-3 py-3 text-muted-foreground text-xs">
                   {new Date(row.created_at).toLocaleDateString()}
                 </td>

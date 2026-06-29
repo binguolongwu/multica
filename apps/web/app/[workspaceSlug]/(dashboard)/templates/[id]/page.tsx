@@ -65,7 +65,7 @@ export default function TemplateDetailPage() {
       setTagsInput((template.tags ?? []).join(", "));
       setInstructions(template.instructions);
       setInstructionsDraft(template.instructions);
-      const urls = template.skill_urls ?? [];
+      const urls = template.skill_ids ?? [];
       setSkillUrls(urls);
       setSkillUrlsDraft([...urls]);
       const mcp = template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "";
@@ -112,7 +112,7 @@ export default function TemplateDetailPage() {
   };
 
   const handleSaveSkills = async () => {
-    if (await doSave({ skill_urls: skillUrlsDraft })) {
+    if (await doSave({ skill_ids: skillUrlsDraft })) {
       setSkillUrls([...skillUrlsDraft]); toast.success(t(($) => $.template_editor.updated));
     }
   };

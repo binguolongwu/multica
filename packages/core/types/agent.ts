@@ -318,6 +318,7 @@ export interface AgentSkillSummary {
   id: string;
   name: string;
   description: string;
+  skill_type: 'builtin' | 'platform' | 'workspace';
 }
 
 export interface CreateAgentRequest {
@@ -364,7 +365,7 @@ export interface AgentTemplate {
   max_concurrent_tasks: number;
   custom_args: string[];
   mcp_config?: unknown | null;
-  skill_urls: string[];
+  skill_ids: string[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -386,7 +387,7 @@ export interface CreateAgentTemplateRequest {
   max_concurrent_tasks?: number;
   custom_args?: string[];
   mcp_config?: unknown | null;
-  skill_urls?: string[];
+  skill_ids?: string[];
 }
 
 /** Request body for PUT /api/admin/agent-templates/:id */
@@ -405,7 +406,7 @@ export interface UpdateAgentTemplateRequest {
   max_concurrent_tasks?: number;
   custom_args?: string[];
   mcp_config?: unknown | null;
-  skill_urls?: string[];
+  skill_ids?: string[];
 }
 
 export interface CreateAgentFromTemplateRequest {
@@ -507,10 +508,11 @@ export interface UpdateAgentEnvRequest {
  */
 export interface SkillSummary {
   id: string;
-  workspace_id: string;
+  workspace_id: string | null;
   name: string;
   description: string;
   config: Record<string, unknown>;
+  skill_type: 'builtin' | 'platform' | 'workspace';
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -543,6 +545,8 @@ export interface UpdateSkillRequest {
   description?: string;
   content?: string;
   config?: Record<string, unknown>;
+  skill_type?: 'builtin' | 'platform' | 'workspace';
+  workspace_id?: string | null;
   files?: { path: string; content: string }[];
 }
 
