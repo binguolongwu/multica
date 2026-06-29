@@ -98,7 +98,7 @@ import { useT, useTimeAgo } from "../../i18n";
 //   (name + usedBy), no horizontal scroll, column toggles don't apply.
 const GRID_COLS =
   "grid-cols-[0.75rem_1rem_minmax(120px,1fr)_var(--lgc-usedby)_1.75rem_0.75rem] " +
-  "@2xl:grid-cols-[0.75rem_1rem_minmax(200px,1fr)_var(--lgc-description)_var(--lgc-usedby)_var(--lgc-source)_var(--lgc-creator)_var(--lgc-updated)_var(--lgc-created)_var(--lgc-skilltype)_1.75rem_0.75rem]";
+  "@2xl:grid-cols-[0.75rem_1rem_2fr_5fr_var(--lgc-skilltype)_var(--lgc-usedby)_var(--lgc-source)_var(--lgc-creator)_var(--lgc-updated)_var(--lgc-created)_1.75rem_0.75rem]";
 
 // h-12 rows. The virtualizer's fixed-size contract: every row renders at
 // exactly this height, which is what lets it skip per-row measurement.
@@ -112,7 +112,6 @@ const COLUMN_WIDTHS: Record<SkillColumnKey, number> = {
   creator: 144,
   updated: 104,
   created: 104,
-  description: 180,
   skillType: 100,
 };
 
@@ -138,7 +137,6 @@ function columnTrackVars(
     "--lgc-creator": width("creator"),
     "--lgc-updated": width("updated"),
     "--lgc-created": width("created"),
-    "--lgc-description": width("description"),
     "--lgc-skilltype": width("skillType"),
     "--lgc-minw": `${minWidth}px`,
   } as React.CSSProperties;
@@ -492,6 +490,13 @@ function SkillListHeader({
       ) : (
         <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
       )}
+      {isColVisible("skillType") ? (
+        <ListGridHeaderCell className="hidden @2xl:flex">
+          {t(($) => $.table.type)}
+        </ListGridHeaderCell>
+      ) : (
+        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
+      )}
       {isColVisible("usedBy") ? (
         <ListGridHeaderCell
           sorted={sorted("usedBy")}
@@ -739,6 +744,12 @@ export default function SkillsPage() {
       ) {
         return false;
       }
+      if (
+        filters.skillTypes.length > 0 &&
+        !filters.skillTypes.includes(row.skill.skill_type)
+      ) {
+        return false;
+      }
       return true;
     });
 
@@ -940,6 +951,11 @@ export default function SkillsPage() {
                 ) : (
                   <ListGridCell className="hidden px-0 @2xl:flex" />
                 )}
+                {isColVisible("skillType") ? (
+                  <SkillTypeCell skillType={row.skill.skill_type} />
+                ) : (
+                  <ListGridCell className="hidden px-0 @2xl:flex" />
+                )}
                 {isColVisible("usedBy") ? (
                   <UsedByCell agents={row.agents} />
                 ) : (
@@ -966,11 +982,6 @@ export default function SkillsPage() {
                   <ListGridCell className="hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground @2xl:flex">
                     {timeAgo(row.skill.created_at)}
                   </ListGridCell>
-                ) : (
-                  <ListGridCell className="hidden px-0 @2xl:flex" />
-                )}
-                {isColVisible("skillType") ? (
-                  <SkillTypeCell skillType={row.skill.skill_type} />
                 ) : (
                   <ListGridCell className="hidden px-0 @2xl:flex" />
                 )}

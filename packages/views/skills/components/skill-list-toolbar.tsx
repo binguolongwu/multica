@@ -69,6 +69,7 @@ export function countActiveFilterDimensions(
   if (filters.origins.length > 0) count++;
   if (filters.agents.length > 0) count++;
   if (filters.creators.length > 0) count++;
+  if (filters.skillTypes.length > 0) count++;
   return count;
 }
 
@@ -342,6 +343,39 @@ export function SkillListToolbar({
                     {countBadge(count)}
                   </DropdownMenuCheckboxItem>
                 ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {/* Skill type */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <span className="flex-1">{t(($) => $.table.type)}</span>
+                {filters.skillTypes?.length > 0 && (
+                  <span className="text-xs font-medium text-primary">
+                    {filters.skillTypes.length}
+                  </span>
+                )}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-auto min-w-44">
+                {(["builtin", "platform", "workspace"] as const).map((value) => {
+                  const count = allRows.filter((r) => r.skill.skill_type === value).length;
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={value}
+                      checked={filters.skillTypes?.includes(value) ?? false}
+                      onCheckedChange={() => onToggleFilter("skillTypes", value)}
+                      className={FILTER_ITEM_CLASS}
+                    >
+                      <HoverCheck checked={filters.skillTypes?.includes(value) ?? false} />
+                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                        value === "builtin" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                        value === "platform" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                        "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      }`}>{value}</span>
+                      {countBadge(count)}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
