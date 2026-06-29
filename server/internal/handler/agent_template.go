@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -23,13 +21,24 @@ import (
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
-// TemplateSkillRef points to one skill URL referenced by a template.
-// Replaces agenttmpl.TemplateSkillRef now that the package is removed.
-type TemplateSkillRef struct {
-	SourceURL string `json:"source_url"`
+type CreateAgentFromTemplateRequest struct {
+	TemplateID         string   `json:"template_id"`
+	Name               string   `json:"name"`
+	RuntimeID          string   `json:"runtime_id"`
+	Model              string   `json:"model,omitempty"`
+	Visibility         string   `json:"visibility,omitempty"`
+	MaxConcurrentTasks int32    `json:"max_concurrent_tasks,omitempty"`
+	Description        *string  `json:"description,omitempty"`
+	Instructions       *string  `json:"instructions,omitempty"`
+	AvatarURL          *string  `json:"avatar_url,omitempty"`
+	ExtraSkillIDs      []string `json:"extra_skill_ids,omitempty"`
 }
 
-// --- List + Get handlers (DB-backed) ---
+type CreateAgentFromTemplateResponse struct {
+	Agent            AgentResponse `json:"agent"`
+	ImportedSkillIDs []string      `json:"imported_skill_ids"`
+	ReusedSkillIDs   []string      `json:"reused_skill_ids"`
+}
 
 func (h *Handler) ListAgentTemplates(w http.ResponseWriter, r *http.Request) {
 	category := r.URL.Query().Get("category")
@@ -95,32 +104,6 @@ func (h *Handler) GetAgentTemplate(w http.ResponseWriter, r *http.Request) {
 
 	resp := agentTemplateToResponse(t)
 	writeJSON(w, http.StatusOK, resp)
-}
-
-// --- Create-from-template handler ---
-
-type CreateAgentFromTemplateRequest struct {
-	TemplateID         string `json:"template_id"`
-	Name               string `json:"name"`
-	RuntimeID          string `json:"runtime_id"`
-	Model              string `json:"model,omitempty"`
-	Visibility         string `json:"visibility,omitempty"`
-	MaxConcurrentTasks int32  `json:"max_concurrent_tasks,omitempty"`
-	Description        *string `json:"description,omitempty"`
-	Instructions       *string `json:"instructions,omitempty"`
-	AvatarURL          *string `json:"avatar_url,omitempty"`
-	ExtraSkillIDs      []string `json:"extra_skill_ids,omitempty"`
-}
-
-type CreateAgentFromTemplateResponse struct {
-	Agent            AgentResponse `json:"agent"`
-	ImportedSkillIDs []string      `json:"imported_skill_ids"`
-	ReusedSkillIDs   []string      `json:"reused_skill_ids"`
-}
-
-type fetchFailureResponse struct {
-	Error      string   `json:"error"`
-	FailedURLs []string `json:"failed_urls"`
 }
 
 func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request) {
@@ -192,45 +175,49 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 		append(logger.RequestAttrs(r),
 			"template_id", req.TemplateID,
 			"workspace_id", workspaceID,
-			"skill_url_count", len(tmplRow.SkillIds),
+			"skill_id_count", len(tmplRow.SkillIds),
 		)...)
 
-	// Parse skill URLs from the template
-	var skillURLs []string
+	// Parse skill IDs from the template
+	var skillIDs []string
 	if len(tmplRow.SkillIds) > 0 {
-		if err := json.Unmarshal(tmplRow.SkillIds, &skillURLs); err != nil {
+		if err := json.Unmarshal(tmplRow.SkillIds, &skillIDs); err != nil {
 			slog.Warn("agent-template create: failed to parse skill_ids, treating as empty",
 				append(logger.RequestAttrs(r), "template_id", req.TemplateID, "error", err)...)
-			skillURLs = nil
+			skillIDs = nil
 		}
 	}
 
-	// Convert URLs to TemplateSkillRefs for the fetch pipeline
-	skillRefs := make([]TemplateSkillRef, 0, len(skillURLs))
-	for _, url := range skillURLs {
-		skillRefs = append(skillRefs, TemplateSkillRef{SourceURL: url})
+	// Look up each skill from the DB. Skills must be platform or built-in
+	// (workspace_id IS NULL) — template skill_ids should only reference those.
+	type skillLookup struct {
+		ID          pgtype.UUID
+		Name        string
+		Description string
+		Content     string
+		Config      []byte
 	}
-
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	fetchStart := time.Now()
-	var fetched []*importedSkill
-	var failedURLs []string
-	if len(skillRefs) > 0 {
-		fetched, failedURLs = fetchTemplateSkillsParallel(httpClient, skillRefs)
-	}
-	slog.Info("agent-template create: fetch phase done",
-		append(logger.RequestAttrs(r),
-			"fetch_duration_ms", time.Since(fetchStart).Milliseconds(),
-			"fetched_count", len(skillRefs)-len(failedURLs),
-			"fail_count", len(failedURLs),
-			"failed_urls", failedURLs,
-		)...)
-	if len(failedURLs) > 0 {
-		writeJSON(w, http.StatusUnprocessableEntity, fetchFailureResponse{
-			Error:      "one or more skill sources are unavailable",
-			FailedURLs: failedURLs,
+	skillsToBind := make([]skillLookup, 0, len(skillIDs))
+	for _, sid := range skillIDs {
+		skillUUID, perr := util.ParseUUID(sid)
+		if perr != nil {
+			slog.Warn("agent-template create: invalid skill_id, skipping",
+				append(logger.RequestAttrs(r), "skill_id", sid, "error", perr)...)
+			continue
+		}
+		skillRow, err := h.Queries.GetSkill(r.Context(), skillUUID)
+		if err != nil {
+			slog.Warn("agent-template create: skill not found, skipping",
+				append(logger.RequestAttrs(r), "skill_id", sid, "error", err)...)
+			continue
+		}
+		skillsToBind = append(skillsToBind, skillLookup{
+			ID:          skillRow.ID,
+			Name:        skillRow.Name,
+			Description: skillRow.Description,
+			Content:     skillRow.Content,
+			Config:      skillRow.Config,
 		})
-		return
 	}
 
 	creatorUUID := parseUUID(ownerID)
@@ -247,69 +234,69 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 	defer tx.Rollback(r.Context())
 	qtx := h.Queries.WithTx(tx)
 
-	importedIDs := make([]string, 0, len(fetched))
-	allSkillIDs := make([]pgtype.UUID, 0, len(fetched))
+	importedIDs := make([]string, 0, len(skillsToBind))
+	reusedIDs := make([]string, 0, len(skillsToBind))
+	allSkillIDs := make([]pgtype.UUID, 0, len(skillsToBind))
 
-	for i, imp := range fetched {
-		if imp == nil {
-			continue
-		}
-
-		// Dedupe by name: reuse existing skill if present
+	for i, stb := range skillsToBind {
+		// Dedupe by name: reuse existing skill if present in target workspace
 		existing, err := qtx.GetSkillByWorkspaceAndName(r.Context(), db.GetSkillByWorkspaceAndNameParams{
 			WorkspaceID: wsUUID,
-			Name:        imp.name,
+			Name:        stb.Name,
 		})
 		if err == nil {
 			slog.Info("agent-template create: reusing existing skill",
 				append(logger.RequestAttrs(r),
 					"index", i,
-					"name", imp.name,
+					"name", stb.Name,
 					"existing_skill_id", uuidToString(existing.ID),
 				)...)
 			allSkillIDs = append(allSkillIDs, existing.ID)
+			reusedIDs = append(reusedIDs, uuidToString(existing.ID))
 			continue
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("agent-template create: lookup existing skill failed",
-				append(logger.RequestAttrs(r), "index", i, "name", imp.name, "error", err)...)
+				append(logger.RequestAttrs(r), "index", i, "name", stb.Name, "error", err)...)
 			writeError(w, http.StatusInternalServerError, "lookup existing skill failed: "+err.Error())
 			return
 		}
 
-		files := make([]CreateSkillFileRequest, 0, len(imp.files))
-		for _, f := range imp.files {
-			if !validateFilePath(f.path) {
+		// Copy the skill + its files to the target workspace
+		skillFiles, err := h.Queries.ListSkillFiles(r.Context(), stb.ID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			slog.Error("agent-template create: lookup skill files failed",
+				append(logger.RequestAttrs(r), "index", i, "name", stb.Name, "error", err)...)
+			writeError(w, http.StatusInternalServerError, "lookup skill files failed: "+err.Error())
+			return
+		}
+
+		files := make([]CreateSkillFileRequest, 0, len(skillFiles))
+		for _, f := range skillFiles {
+			if !validateFilePath(f.Path) {
 				continue
 			}
-			files = append(files, CreateSkillFileRequest{Path: f.path, Content: f.content})
+			files = append(files, CreateSkillFileRequest{Path: f.Path, Content: f.Content})
 		}
 
 		origin := map[string]any{
 			"type":          "agent_template",
 			"template_name": tmplRow.Name,
 		}
-		if imp.origin != nil {
-			for k, v := range imp.origin {
-				if _, exists := origin[k]; !exists {
-					origin[k] = v
-				}
-			}
-		}
 
 		created, err := createSkillWithFilesInTx(r.Context(), qtx, skillCreateInput{
 			WorkspaceID: wsUUID,
 			CreatorID:   creatorUUID,
-			Name:        imp.name,
-			Description: imp.description,
-			Content:     imp.content,
+			Name:        stb.Name,
+			Description: stb.Description,
+			Content:     stb.Content,
 			Config:      map[string]any{"origin": origin},
 			Files:       files,
 		})
 		if err != nil {
-			slog.Error("agent-template create: failed to create skill",
-				append(logger.RequestAttrs(r), "index", i, "name", imp.name, "error", err)...)
-			writeError(w, http.StatusInternalServerError, "failed to create skill: "+err.Error())
+			slog.Error("agent-template create: failed to copy skill",
+				append(logger.RequestAttrs(r), "index", i, "name", stb.Name, "error", err)...)
+			writeError(w, http.StatusInternalServerError, "failed to copy skill: "+err.Error())
 			return
 		}
 		allSkillIDs = append(allSkillIDs, parseUUID(created.ID))
@@ -442,86 +429,12 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 			"agent_id", uuidToString(agent.ID),
 			"template_name", tmplRow.Name,
 			"imported_skill_count", len(importedIDs),
+			"reused_skill_count", len(reusedIDs),
 		)...)
 
 	writeJSON(w, http.StatusCreated, CreateAgentFromTemplateResponse{
 		Agent:            resp,
 		ImportedSkillIDs: importedIDs,
+		ReusedSkillIDs:   reusedIDs,
 	})
-}
-
-// --- Parallel skill fetch ---
-
-type templateFetchResult struct {
-	index    int
-	imported *importedSkill
-	url      string
-	err      error
-}
-
-func fetchTemplateSkillsParallel(client *http.Client, refs []TemplateSkillRef) ([]*importedSkill, []string) {
-	results := make(chan templateFetchResult, len(refs))
-	var wg sync.WaitGroup
-	for i, ref := range refs {
-		wg.Add(1)
-		go func(i int, ref TemplateSkillRef) {
-			defer wg.Done()
-			start := time.Now()
-			slog.Info("agent-template fetch: start", "index", i, "source_url", ref.SourceURL)
-			imp, err := fetchSkillFromURL(client, ref.SourceURL)
-			elapsedMs := time.Since(start).Milliseconds()
-			if err != nil {
-				slog.Warn("agent-template fetch: failed",
-					"index", i,
-					"source_url", ref.SourceURL,
-					"duration_ms", elapsedMs,
-					"error", err,
-				)
-			} else {
-				resolvedName := ""
-				fileCount := 0
-				if imp != nil {
-					resolvedName = imp.name
-					fileCount = len(imp.files)
-				}
-				slog.Info("agent-template fetch: done",
-					"index", i,
-					"source_url", ref.SourceURL,
-					"duration_ms", elapsedMs,
-					"resolved_name", resolvedName,
-					"file_count", fileCount,
-				)
-			}
-			results <- templateFetchResult{index: i, imported: imp, url: ref.SourceURL, err: err}
-		}(i, ref)
-	}
-	wg.Wait()
-	close(results)
-
-	imports := make([]*importedSkill, len(refs))
-	var failed []string
-	for r := range results {
-		if r.err != nil {
-			failed = append(failed, r.url)
-			continue
-		}
-		imports[r.index] = r.imported
-	}
-	return imports, failed
-}
-
-func fetchSkillFromURL(client *http.Client, rawURL string) (*importedSkill, error) {
-	source, normalized, err := detectImportSource(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	switch source {
-	case sourceClawHub:
-		return fetchFromClawHub(client, normalized)
-	case sourceSkillsSh:
-		return fetchFromSkillsSh(client, normalized)
-	case sourceGitHub:
-		return fetchFromGitHub(client, normalized)
-	}
-	return nil, fmt.Errorf("unknown import source for %s", rawURL)
 }
