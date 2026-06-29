@@ -32,14 +32,21 @@ export default function TemplateDetailPage() {
   const updateMutation = useUpdateAgentTemplate();
   const deleteMutation = useDeleteAgentTemplate();
 
+  // Left sidebar state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
+  const [sidebarDirty, setSidebarDirty] = useState(false);
+
+  // Tab state
   const [instructions, setInstructions] = useState("");
+  const [instructionsDraft, setInstructionsDraft] = useState("");
   const [skillUrlsInput, setSkillUrlsInput] = useState("");
+  const [skillUrlsDraft, setSkillUrlsDraft] = useState("");
   const [mcpConfigInput, setMcpConfigInput] = useState("");
-  const [dirty, setDirty] = useState(false);
+  const [mcpConfigDraft, setMcpConfigDraft] = useState("");
+
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,53 +56,81 @@ export default function TemplateDetailPage() {
       setCategory(template.category);
       setTagsInput((template.tags ?? []).join(", "));
       setInstructions(template.instructions);
-      setSkillUrlsInput((template.skill_urls ?? []).join("\n"));
-      setMcpConfigInput(template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "");
-      setDirty(false);
+      setInstructionsDraft(template.instructions);
+      const urls = (template.skill_urls ?? []).join("\n");
+      setSkillUrlsInput(urls);
+      setSkillUrlsDraft(urls);
+      const mcp = template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "";
+      setMcpConfigInput(mcp);
+      setMcpConfigDraft(mcp);
+      setSidebarDirty(false);
     }
   }, [template]);
 
-  const markDirty = () => setDirty(true);
+  // Derive dirty states
+  const instructionsDirty = instructionsDraft !== instructions;
+  const skillsDirty = skillUrlsDraft !== skillUrlsInput;
+  const mcpDirty = mcpConfigDraft !== mcpConfigInput;
 
-  const buildUpdate = (): UpdateAgentTemplateRequest => {
-    if (!template) return {};
-    const data: UpdateAgentTemplateRequest = {};
-    if (name !== template.name) data.name = name;
-    if (description !== template.description) data.description = description;
-    if (category !== template.category) data.category = category;
-    if (instructions !== template.instructions) data.instructions = instructions;
-
-    const newTags = tagsInput.split(",").map((x) => x.trim()).filter(Boolean);
-    const oldTags = template.tags ?? [];
-    if (newTags.join(",") !== oldTags.join(",")) data.tags = newTags;
-
-    const newSkillUrls = skillUrlsInput.split("\n").map((x) => x.trim()).filter(Boolean);
-    const oldSkillUrls = template.skill_urls ?? [];
-    if (newSkillUrls.join(",") !== oldSkillUrls.join(",")) data.skill_urls = newSkillUrls;
-
-    if (mcpConfigInput.trim()) {
-      try {
-        const parsed = JSON.parse(mcpConfigInput);
-        data.mcp_config = parsed;
-      } catch { /* skip invalid */ }
-    } else if (template.mcp_config) {
-      data.mcp_config = null as unknown as undefined;
-    }
-
-    return data;
-  };
-
-  const handleSave = async () => {
+  const doSave = async (data: UpdateAgentTemplateRequest) => {
     if (!template) return;
     setSaving(true);
     try {
-      await updateMutation.mutateAsync({ id: template.id, data: buildUpdate() });
-      toast.success(t(($) => $.template_editor.updated));
-      setDirty(false);
+      await updateMutation.mutateAsync({ id: template.id, data });
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t(($) => $.template_editor.update_failed));
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveSidebar = async () => {
+    const data: UpdateAgentTemplateRequest = {};
+    if (name !== template!.name) data.name = name;
+    if (description !== template!.description) data.description = description;
+    if (category !== template!.category) data.category = category;
+    const newTags = tagsInput.split(",").map((x) => x.trim()).filter(Boolean);
+    const oldTags = template!.tags ?? [];
+    if (newTags.join(",") !== oldTags.join(",")) data.tags = newTags;
+    if (Object.keys(data).length === 0) return;
+    if (await doSave(data)) {
+      setSidebarDirty(false);
+      toast.success(t(($) => $.template_editor.updated));
+    }
+  };
+
+  const handleSaveInstructions = async () => {
+    if (await doSave({ instructions: instructionsDraft })) {
+      setInstructions(instructionsDraft);
+      toast.success(t(($) => $.template_editor.updated));
+    }
+  };
+
+  const handleSaveSkills = async () => {
+    const urls = skillUrlsDraft.split("\n").map((x) => x.trim()).filter(Boolean);
+    if (await doSave({ skill_urls: urls })) {
+      setSkillUrlsInput(skillUrlsDraft);
+      toast.success(t(($) => $.template_editor.updated));
+    }
+  };
+
+  const handleSaveMcp = async () => {
+    const data: UpdateAgentTemplateRequest = {};
+    if (mcpConfigDraft.trim()) {
+      try {
+        data.mcp_config = JSON.parse(mcpConfigDraft);
+      } catch {
+        toast.error("Invalid JSON");
+        return;
+      }
+    } else {
+      data.mcp_config = null as unknown as undefined;
+    }
+    if (await doSave(data)) {
+      setMcpConfigInput(mcpConfigDraft);
+      toast.success(t(($) => $.template_editor.updated));
     }
   };
 
@@ -142,11 +177,6 @@ export default function TemplateDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && (
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
-            </Button>
-          )}
           {isAdmin && (
             <Button variant="ghost" size="icon-sm" onClick={handleDelete}>
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -160,19 +190,18 @@ export default function TemplateDetailPage() {
         {/* Left sidebar */}
         <aside className="flex w-full flex-col rounded-lg border bg-background md:h-full md:min-h-0 md:overflow-y-auto">
 
-          {/* Identity */}
           <div className="flex flex-col gap-3 border-b px-5 pb-5 pt-5">
             <div className="flex flex-col gap-1">
               <input
                 className="w-full bg-transparent text-base font-semibold leading-tight outline-none"
                 value={name}
-                onChange={(e) => { setName(e.target.value); markDirty(); }}
+                onChange={(e) => { setName(e.target.value); setSidebarDirty(true); }}
                 placeholder="Template name"
               />
               <input
                 className="w-full bg-transparent text-xs leading-relaxed text-muted-foreground outline-none"
                 value={description}
-                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
+                onChange={(e) => { setDescription(e.target.value); setSidebarDirty(true); }}
                 placeholder="Description"
               />
             </div>
@@ -184,7 +213,6 @@ export default function TemplateDetailPage() {
             </div>
           </div>
 
-          {/* Properties */}
           <div className="border-b px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {t(($) => $.template_editor.properties)}
@@ -193,7 +221,7 @@ export default function TemplateDetailPage() {
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
                 <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.category)}</span>
                 <Input className="h-7 text-xs" value={category}
-                  onChange={(e) => { setCategory(e.target.value); markDirty(); }}
+                  onChange={(e) => { setCategory(e.target.value); setSidebarDirty(true); }}
                   placeholder="e.g. Engineering" />
               </div>
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
@@ -203,13 +231,12 @@ export default function TemplateDetailPage() {
             </div>
           </div>
 
-          {/* Tags */}
           <div className="border-b px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {t(($) => $.template_editor.tags)}
             </div>
             <Input className="h-7 text-xs mt-1" value={tagsInput}
-              onChange={(e) => { setTagsInput(e.target.value); markDirty(); }}
+              onChange={(e) => { setTagsInput(e.target.value); setSidebarDirty(true); }}
               placeholder="backend, api, go" />
             {tagsInput && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -220,8 +247,9 @@ export default function TemplateDetailPage() {
             )}
           </div>
 
-          {/* Details */}
-          <div className="px-5 py-4">
+          <div className="flex-1" />
+
+          <div className="border-t px-5 py-4">
             <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {t(($) => $.template_editor.details)}
             </div>
@@ -240,6 +268,15 @@ export default function TemplateDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Sidebar save */}
+          {sidebarDirty && (
+            <div className="border-t px-5 py-3">
+              <Button size="sm" className="w-full" onClick={handleSaveSidebar} disabled={saving}>
+                {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
+              </Button>
+            </div>
+          )}
         </aside>
 
         {/* Right content -- Tabs */}
@@ -251,37 +288,61 @@ export default function TemplateDetailPage() {
               <TabsTrigger value="mcp">MCP</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="instructions" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
-              <Label className="text-xs text-muted-foreground mb-2">
+            {/* Instructions tab */}
+            <TabsContent value="instructions" className="flex-1 flex flex-col min-h-0 mt-3">
+              <Label className="text-xs text-muted-foreground mb-2 shrink-0">
                 Define the agent&apos;s identity and working style. Injected into every task context. Supports Markdown.
               </Label>
               <textarea
-                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
-                value={instructions}
-                onChange={(e) => { setInstructions(e.target.value); markDirty(); }}
+                className="flex-1 min-h-0 w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={instructionsDraft}
+                onChange={(e) => setInstructionsDraft(e.target.value)}
                 placeholder="Agent instructions (markdown)..." />
+              {instructionsDirty && (
+                <div className="shrink-0 mt-3">
+                  <Button size="sm" onClick={handleSaveInstructions} disabled={saving}>
+                    {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
-            <TabsContent value="skills" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
-              <Label className="text-xs text-muted-foreground mb-2">
+            {/* Skills tab */}
+            <TabsContent value="skills" className="flex-1 flex flex-col min-h-0 mt-3">
+              <Label className="text-xs text-muted-foreground mb-2 shrink-0">
                 External skill URLs (one per line). Imported when an agent is created from this template.
               </Label>
               <textarea
-                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
-                value={skillUrlsInput}
-                onChange={(e) => { setSkillUrlsInput(e.target.value); markDirty(); }}
+                className="flex-1 min-h-0 w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={skillUrlsDraft}
+                onChange={(e) => setSkillUrlsDraft(e.target.value)}
                 placeholder="https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices" />
+              {skillsDirty && (
+                <div className="shrink-0 mt-3">
+                  <Button size="sm" onClick={handleSaveSkills} disabled={saving}>
+                    {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
-            <TabsContent value="mcp" className="flex-1 min-h-0 mt-3 data-[state=active]:flex data-[state=active]:flex-col">
-              <Label className="text-xs text-muted-foreground mb-2">
+            {/* MCP tab */}
+            <TabsContent value="mcp" className="flex-1 flex flex-col min-h-0 mt-3">
+              <Label className="text-xs text-muted-foreground mb-2 shrink-0">
                 MCP server configuration (JSON format).
               </Label>
               <textarea
-                className="flex-1 min-h-[400px] w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
-                value={mcpConfigInput}
-                onChange={(e) => { setMcpConfigInput(e.target.value); markDirty(); }}
+                className="flex-1 min-h-0 w-full rounded-md border p-4 font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
+                value={mcpConfigDraft}
+                onChange={(e) => setMcpConfigDraft(e.target.value)}
                 placeholder='{"servers": {}}' />
+              {mcpDirty && (
+                <div className="shrink-0 mt-3">
+                  <Button size="sm" onClick={handleSaveMcp} disabled={saving}>
+                    {saving ? t(($) => $.template_editor.saving) : t(($) => $.template_editor.save)}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
