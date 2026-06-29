@@ -328,10 +328,10 @@ func (q *Queries) ListAgentSkills(ctx context.Context, agentID pgtype.UUID) ([]S
 }
 
 const listAgentSkillsByWorkspace = `-- name: ListAgentSkillsByWorkspace :many
-SELECT ask.agent_id, s.id, s.name, s.description
+SELECT ask.agent_id, s.id, s.name, s.description, s.skill_type
 FROM agent_skill ask
 JOIN skill s ON s.id = ask.skill_id
-WHERE s.workspace_id = $1
+WHERE s.workspace_id IS NULL OR s.workspace_id = $1
 ORDER BY s.name ASC
 `
 
@@ -340,6 +340,7 @@ type ListAgentSkillsByWorkspaceRow struct {
 	ID          pgtype.UUID `json:"id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
+	SkillType   string      `json:"skill_type"`
 }
 
 func (q *Queries) ListAgentSkillsByWorkspace(ctx context.Context, workspaceID pgtype.UUID) ([]ListAgentSkillsByWorkspaceRow, error) {
@@ -356,6 +357,7 @@ func (q *Queries) ListAgentSkillsByWorkspace(ctx context.Context, workspaceID pg
 			&i.ID,
 			&i.Name,
 			&i.Description,
+			&i.SkillType,
 		); err != nil {
 			return nil, err
 		}

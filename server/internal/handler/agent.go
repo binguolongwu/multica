@@ -589,15 +589,16 @@ if len(runtimeIDs) > 0 {
 		writeError(w, http.StatusInternalServerError, "failed to load agent skills")
 		return
 	}
-	skillMap := map[string][]AgentSkillSummary{}
-	for _, row := range skillRows {
-		agentID := uuidToString(row.AgentID)
-		skillMap[agentID] = append(skillMap[agentID], AgentSkillSummary{
-			ID:          uuidToString(row.ID),
-			Name:        row.Name,
-			Description: row.Description,
-		})
-	}
+		skillMap := map[string][]AgentSkillSummary{}
+		for _, row := range skillRows {
+			agentID := uuidToString(row.AgentID)
+			skillMap[agentID] = append(skillMap[agentID], AgentSkillSummary{
+				ID:          uuidToString(row.ID),
+				Name:        row.Name,
+				Description: row.Description,
+				SkillType:   row.SkillType,
+			})
+		}
 
 	// mcp_config still uses the workspace-level always-redact setting and
 	// the per-row owner/admin gate — secrets in MCP server configs follow
@@ -1287,6 +1288,7 @@ func (h *Handler) attachAgentSkills(ctx context.Context, resp *AgentResponse, ag
 			ID:          uuidToString(s.ID),
 			Name:        s.Name,
 			Description: s.Description,
+			SkillType:   s.SkillType,
 		}
 	}
 	resp.Skills = out

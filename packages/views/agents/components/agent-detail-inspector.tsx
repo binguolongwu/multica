@@ -202,14 +202,20 @@ export function AgentDetailInspector({
           </span>
         </div>
         <div className="flex flex-wrap gap-1">
-          {agent.skills.map((s) => (
-            <span
-              key={s.id}
-              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
-            >
-              {s.name}
-            </span>
-          ))}
+  {agent.skills.map((s) => (
+    <span
+      key={s.id}
+      className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium ${
+        s.skill_type === 'builtin' 
+          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+          : s.skill_type === 'platform'
+          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {s.name}
+    </span>
+  ))}
           <SkillAttach agent={agent} canEdit={canEdit} />
         </div>
       </div>
