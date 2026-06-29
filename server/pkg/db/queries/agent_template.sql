@@ -14,7 +14,7 @@ WHERE id = $1;
 INSERT INTO agent_template (
     name, description, category, icon, accent, tags,
     instructions, avatar_url, model, thinking_level, visibility,
-    max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by
+    max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9, $10, $11,
@@ -38,7 +38,7 @@ UPDATE agent_template SET
     max_concurrent_tasks = COALESCE(sqlc.narg('max_concurrent_tasks'), max_concurrent_tasks),
     custom_args = COALESCE(sqlc.narg('custom_args'), custom_args),
     mcp_config = COALESCE(sqlc.narg('mcp_config'), mcp_config),
-    skill_urls = COALESCE(sqlc.narg('skill_urls'), skill_urls),
+    skill_ids = COALESCE(sqlc.narg('skill_ids'), skill_ids),
     updated_at = now()
 WHERE id = $1
 RETURNING *;

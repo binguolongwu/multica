@@ -120,7 +120,7 @@ type AgentTemplate struct {
 	MaxConcurrentTasks int32              `json:"max_concurrent_tasks"`
 	CustomArgs         []byte             `json:"custom_args"`
 	McpConfig          []byte             `json:"mcp_config"`
-	SkillUrls          []byte             `json:"skill_urls"`
+	SkillIds           []byte             `json:"skill_ids"`
 	CreatedBy          pgtype.UUID        `json:"created_by"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
@@ -811,6 +811,7 @@ type Skill struct {
 	CreatedBy   pgtype.UUID        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	SkillType   string             `json:"skill_type"`
 }
 
 type SkillFile struct {

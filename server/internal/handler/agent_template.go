@@ -192,14 +192,14 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 		append(logger.RequestAttrs(r),
 			"template_id", req.TemplateID,
 			"workspace_id", workspaceID,
-			"skill_url_count", len(tmplRow.SkillUrls),
+			"skill_url_count", len(tmplRow.SkillIds),
 		)...)
 
 	// Parse skill URLs from the template
 	var skillURLs []string
-	if len(tmplRow.SkillUrls) > 0 {
-		if err := json.Unmarshal(tmplRow.SkillUrls, &skillURLs); err != nil {
-			slog.Warn("agent-template create: failed to parse skill_urls, treating as empty",
+	if len(tmplRow.SkillIds) > 0 {
+		if err := json.Unmarshal(tmplRow.SkillIds, &skillURLs); err != nil {
+			slog.Warn("agent-template create: failed to parse skill_ids, treating as empty",
 				append(logger.RequestAttrs(r), "template_id", req.TemplateID, "error", err)...)
 			skillURLs = nil
 		}

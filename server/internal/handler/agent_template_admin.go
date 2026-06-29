@@ -35,7 +35,7 @@ type AgentTemplateResponse struct {
 	MaxConcurrentTasks int32           `json:"max_concurrent_tasks"`
 	CustomArgs         json.RawMessage `json:"custom_args"`
 	McpConfig          json.RawMessage `json:"mcp_config,omitempty"`
-	SkillUrls          json.RawMessage `json:"skill_urls"`
+	SkillIds          json.RawMessage `json:"skill_ids"`
 	CreatedBy          *string         `json:"created_by"`
 	CreatedAt          string          `json:"created_at"`
 	UpdatedAt          string          `json:"updated_at"`
@@ -71,7 +71,7 @@ func agentTemplateToResponse(t db.AgentTemplate) AgentTemplateResponse {
 		MaxConcurrentTasks: t.MaxConcurrentTasks,
 		CustomArgs:         json.RawMessage(t.CustomArgs),
 		McpConfig:          mcpConfig,
-		SkillUrls:          json.RawMessage(t.SkillUrls),
+		SkillIds:          json.RawMessage(t.SkillIds),
 		CreatedBy:          createdBy,
 		CreatedAt:          t.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:          t.UpdatedAt.Time.Format("2006-01-02T15:04:05Z"),
@@ -95,7 +95,7 @@ type CreateAgentTemplateAdminRequest struct {
 	MaxConcurrentTasks int32           `json:"max_concurrent_tasks,omitempty"`
 	CustomArgs         []string        `json:"custom_args,omitempty"`
 	McpConfig          json.RawMessage `json:"mcp_config,omitempty"`
-	SkillUrls          []string        `json:"skill_urls,omitempty"`
+	SkillIds          []string        `json:"skill_ids,omitempty"`
 }
 
 type UpdateAgentTemplateAdminRequest struct {
@@ -113,7 +113,7 @@ type UpdateAgentTemplateAdminRequest struct {
 	MaxConcurrentTasks *int32           `json:"max_concurrent_tasks,omitempty"`
 	CustomArgs         *[]string        `json:"custom_args,omitempty"`
 	McpConfig          *json.RawMessage `json:"mcp_config,omitempty"`
-	SkillUrls          *[]string        `json:"skill_urls,omitempty"`
+	SkillIds          *[]string        `json:"skill_ids,omitempty"`
 }
 
 // --- Admin handlers ---
@@ -145,8 +145,8 @@ func (h *Handler) CreateAgentTemplateAdmin(w http.ResponseWriter, r *http.Reques
 	if req.CustomArgs == nil {
 		ca = []byte("[]")
 	}
-	su, _ := json.Marshal(req.SkillUrls)
-	if req.SkillUrls == nil {
+	su, _ := json.Marshal(req.SkillIds)
+	if req.SkillIds == nil {
 		su = []byte("[]")
 	}
 
@@ -175,7 +175,7 @@ func (h *Handler) CreateAgentTemplateAdmin(w http.ResponseWriter, r *http.Reques
 		MaxConcurrentTasks: req.MaxConcurrentTasks,
 		CustomArgs:         ca,
 		McpConfig:          req.McpConfig,
-		SkillUrls:          su,
+		SkillIds:          su,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -261,9 +261,9 @@ func (h *Handler) UpdateAgentTemplateAdmin(w http.ResponseWriter, r *http.Reques
 	if req.McpConfig != nil {
 		params.McpConfig = *req.McpConfig
 	}
-	if req.SkillUrls != nil {
-		serialized, _ := json.Marshal(*req.SkillUrls)
-		params.SkillUrls = serialized
+	if req.SkillIds != nil {
+		serialized, _ := json.Marshal(*req.SkillIds)
+		params.SkillIds = serialized
 	}
 
 	updated, err := h.Queries.UpdateAgentTemplate(r.Context(), params)

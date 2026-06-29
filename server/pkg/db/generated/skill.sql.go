@@ -30,7 +30,7 @@ func (q *Queries) AddAgentSkill(ctx context.Context, arg AddAgentSkillParams) er
 const createSkill = `-- name: CreateSkill :one
 INSERT INTO skill (workspace_id, name, description, content, config, created_by)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, workspace_id, name, description, content, config, created_by, created_at, updated_at
+RETURNING id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type
 `
 
 type CreateSkillParams struct {
@@ -62,6 +62,7 @@ func (q *Queries) CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SkillType,
 	)
 	return i, err
 }
@@ -100,7 +101,7 @@ func (q *Queries) DeleteSkillFilesBySkill(ctx context.Context, skillID pgtype.UU
 }
 
 const getSkill = `-- name: GetSkill :one
-SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at FROM skill
+SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type FROM skill
 WHERE id = $1
 `
 
@@ -117,12 +118,13 @@ func (q *Queries) GetSkill(ctx context.Context, id pgtype.UUID) (Skill, error) {
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SkillType,
 	)
 	return i, err
 }
 
 const getSkillByWorkspaceAndName = `-- name: GetSkillByWorkspaceAndName :one
-SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at FROM skill
+SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type FROM skill
 WHERE workspace_id = $1 AND name = $2
 `
 
@@ -148,6 +150,7 @@ func (q *Queries) GetSkillByWorkspaceAndName(ctx context.Context, arg GetSkillBy
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SkillType,
 	)
 	return i, err
 }
@@ -172,7 +175,7 @@ func (q *Queries) GetSkillFile(ctx context.Context, id pgtype.UUID) (SkillFile, 
 }
 
 const getSkillInWorkspace = `-- name: GetSkillInWorkspace :one
-SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at FROM skill
+SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type FROM skill
 WHERE id = $1 AND workspace_id = $2
 `
 
@@ -194,6 +197,7 @@ func (q *Queries) GetSkillInWorkspace(ctx context.Context, arg GetSkillInWorkspa
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SkillType,
 	)
 	return i, err
 }
@@ -232,7 +236,7 @@ func (q *Queries) ListAgentSkillNamesByAgentIDs(ctx context.Context, agentIds []
 }
 
 const listAgentSkillSummaries = `-- name: ListAgentSkillSummaries :many
-SELECT s.id, s.workspace_id, s.name, s.description, s.config, s.created_by, s.created_at, s.updated_at
+SELECT s.id, s.workspace_id, s.name, s.description, s.config, s.skill_type, s.created_by, s.created_at, s.updated_at
 FROM skill s
 JOIN agent_skill ask ON ask.skill_id = s.id
 WHERE ask.agent_id = $1
@@ -245,6 +249,7 @@ type ListAgentSkillSummariesRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Config      []byte             `json:"config"`
+	SkillType   string             `json:"skill_type"`
 	CreatedBy   pgtype.UUID        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
@@ -267,6 +272,7 @@ func (q *Queries) ListAgentSkillSummaries(ctx context.Context, agentID pgtype.UU
 			&i.Name,
 			&i.Description,
 			&i.Config,
+			&i.SkillType,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -283,7 +289,7 @@ func (q *Queries) ListAgentSkillSummaries(ctx context.Context, agentID pgtype.UU
 
 const listAgentSkills = `-- name: ListAgentSkills :many
 
-SELECT s.id, s.workspace_id, s.name, s.description, s.content, s.config, s.created_by, s.created_at, s.updated_at FROM skill s
+SELECT s.id, s.workspace_id, s.name, s.description, s.content, s.config, s.created_by, s.created_at, s.updated_at, s.skill_type FROM skill s
 JOIN agent_skill ask ON ask.skill_id = s.id
 WHERE ask.agent_id = $1
 ORDER BY s.name ASC
@@ -309,6 +315,7 @@ func (q *Queries) ListAgentSkills(ctx context.Context, agentID pgtype.UUID) ([]S
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SkillType,
 		); err != nil {
 			return nil, err
 		}
@@ -360,6 +367,57 @@ func (q *Queries) ListAgentSkillsByWorkspace(ctx context.Context, workspaceID pg
 	return items, nil
 }
 
+const listPlatformSkills = `-- name: ListPlatformSkills :many
+SELECT id, workspace_id, name, description, config, skill_type, created_by, created_at, updated_at
+FROM skill
+WHERE skill_type IN ('builtin', 'platform')
+ORDER BY skill_type, name ASC
+`
+
+type ListPlatformSkillsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Config      []byte             `json:"config"`
+	SkillType   string             `json:"skill_type"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Returns both platform and built-in skills — the set available for
+// agent template skill_ids references.
+func (q *Queries) ListPlatformSkills(ctx context.Context) ([]ListPlatformSkillsRow, error) {
+	rows, err := q.db.Query(ctx, listPlatformSkills)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPlatformSkillsRow{}
+	for rows.Next() {
+		var i ListPlatformSkillsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Config,
+			&i.SkillType,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSkillFiles = `-- name: ListSkillFiles :many
 
 SELECT id, skill_id, path, content, created_at, updated_at FROM skill_file
@@ -396,10 +454,10 @@ func (q *Queries) ListSkillFiles(ctx context.Context, skillID pgtype.UUID) ([]Sk
 }
 
 const listSkillSummariesByWorkspace = `-- name: ListSkillSummariesByWorkspace :many
-SELECT id, workspace_id, name, description, config, created_by, created_at, updated_at
+SELECT id, workspace_id, name, description, config, skill_type, created_by, created_at, updated_at
 FROM skill
-WHERE workspace_id = $1
-ORDER BY name ASC
+WHERE workspace_id IS NULL OR workspace_id = $1
+ORDER BY skill_type, name ASC
 `
 
 type ListSkillSummariesByWorkspaceRow struct {
@@ -408,6 +466,7 @@ type ListSkillSummariesByWorkspaceRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Config      []byte             `json:"config"`
+	SkillType   string             `json:"skill_type"`
 	CreatedBy   pgtype.UUID        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
@@ -432,6 +491,7 @@ func (q *Queries) ListSkillSummariesByWorkspace(ctx context.Context, workspaceID
 			&i.Name,
 			&i.Description,
 			&i.Config,
+			&i.SkillType,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -446,14 +506,55 @@ func (q *Queries) ListSkillSummariesByWorkspace(ctx context.Context, workspaceID
 	return items, nil
 }
 
-const listSkillsByWorkspace = `-- name: ListSkillsByWorkspace :many
+const listSkillsByType = `-- name: ListSkillsByType :many
 
-SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at FROM skill
-WHERE workspace_id = $1
+SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type FROM skill
+WHERE skill_type = $1
 ORDER BY name ASC
 `
 
+// Skill type queries (platform / builtin skill discovery)
+func (q *Queries) ListSkillsByType(ctx context.Context, skillType string) ([]Skill, error) {
+	rows, err := q.db.Query(ctx, listSkillsByType, skillType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Skill{}
+	for rows.Next() {
+		var i Skill
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Content,
+			&i.Config,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SkillType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSkillsByWorkspace = `-- name: ListSkillsByWorkspace :many
+
+SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type FROM skill
+WHERE workspace_id IS NULL OR workspace_id = $1
+ORDER BY skill_type, name ASC
+`
+
 // Skill CRUD
+// Includes platform and built-in skills (workspace_id IS NULL) plus
+// workspace-bound skills for the given workspace.
 func (q *Queries) ListSkillsByWorkspace(ctx context.Context, workspaceID pgtype.UUID) ([]Skill, error) {
 	rows, err := q.db.Query(ctx, listSkillsByWorkspace, workspaceID)
 	if err != nil {
@@ -473,6 +574,7 @@ func (q *Queries) ListSkillsByWorkspace(ctx context.Context, workspaceID pgtype.
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SkillType,
 		); err != nil {
 			return nil, err
 		}
@@ -516,7 +618,7 @@ UPDATE skill SET
     config = COALESCE($5, config),
     updated_at = now()
 WHERE id = $1
-RETURNING id, workspace_id, name, description, content, config, created_by, created_at, updated_at
+RETURNING id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type
 `
 
 type UpdateSkillParams struct {
@@ -546,6 +648,7 @@ func (q *Queries) UpdateSkill(ctx context.Context, arg UpdateSkillParams) (Skill
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SkillType,
 	)
 	return i, err
 }

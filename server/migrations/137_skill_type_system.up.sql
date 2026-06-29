@@ -39,8 +39,8 @@ ALTER TABLE agent_template RENAME COLUMN skill_urls TO skill_ids;
 -- multica-autopilots
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-autopilots',
- 'Use when creating, updating, inspecting, triggering, or debugging Multica autopilots. Covers the full chain: schedule/webhook/manual trigger, create_issue vs run_only execution, agent/squad leader admission, runs, created issues/tasks, webhook URL rotation, and side-effect boundaries.',
- $skill1$---
+ $d1$$Use when creating, updating, inspecting, triggering, or debugging Multica autopilots. Covers the full chain: schedule/webhook/manual trigger, create_issue vs run_only execution, agent/squad leader admission, runs, created issues/tasks, webhook URL rotation, and side-effect boundaries.$$d1$,
+ $c1$$---
 name: multica-autopilots
 description: "Use when creating, updating, inspecting, triggering, or debugging Multica autopilots. Covers the full chain: schedule/webhook/manual trigger, create_issue vs run_only execution, agent/squad leader admission, runs, created issues/tasks, webhook URL rotation, and side-effect boundaries."
 user-invocable: false
@@ -108,14 +108,14 @@ For "why didn't it run":
 These mutate durable state or start work: `create`, `update`, `delete`, trigger add/update/delete/rotate, `trigger`, and webhook calls to `/api/webhooks/autopilots/{token}`.
 
 More source-backed details: `references/autopilots-source-map.md`.
-$skill1$,
+$$c1$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-autopilots: references/autopilots-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-autopilots'),
  'references/autopilots-source-map.md',
- $file1$# Autopilots source map
+ $f1$$# Autopilots source map
 
 - `server/cmd/multica/cmd_autopilot.go` registers `list`, `get`, `create`, `update`, `delete`, `trigger`, `runs`, `trigger-add`, `trigger-update`, `trigger-delete`, and `trigger-rotate-url`.
 - The CLI maps reads/writes to `/api/autopilots`, `/api/autopilots/{id}`, `/api/autopilots/{id}/trigger`, `/api/autopilots/{id}/runs`, and trigger subroutes.
@@ -124,13 +124,13 @@ INSERT INTO skill_file (skill_id, path, content) VALUES
 - `resolveAutopilotLeader` resolves squad-assigned autopilots to the squad leader.
 - `AgentReadiness` blocks archived/runtime-unready agents before enqueue.
 - `server/cmd/server/router.go` exposes authenticated `/api/autopilots` routes and unauthenticated webhook ingress `/api/webhooks/autopilots/{token}`.
-$file1$);
+$$f1$);
 
 -- multica-creating-agents
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-creating-agents',
- 'Use when creating, inspecting, or debugging a Multica agent through the `multica agent` CLI or `POST /api/agents` — what each field is, its persisted shape, whether it is metadata-only or consumed by the daemon at claim time, which inputs are validated/rejected, how custom_env secrets are gated, and how skill binding behaves. Not for assigning issues to existing agents or for runtime task prompts.',
- $skill2$---
+ $d2$$Use when creating, inspecting, or debugging a Multica agent through the `multica agent` CLI or `POST /api/agents` — what each field is, its persisted shape, whether it is metadata-only or consumed by the daemon at claim time, which inputs are validated/rejected, how custom_env secrets are gated, and how skill binding behaves. Not for assigning issues to existing agents or for runtime task prompts.$$d2$,
+ $c2$$---
 name: multica-creating-agents
 description: "Use when creating, inspecting, or debugging a Multica agent through the `multica agent` CLI or `POST /api/agents` — what each field is, its persisted shape, whether it is metadata-only or consumed by the daemon at claim time, which inputs are validated/rejected, how custom_env secrets are gated, and how skill binding behaves. Not for assigning issues to existing agents or for runtime task prompts."
 user-invocable: false
@@ -359,14 +359,14 @@ State-changing (require an explicit instruction — do not run speculatively):
 `references/creating-agents-source-map.md` maps every contract above to its
 `file:line` on the current tree, the runtime effect, and a safe read-only
 verification command.
-$skill2$,
+$$c2$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-creating-agents: references/creating-agents-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-creating-agents'),
  'references/creating-agents-source-map.md',
- $file2$# Creating agents — source map
+ $f2$$# Creating agents — source map
 
 Evidence layer for `SKILL.md`. Every contract maps to `file:line` on the
 current tree (branch `feat/builtin-skills`, latest `main` merged), the runtime
@@ -480,13 +480,13 @@ only.
 | `CreateAgentParams` | 739–756 | typed params: `RuntimeConfig []byte`, `Instructions string`, `CustomEnv []byte`, `CustomArgs []byte`, `Model pgtype.Text`, `ThinkingLevel pgtype.Text` |
 | `UpdateAgent` SET | 2552–2566 | COALESCE updates of `runtime_config, instructions, custom_env, custom_args, model, thinking_level` — note `custom_env` is COALESCE-guarded but the handler rejects it before this query runs |
 | `UpdateAgentCustomEnv` (called by the `UpdateAgentEnv` handler) | 2652 | `SET custom_env = $2` — the only write path for env values |
-$file2$);
+$$f2$);
 
 -- multica-mentioning
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-mentioning',
- 'Use when an issue comment needs to @mention someone — link to a person, trigger another agent, hand work to a squad, or broadcast with @all. Documents the verified mention contract: how a mention link is built from a real UUID, the four mention types and exactly what each one enqueues (agent → a run for that agent, squad → a run for the squad leader, member and issue → a rendered link with NO run), comment create/edit preview and suppression, the @all broadcast and how it suppresses the assignee's auto-trigger, and the silent no-op cases (a name where a UUID belongs, a bad/unknown UUID, an already-pending task, an archived agent, a private agent you cannot access). WHETHER to mention — loop avoidance, staying silent on acknowledgements — lives in the runtime brief's Mentions section, not here. This skill is the backend contract only, traced to server/internal/util/mention.go and server/internal/handler/comment.go.',
- $skill3$---
+ $d3$$Use when an issue comment needs to @mention someone — link to a person, trigger another agent, hand work to a squad, or broadcast with @all. Documents the verified mention contract: how a mention link is built from a real UUID, the four mention types and exactly what each one enqueues (agent → a run for that agent, squad → a run for the squad leader, member and issue → a rendered link with NO run), comment create/edit preview and suppression, the @all broadcast and how it suppresses the assignee's auto-trigger, and the silent no-op cases (a name where a UUID belongs, a bad/unknown UUID, an already-pending task, an archived agent, a private agent you cannot access). WHETHER to mention — loop avoidance, staying silent on acknowledgements — lives in the runtime brief's Mentions section, not here. This skill is the backend contract only, traced to server/internal/util/mention.go and server/internal/handler/comment.go.$$d3$,
+ $c3$$---
 name: multica-mentioning
 description: "Use when an issue comment needs to @mention someone — link to a person, trigger another agent, hand work to a squad, or broadcast with @all. Documents the verified mention contract: how a mention link is built from a real UUID, the four mention types and exactly what each one enqueues (agent → a run for that agent, squad → a run for the squad leader, member and issue → a rendered link with NO run), comment create/edit preview and suppression, the @all broadcast and how it suppresses the assignee's auto-trigger, and the silent no-op cases (a name where a UUID belongs, a bad/unknown UUID, an already-pending task, an archived agent, a private agent you cannot access). WHETHER to mention — loop avoidance, staying silent on acknowledgements — lives in the runtime brief's Mentions section, not here. This skill is the backend contract only, traced to server/internal/util/mention.go and server/internal/handler/comment.go."
 user-invocable: false
@@ -644,14 +644,14 @@ still parses (which is why the type must match the id source).
 enqueue branches, the @all suppression, and the CLI id-source mapping, plus the
 explicit note that no member-notification delivery path exists in the Go
 comment handler.
-$skill3$,
+$$c3$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-mentioning: references/mentioning-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-mentioning'),
  'references/mentioning-source-map.md',
- $file3$# Mentioning — source map
+ $f3$$# Mentioning — source map
 
 Every claim in `SKILL.md` traces to a line below. Re-derive against the current
 tree before trusting any line number; the behavior is the contract, the line is
@@ -773,13 +773,13 @@ unchanged threads — no member-notification call. The verified contract is
 narrow: a `member` or `issue` mention renders as a link and enqueues no agent
 run; only `agent` and `squad` mentions enqueue work. If a notification UX
 exists, it is not in this handler, so this skill makes no claim about it.
-$file3$);
+$$f3$);
 
 -- multica-oss-operations
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-oss-operations',
- 'Upload, download, and list files in the workspace Object Storage Service (OSS).',
- $skill4$---
+ $d4$$Upload, download, and list files in the workspace Object Storage Service (OSS).$$d4$,
+ $c4$$---
 name: multica-oss-operations
 description: "Upload, download, and list files in the workspace Object Storage Service (OSS)."
 user-invocable: false
@@ -820,14 +820,14 @@ multica oss download --key <oss_key> --output <local_path>
   `[Download report](https://files.example.com/reports/...)`
 - Check `multica oss list` before overwriting an existing key
 - Do NOT store credentials, secrets, or .env files in OSS
-$skill4$,
+$$c4$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-projects-and-resources
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-projects-and-resources',
- 'Use when creating, inspecting, updating, or debugging Multica projects and project resources. Covers durable project context, github_repo and local_directory resources, how resources affect future agent task context, when to bind repos, and when not to mutate resources.',
- $skill5$---
+ $d5$$Use when creating, inspecting, updating, or debugging Multica projects and project resources. Covers durable project context, github_repo and local_directory resources, how resources affect future agent task context, when to bind repos, and when not to mutate resources.$$d5$,
+ $c5$$---
 name: multica-projects-and-resources
 description: "Use when creating, inspecting, updating, or debugging Multica projects and project resources. Covers durable project context, github_repo and local_directory resources, how resources affect future agent task context, when to bind repos, and when not to mutate resources."
 user-invocable: false
@@ -901,14 +901,14 @@ is task-local checkout state.
 Project create/update/delete/status and project resource add/update/remove mutate durable workspace state and affect future tasks. Ask before changing `local_directory` unless the user explicitly requested that exact local path.
 
 More source-backed details: `references/projects-and-resources-source-map.md`.
-$skill5$,
+$$c5$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-projects-and-resources: references/projects-and-resources-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-projects-and-resources'),
  'references/projects-and-resources-source-map.md',
- $file5$# Projects and resources source map
+ $f5$$# Projects and resources source map
 
 - `server/cmd/multica/cmd_project.go` registers project `list`, `get`, `create`, `update`, `delete`, and `status`.
 - The same file registers `project resource list/add/update/remove`.
@@ -920,13 +920,13 @@ INSERT INTO skill_file (skill_id, path, content) VALUES
 - Project resources are written into `.multica/project/resources.json` for agent workdirs.
 - `github_repo.resource_ref.ref` is lifted into daemon `RepoData.Ref` by `server/internal/handler/daemon.go`; `server/internal/daemon/daemon.go` stores it per task, and `server/internal/daemon/health.go` uses it as the default `/repo/checkout` ref when the checkout request does not explicitly pass one.
 - A project's `description` is injected as durable context for every task in the project. The claim handler (`server/internal/handler/daemon.go`) reads `proj.Description` onto the claim response (`ProjectDescription`, `server/internal/handler/agent.go`); the daemon carries it through `Task` (`server/internal/daemon/types.go`) and `TaskContextForEnv` (`server/internal/daemon/execenv/execenv.go`) into the brief's `## Project Context` section (`server/internal/daemon/execenv/runtime_config.go`) and into `.multica/project/resources.json` as `project_description` (`server/internal/daemon/execenv/context.go`).
-$file5$);
+$$f5$);
 
 -- multica-runtimes-and-repos
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-runtimes-and-repos',
- 'Use when inspecting or debugging Multica runtimes, daemon task claiming, agent not running, workdir/session reuse, or repository checkout. Covers runtime online/offline state, daemon heartbeat/claim chain, task-scoped repo checkout, project repo context, local_directory caveats, and safe diagnostic commands.',
- $skill6$---
+ $d6$$Use when inspecting or debugging Multica runtimes, daemon task claiming, agent not running, workdir/session reuse, or repository checkout. Covers runtime online/offline state, daemon heartbeat/claim chain, task-scoped repo checkout, project repo context, local_directory caveats, and safe diagnostic commands.$$d6$,
+ $c6$$---
 name: multica-runtimes-and-repos
 description: "Use when inspecting or debugging Multica runtimes, daemon task claiming, agent not running, workdir/session reuse, or repository checkout. Covers runtime online/offline state, daemon heartbeat/claim chain, task-scoped repo checkout, project repo context, local_directory caveats, and safe diagnostic commands."
 user-invocable: false
@@ -1003,14 +1003,14 @@ Workspace repos and project resources are not the same thing:
 Do not add a project resource just because `repo checkout` failed. First determine whether the user asked for durable project context or just a task checkout.
 
 More source-backed details: `references/runtimes-and-repos-source-map.md`.
-$skill6$,
+$$c6$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-runtimes-and-repos: references/runtimes-and-repos-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-runtimes-and-repos'),
  'references/runtimes-and-repos-source-map.md',
- $file6$# Runtimes and repos source map
+ $f6$$# Runtimes and repos source map
 
 - `server/cmd/multica/cmd_runtime.go` registers `runtime list`, `usage`, `activity`, `update`, and `delete`.
 - `runtime list` reads `/api/runtimes` and prints `id`, `name`, `runtime_mode`, `provider`, `status`, and `last_seen_at`.
@@ -1022,13 +1022,13 @@ INSERT INTO skill_file (skill_id, path, content) VALUES
 - `server/cmd/server/router.go` registers daemon APIs under `/api/daemon`, including workspace repos and task claim.
 - `server/internal/daemon/daemon.go` claims tasks, prepares workdirs, launches provider CLIs, and reports completion.
 - `server/internal/daemon/execenv/runtime_config.go` injects task/project/repo context into agent workdirs.
-$file6$);
+$$f6$);
 
 -- multica-skill-importing
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-skill-importing',
- 'Use when a user provides a skill URL, slug, or clear intent to import/install a specific skill into the current Multica workspace. Teaches the workspace import API/CLI path (POST /api/skills/import), the supported URL source families, --on-conflict fail|overwrite|rename|skip behavior and structured import results, additive agent binding vs replace-all, and the reserved SKILL.md supporting-file rule. Do not use it to decide which skill the user needs, and never treat an external local installer like npx skills add as the final Multica install.',
- $skill7$---
+ $d7$$Use when a user provides a skill URL, slug, or clear intent to import/install a specific skill into the current Multica workspace. Teaches the workspace import API/CLI path (POST /api/skills/import), the supported URL source families, --on-conflict fail|overwrite|rename|skip behavior and structured import results, additive agent binding vs replace-all, and the reserved SKILL.md supporting-file rule. Do not use it to decide which skill the user needs, and never treat an external local installer like npx skills add as the final Multica install.$$d7$,
+ $c7$$---
 name: multica-skill-importing
 description: "Use when a user provides a skill URL, slug, or clear intent to import/install a specific skill into the current Multica workspace. Teaches the workspace import API/CLI path (POST /api/skills/import), the supported URL source families, --on-conflict fail|overwrite|rename|skip behavior and structured import results, additive agent binding vs replace-all, and the reserved SKILL.md supporting-file rule. Do not use it to decide which skill the user needs, and never treat an external local installer like npx skills add as the final Multica install."
 user-invocable: false
@@ -1267,14 +1267,14 @@ multica agent skills list <agent-id> --output json
 
 - `references/skill-importing-source-map.md` — every behavior above mapped to
   `file:line` in `server/`, plus the verification command to re-derive the lines.
-$skill7$,
+$$c7$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-skill-importing: references/skill-importing-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-skill-importing'),
  'references/skill-importing-source-map.md',
- $file7$# Skill-importing source map
+ $f7$$# Skill-importing source map
 
 Evidence layer for `multica-skill-importing`. Every behavioral claim in `SKILL.md`
 maps to a real code path below with `file:line`. Paths are relative to the repo
@@ -1393,13 +1393,13 @@ Behavior is path-shape-dependent. On **import or create** a manifest's `SKILL.md
 supporting file is dropped (it will not appear in the returned `files`), so the
 import still succeeds — it does not 400. The hard 400 rejection fires only on the
 dedicated single-file endpoint `PUT /api/skills/{id}/files`.
-$file7$);
+$$f7$);
 
 -- multica-squads
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-squads',
- 'Use when creating, inspecting, updating, assigning, mentioning, or debugging Multica squads. Explains what squads are, squad/member fields, CLI commands, leader routing, issue assignment, comments, mentions, autopilot behavior, leader briefing, side effects, and product-gap handling.',
- $skill8$---
+ $d8$$Use when creating, inspecting, updating, assigning, mentioning, or debugging Multica squads. Explains what squads are, squad/member fields, CLI commands, leader routing, issue assignment, comments, mentions, autopilot behavior, leader briefing, side effects, and product-gap handling.$$d8$,
+ $c8$$---
 name: multica-squads
 description: "Use when creating, inspecting, updating, assigning, mentioning, or debugging Multica squads. Explains what squads are, squad/member fields, CLI commands, leader routing, issue assignment, comments, mentions, autopilot behavior, leader briefing, side effects, and product-gap handling."
 user-invocable: false
@@ -1654,14 +1654,14 @@ For source paths, tests, edge cases, and exact routing details, see:
 ```text
 references/squad-source-map.md
 ```
-$skill8$,
+$$c8$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-squads: references/squad-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-squads'),
  'references/squad-source-map.md',
- $file8$# Squad Source Map
+ $f8$$# Squad Source Map
 
 This file records source evidence for `multica-squads/SKILL.md`.
 
@@ -1891,13 +1891,13 @@ Verification command:
 ```bash
 go test ./internal/handler -run 'Test.*Squad|Test.*squad|Test.*Autopilot.*Squad|Test.*ChildDone.*Squad'
 ```
-$file8$);
+$$f8$);
 
 -- multica-wiki-currate
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-currate',
- 'Use when ingesting raw notes from raw/learnings/ and other raw/ sources into the polished wiki/. Deduplicates and merges task-agent notes by topic into wiki/<topic>.md and wiki/pitfalls/<topic>.md so the knowledge base stays curated, not fragmented.',
- $skill9$---
+ $d9$$Use when ingesting raw notes from raw/learnings/ and other raw/ sources into the polished wiki/. Deduplicates and merges task-agent notes by topic into wiki/<topic>.md and wiki/pitfalls/<topic>.md so the knowledge base stays curated, not fragmented.$$d9$,
+ $c9$$---
 name: multica-wiki-currate
 description: "Use when ingesting raw notes from raw/learnings/ and other raw/ sources into the polished wiki/. Deduplicates and merges task-agent notes by topic into wiki/<topic>.md and wiki/pitfalls/<topic>.md so the knowledge base stays curated, not fragmented."
 user-invocable: false
@@ -1979,14 +1979,14 @@ multica wiki write-page --path "wiki/index.md" --append "- [[<topic>]] — <one-
 Curated notes are now in `wiki/`. Leave the `raw/learnings/` notes in
 place as the audit trail (or archive per workspace policy). The next
 curation run picks up any newly-added notes.
-$skill9$,
+$$c9$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-distill
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-distill',
- 'Use after completing a task that involved debugging, a workaround, a surprising failure, or a reusable pattern. Writes a raw note under raw/learnings/ for the wiki admin to curate, and optionally appends a pointer to an existing wiki/ page for high-value knowledge.',
- $skill10$---
+ $d10$$Use after completing a task that involved debugging, a workaround, a surprising failure, or a reusable pattern. Writes a raw note under raw/learnings/ for the wiki admin to curate, and optionally appends a pointer to an existing wiki/ page for high-value knowledge.$$d10$,
+ $c10$$---
 name: multica-wiki-distill
 description: "Use after completing a task that involved debugging, a workaround, a surprising failure, or a reusable pattern. Writes a raw note under raw/learnings/ for the wiki admin to curate, and optionally appends a pointer to an existing wiki/ page for high-value knowledge."
 user-invocable: false
@@ -2070,14 +2070,14 @@ You only add a pointer to an EXISTING page when the insight is urgent.
 
 You're done. The wiki admin agent curates `raw/learnings/*` into the
 polished `wiki/` pages on its schedule. Do not wait for or trigger that.
-$skill10$,
+$$c10$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-index-refresh
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-index-refresh',
- 'Use when asked to 'refresh the index', 'rebuild index', or after batch ingests — to rebuild wiki/index.md from the current page catalog.',
- $skill11$---
+ $d11$$Use when asked to 'refresh the index', 'rebuild index', or after batch ingests — to rebuild wiki/index.md from the current page catalog.$$d11$,
+ $c11$$---
 name: multica-wiki-index-refresh
 description: "Use when asked to 'refresh the index', 'rebuild index', or after batch ingests — to rebuild wiki/index.md from the current page catalog."
 user-invocable: false
@@ -2122,14 +2122,14 @@ Rebuild `wiki/index.md` — the primary navigation aid. Every page must be liste
 - [ ] No stale entries (pages listed but deleted)
 - [ ] Summaries factual and one line each
 - [ ] Categories match the domain-driven layout
-$skill11$,
+$$c11$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-ingest
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-ingest',
- 'Use when asked to ingest a captured source from raw/ into the wiki, or when the user says 'ingest <slug>'. Turns a source document into durable, interlinked wiki knowledge.',
- $skill12$---
+ $d12$$Use when asked to ingest a captured source from raw/ into the wiki, or when the user says 'ingest <slug>'. Turns a source document into durable, interlinked wiki knowledge.$$d12$,
+ $c12$$---
 name: multica-wiki-ingest
 description: "Use when asked to ingest a captured source from raw/ into the wiki, or when the user says 'ingest <slug>'. Turns a source document into durable, interlinked wiki knowledge."
 user-invocable: false
@@ -2170,14 +2170,14 @@ wiki/
 7. **Flag contradictions** — append `> ⚠ contradicted by [[...]] (YYYY-MM-DD)` to older page.
 8. **Refresh `wiki/index.md`** — add one-line summaries for new pages.
 9. **Append to `wiki/log.md`:** `## [YYYY-MM-DD] ingest | <title>`
-$skill12$,
+$$c12$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-lint
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-lint',
- 'Use when asked to audit the wiki — 'lint', 'health check', 'audit'. Read-only. Return a triage list grouped by severity. Do not auto-fix.',
- $skill13$---
+ $d13$$Use when asked to audit the wiki — 'lint', 'health check', 'audit'. Read-only. Return a triage list grouped by severity. Do not auto-fix.$$d13$,
+ $c13$$---
 name: multica-wiki-lint
 description: "Use when asked to audit the wiki — 'lint', 'health check', 'audit'. Read-only. Return a triage list grouped by severity. Do not auto-fix."
 user-invocable: false
@@ -2226,14 +2226,14 @@ Audit, do not edit. Return findings the maintainer can triage.
 
 ## Voice
 Lead with severity counts. One finding per bullet. When unsure, flag medium with "verify".
-$skill13$,
+$$c13$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-maintain
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-maintain',
- 'Use when maintaining the wiki — resolving contradictions, merging duplicates, restructuring directories, curating stale content, or evolving the schema. Maintenance work, not fresh ingest.',
- $skill14$---
+ $d14$$Use when maintaining the wiki — resolving contradictions, merging duplicates, restructuring directories, curating stale content, or evolving the schema. Maintenance work, not fresh ingest.$$d14$,
+ $c14$$---
 name: multica-wiki-maintain
 description: "Use when maintaining the wiki — resolving contradictions, merging duplicates, restructuring directories, curating stale content, or evolving the schema. Maintenance work, not fresh ingest."
 user-invocable: false
@@ -2263,14 +2263,14 @@ with `stale_since` frontmatter. Offer to archive obsolete ones.
 `AGENTS.md`, create directory markers, update `wiki/index.md`, log the change.
 
 Voice: terse, factual, neutral. You are the curator, not the author of new claims.
-$skill14$,
+$$c14$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-wiki-query
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-wiki-query',
- 'Use when asked a question that the wiki might answer — search, read, synthesize, and file findings. Check the wiki before guessing or using external knowledge.',
- $skill15$---
+ $d15$$Use when asked a question that the wiki might answer — search, read, synthesize, and file findings. Check the wiki before guessing or using external knowledge.$$d15$,
+ $c15$$---
 name: multica-wiki-query
 description: "Use when asked a question that the wiki might answer — search, read, synthesize, and file findings. Check the wiki before guessing or using external knowledge."
 user-invocable: false
@@ -2311,14 +2311,14 @@ Never fabricate citations or claim coverage that doesn't exist.
 ## Voice
 Answer with citations. Prefer wiki content over external knowledge. File substantial
 answers so the next query starts from a higher baseline.
-$skill15$,
+$$c15$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-working-on-issues
 INSERT INTO skill (id, workspace_id, skill_type, name, description, content, config) VALUES
 (gen_random_uuid(), NULL, 'builtin', 'multica-working-on-issues',
- 'Use when working on a Multica issue after the runtime has provided the trigger context — to apply the product contracts the runtime brief does not encode: how PR linking differs from close intent, how to read a linked PR's real state via the pull-requests CLI, which metadata keys are high-signal, what status changes trigger on the server, and how sub-issue create status (todo vs backlog) controls whether assigned agents start immediately.',
- $skill16$---
+ $d16$$Use when working on a Multica issue after the runtime has provided the trigger context — to apply the product contracts the runtime brief does not encode: how PR linking differs from close intent, how to read a linked PR's real state via the pull-requests CLI, which metadata keys are high-signal, what status changes trigger on the server, and how sub-issue create status (todo vs backlog) controls whether assigned agents start immediately.$$d16$,
+ $c16$$---
 name: multica-working-on-issues
 description: "Use when working on a Multica issue after the runtime has provided the trigger context — to apply the product contracts the runtime brief does not encode: how PR linking differs from close intent, how to read a linked PR's real state via the pull-requests CLI, which metadata keys are high-signal, what status changes trigger on the server, and how sub-issue create status (todo vs backlog) controls whether assigned agents start immediately."
 user-invocable: false
@@ -2550,14 +2550,14 @@ contract above: the `pull-requests` CLI and route, the PR response field list,
 notify, the stage column / `stageBarrierClosed` barrier and the `--stage` /
 `issue children` CLI, and the metadata CLI. Re-derive before depending on an
 exact line.
-$skill16$,
+$$c16$,
  '{"origin": {"type": "builtin"}}');
 
 -- multica-working-on-issues: references/working-on-issues-source-map.md
 INSERT INTO skill_file (skill_id, path, content) VALUES
 ((SELECT id FROM skill WHERE skill_type = 'builtin' AND name = 'multica-working-on-issues'),
  'references/working-on-issues-source-map.md',
- $file16$# working-on-issues source map
+ $f16$$# working-on-issues source map
 
 Evidence layer for `SKILL.md`. Every contract the skill states is traced to a
 current `file:line` here. Lines were re-derived against `feat/builtin-skills`
@@ -2708,5 +2708,5 @@ grep -n 'extractIdentifiers(\|extractClosingIdentifiers(\|derivePRState(' intern
 grep -n 'prevIssue.Status == "backlog"\|func (h \*Handler) shouldEnqueueAgentTask' internal/handler/issue.go
 grep -n 'func notifyParentOfChildDone'       internal/handler/issue_child_done.go
 ```
-$file16$);
+$$f16$);
 

@@ -15,13 +15,13 @@ const createAgentTemplate = `-- name: CreateAgentTemplate :one
 INSERT INTO agent_template (
     name, description, category, icon, accent, tags,
     instructions, avatar_url, model, thinking_level, visibility,
-    max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by
+    max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9, $10, $11,
     $12, $13, $14, $15, $16
 )
-RETURNING id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by, created_at, updated_at
+RETURNING id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by, created_at, updated_at
 `
 
 type CreateAgentTemplateParams struct {
@@ -39,7 +39,7 @@ type CreateAgentTemplateParams struct {
 	MaxConcurrentTasks int32       `json:"max_concurrent_tasks"`
 	CustomArgs         []byte      `json:"custom_args"`
 	McpConfig          []byte      `json:"mcp_config"`
-	SkillUrls          []byte      `json:"skill_urls"`
+	SkillIds           []byte      `json:"skill_ids"`
 	CreatedBy          pgtype.UUID `json:"created_by"`
 }
 
@@ -59,7 +59,7 @@ func (q *Queries) CreateAgentTemplate(ctx context.Context, arg CreateAgentTempla
 		arg.MaxConcurrentTasks,
 		arg.CustomArgs,
 		arg.McpConfig,
-		arg.SkillUrls,
+		arg.SkillIds,
 		arg.CreatedBy,
 	)
 	var i AgentTemplate
@@ -79,7 +79,7 @@ func (q *Queries) CreateAgentTemplate(ctx context.Context, arg CreateAgentTempla
 		&i.MaxConcurrentTasks,
 		&i.CustomArgs,
 		&i.McpConfig,
-		&i.SkillUrls,
+		&i.SkillIds,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -97,7 +97,7 @@ func (q *Queries) DeleteAgentTemplate(ctx context.Context, id pgtype.UUID) error
 }
 
 const getAgentTemplate = `-- name: GetAgentTemplate :one
-SELECT id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by, created_at, updated_at FROM agent_template
+SELECT id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by, created_at, updated_at FROM agent_template
 WHERE id = $1
 `
 
@@ -120,7 +120,7 @@ func (q *Queries) GetAgentTemplate(ctx context.Context, id pgtype.UUID) (AgentTe
 		&i.MaxConcurrentTasks,
 		&i.CustomArgs,
 		&i.McpConfig,
-		&i.SkillUrls,
+		&i.SkillIds,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -141,7 +141,7 @@ func (q *Queries) GetUserPlatformAdmin(ctx context.Context, id pgtype.UUID) (boo
 
 const listAgentTemplates = `-- name: ListAgentTemplates :many
 
-SELECT id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by, created_at, updated_at FROM agent_template
+SELECT id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by, created_at, updated_at FROM agent_template
 WHERE ($1::text IS NULL OR category = $1)
 ORDER BY category, name
 `
@@ -173,7 +173,7 @@ func (q *Queries) ListAgentTemplates(ctx context.Context, category pgtype.Text) 
 			&i.MaxConcurrentTasks,
 			&i.CustomArgs,
 			&i.McpConfig,
-			&i.SkillUrls,
+			&i.SkillIds,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -204,10 +204,10 @@ UPDATE agent_template SET
     max_concurrent_tasks = COALESCE($13, max_concurrent_tasks),
     custom_args = COALESCE($14, custom_args),
     mcp_config = COALESCE($15, mcp_config),
-    skill_urls = COALESCE($16, skill_urls),
+    skill_ids = COALESCE($16, skill_ids),
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_urls, created_by, created_at, updated_at
+RETURNING id, name, description, category, icon, accent, tags, instructions, avatar_url, model, thinking_level, visibility, max_concurrent_tasks, custom_args, mcp_config, skill_ids, created_by, created_at, updated_at
 `
 
 type UpdateAgentTemplateParams struct {
@@ -226,7 +226,7 @@ type UpdateAgentTemplateParams struct {
 	MaxConcurrentTasks pgtype.Int4 `json:"max_concurrent_tasks"`
 	CustomArgs         []byte      `json:"custom_args"`
 	McpConfig          []byte      `json:"mcp_config"`
-	SkillUrls          []byte      `json:"skill_urls"`
+	SkillIds           []byte      `json:"skill_ids"`
 }
 
 func (q *Queries) UpdateAgentTemplate(ctx context.Context, arg UpdateAgentTemplateParams) (AgentTemplate, error) {
@@ -246,7 +246,7 @@ func (q *Queries) UpdateAgentTemplate(ctx context.Context, arg UpdateAgentTempla
 		arg.MaxConcurrentTasks,
 		arg.CustomArgs,
 		arg.McpConfig,
-		arg.SkillUrls,
+		arg.SkillIds,
 	)
 	var i AgentTemplate
 	err := row.Scan(
@@ -265,7 +265,7 @@ func (q *Queries) UpdateAgentTemplate(ctx context.Context, arg UpdateAgentTempla
 		&i.MaxConcurrentTasks,
 		&i.CustomArgs,
 		&i.McpConfig,
-		&i.SkillUrls,
+		&i.SkillIds,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
