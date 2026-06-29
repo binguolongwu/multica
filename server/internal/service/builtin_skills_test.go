@@ -1,12 +1,111 @@
 package service
 
 import (
+	"embed"
+	"io/fs"
+	"path"
 	"strings"
 	"testing"
 
 	"github.com/multica-ai/multica/server/internal/util"
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed builtin_skills
+var builtinSkillsFS embed.FS
+
+const builtinSkillsRoot = "builtin_skills"
+
+func loadBuiltinSkills() []AgentSkillData {
+	entries, err := fs.ReadDir(builtinSkillsFS, builtinSkillsRoot)
+	if err != nil {
+		return nil
+	}
+	var skills []AgentSkillData
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if skill, ok := loadBuiltinSkill(entry.Name()); ok {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+func loadBuiltinSkill(name string) (AgentSkillData, bool) {
+	dir := path.Join(builtinSkillsRoot, name)
+	content, err := fs.ReadFile(builtinSkillsFS, path.Join(dir, "SKILL.md"))
+	if err != nil {
+		return AgentSkillData{}, false
+	}
+	skill := AgentSkillData{Name: name, Content: string(content)}
+	_ = fs.WalkDir(builtinSkillsFS, dir, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil || d.IsDir() {
+			return walkErr
+		}
+		rel := strings.TrimPrefix(p, dir+"/")
+		if rel == "SKILL.md" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(builtinSkillsFS, p)
+		if readErr != nil {
+			return nil
+		}
+		skill.Files = append(skill.Files, AgentSkillFileData{Path: rel, Content: string(data)})
+		return nil
+	})
+	return skill, true
+}
+
+func findSkill(t *testing.T, name string) (AgentSkillData, bool) {
+	t.Helper()
+	for _, s := range loadBuiltinSkills() {
+		if s.Name == name {
+			return s, true
+		}
+	}
+	t.Errorf("built-in skill %q not found", name)
+	return AgentSkillData{}, false
+}
+
+func skillHasFile(skill AgentSkillData, filePath string) bool {
+	for _, f := range skill.Files {
+		if f.Path == filePath {
+			return true
+		}
+	}
+	return false
+}
+
+func splitFrontmatter(content string) (map[string]string, string, bool) {
+	if !strings.HasPrefix(content, "---\n") {
+		return nil, content, false
+	}
+	rest := content[len("---\n"):]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return nil, content, false
+	}
+	block := rest[:end]
+	body := rest[end:]
+	if nl := strings.Index(body, "\n"); nl >= 0 {
+		body = body[nl+1:]
+	}
+
+	fm := make(map[string]string)
+	for _, line := range strings.Split(block, "\n") {
+		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			continue
+		}
+		key, val, found := strings.Cut(line, ":")
+		if !found {
+			continue
+		}
+		fm[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(val), `"'`)
+	}
+	return fm, body, true
+}
 
 // Built-in skills are the platform's standard "template" skills. These evals
 // pin the template every skill must follow and — crucially — couple each
@@ -517,57 +616,6 @@ func TestProjectsAndResourcesSkillCoversDurableContext(t *testing.T) {
 	}
 }
 
-func findSkill(t *testing.T, name string) (AgentSkillData, bool) {
-	t.Helper()
-	for _, s := range loadBuiltinSkills() {
-		if s.Name == name {
-			return s, true
-		}
-	}
-	t.Errorf("built-in skill %q not found", name)
-	return AgentSkillData{}, false
-}
-
-func skillHasFile(skill AgentSkillData, path string) bool {
-	for _, f := range skill.Files {
-		if f.Path == path {
-			return true
-		}
-	}
-	return false
-}
-
-// splitFrontmatter returns the top-level scalar keys of a leading YAML
-// frontmatter block, the body after it, and whether a block was found. It only
-// understands flat `key: value` lines — enough for the template's frontmatter.
-func splitFrontmatter(content string) (map[string]string, string, bool) {
-	if !strings.HasPrefix(content, "---\n") {
-		return nil, content, false
-	}
-	rest := content[len("---\n"):]
-	end := strings.Index(rest, "\n---")
-	if end < 0 {
-		return nil, content, false
-	}
-	block := rest[:end]
-	body := rest[end:]
-	if nl := strings.Index(body, "\n"); nl >= 0 {
-		body = body[nl+1:] // drop the closing --- line
-	}
-
-	fm := make(map[string]string)
-	for _, line := range strings.Split(block, "\n") {
-		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
-			continue // nested value; the template uses only flat scalars
-		}
-		key, val, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-		fm[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(val), `"'`)
-	}
-	return fm, body, true
-}
 
 // TestWikiDistillSkillCoversContract pins the task-agent knowledge-distill
 // skill: it must be a non-user-invocable, multica-CLI-fenced skill that

@@ -1,72 +1,49 @@
 package service
 
 import (
-	"embed"
-	"io/fs"
-	"path"
-	"strings"
+	"context"
+	"log/slog"
 )
 
-//go:embed builtin_skills
-var builtinSkillsFS embed.FS
-
-const builtinSkillsRoot = "builtin_skills"
-
-// BuiltinSkills returns the platform's built-in skills, embedded at compile
-// time. Every agent receives these on top of its workspace-bound skills, so
+// BuiltinSkills returns the platform's built-in skills from the database.
+// Every agent receives these on top of its workspace-bound skills, so
 // they teach platform-wide "how to" workflows (e.g. mentioning) that the
 // runtime brief intentionally leaves to skills.
 //
-// Layout: builtin_skills/<name>/SKILL.md plus optional supporting files. The
-// <name> directory carries a "multica-" prefix so its on-disk slug can never
-// collide with a workspace skill a user authored (see writeSkillFiles, which
-// derives the skill directory from AgentSkillData.Name).
+// These skills are stored in the `skill` table with skill_type = 'builtin'.
+// They were previously embedded at compile time via //go:embed; the
+// migration to DB-backed built-in skills allows platform admins to edit
+// them in-place without a redeploy.
 func (s *TaskService) BuiltinSkills() []AgentSkillData {
-	return loadBuiltinSkills()
-}
-
-func loadBuiltinSkills() []AgentSkillData {
-	entries, err := fs.ReadDir(builtinSkillsFS, builtinSkillsRoot)
+	ctx := context.Background()
+	skills, err := s.Queries.ListSkillsByType(ctx, "builtin")
 	if err != nil {
+		slog.Error("failed to load builtin skills from DB", "error", err)
 		return nil
 	}
-	var skills []AgentSkillData
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if skill, ok := loadBuiltinSkill(entry.Name()); ok {
-			skills = append(skills, skill)
-		}
-	}
-	return skills
-}
 
-func loadBuiltinSkill(name string) (AgentSkillData, bool) {
-	dir := path.Join(builtinSkillsRoot, name)
-	content, err := fs.ReadFile(builtinSkillsFS, path.Join(dir, "SKILL.md"))
-	if err != nil {
-		// A skill directory without a SKILL.md is malformed — skip it rather
-		// than ship an empty skill.
-		return AgentSkillData{}, false
+	result := make([]AgentSkillData, 0, len(skills))
+	for _, sk := range skills {
+		// Fetch supporting files (e.g. references/*-source-map.md)
+		files, err := s.Queries.ListSkillFiles(ctx, sk.ID)
+		if err != nil {
+			slog.Warn("failed to load skill files, continuing without files",
+				"skill", sk.Name, "error", err)
+		}
+
+		fileData := make([]AgentSkillFileData, 0, len(files))
+		for _, f := range files {
+			fileData = append(fileData, AgentSkillFileData{
+				Path:    f.Path,
+				Content: f.Content,
+			})
+		}
+
+		result = append(result, AgentSkillData{
+			Name:    sk.Name,
+			Content: sk.Content,
+			Files:   fileData,
+		})
 	}
-	skill := AgentSkillData{Name: name, Content: string(content)}
-	// Any other file in the directory becomes a supporting file, preserving
-	// its relative path so subdirectories (e.g. rules/styling.md) survive.
-	_ = fs.WalkDir(builtinSkillsFS, dir, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil || d.IsDir() {
-			return walkErr
-		}
-		rel := strings.TrimPrefix(p, dir+"/")
-		if rel == "SKILL.md" {
-			return nil
-		}
-		data, readErr := fs.ReadFile(builtinSkillsFS, p)
-		if readErr != nil {
-			return nil
-		}
-		skill.Files = append(skill.Files, AgentSkillFileData{Path: rel, Content: string(data)})
-		return nil
-	})
-	return skill, true
+	return result
 }
