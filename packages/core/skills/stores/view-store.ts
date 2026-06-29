@@ -14,7 +14,7 @@ import { defaultStorage } from "../../platform/storage";
 // they are session-scoped, and persisting them would greet returning users
 // with an inexplicably narrowed list.
 
-export type SkillSortField = "name" | "usedBy" | "updated" | "created";
+export type SkillSortField = "name" | "usedBy" | "updated" | "created" | "description";
 
 export type SkillSortDirection = "asc" | "desc";
 
@@ -27,6 +27,7 @@ export const SKILL_SORT_DEFAULT_DIRECTION: Record<
   usedBy: "desc",
   updated: "desc",
   created: "desc",
+  description: "asc",
 };
 
 export type SkillOriginType =
@@ -53,16 +54,17 @@ export const EMPTY_SKILL_FILTERS: SkillListFilters = {
 
 // User-hideable columns. Name and the structural columns (checkbox, kebab)
 // are always visible.
-	export type SkillColumnKey =
-	  | "usedBy"
-	  | "source"
-	  | "creator"
-	  | "updated"
-	  | "created"
-	  | "skillType";
+		export type SkillColumnKey =
+		  | "usedBy"
+		  | "source"
+		  | "creator"
+		  | "updated"
+		  | "created"
+		  | "description"
+		  | "skillType";
 
-	/** Source and created are opt-in: hidden until the user enables them. */
-	export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["source", "created", "skillType"];
+		/** Source and created are opt-in: hidden until the user enables them. */
+		export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["source", "created", "skillType"];
 
 export interface SkillsViewState {
   sortField: SkillSortField;

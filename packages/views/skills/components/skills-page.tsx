@@ -98,7 +98,7 @@ import { useT, useTimeAgo } from "../../i18n";
 //   (name + usedBy), no horizontal scroll, column toggles don't apply.
 const GRID_COLS =
   "grid-cols-[0.75rem_1rem_minmax(120px,1fr)_var(--lgc-usedby)_1.75rem_0.75rem] " +
-  "@2xl:grid-cols-[0.75rem_1rem_minmax(200px,1fr)_var(--lgc-usedby)_var(--lgc-source)_var(--lgc-creator)_var(--lgc-updated)_var(--lgc-created)_1.75rem_0.75rem]";
+  "@2xl:grid-cols-[0.75rem_1rem_minmax(200px,1fr)_var(--lgc-description)_var(--lgc-usedby)_var(--lgc-source)_var(--lgc-creator)_var(--lgc-updated)_var(--lgc-created)_var(--lgc-skilltype)_1.75rem_0.75rem]";
 
 // h-12 rows. The virtualizer's fixed-size contract: every row renders at
 // exactly this height, which is what lets it skip per-row measurement.
@@ -112,10 +112,12 @@ const COLUMN_WIDTHS: Record<SkillColumnKey, number> = {
   creator: 144,
   updated: 104,
   created: 104,
+  description: 180,
+  skillType: 100,
 };
 
 // Fixed tracks (edges 12+12, checkbox 16, name min 200, kebab 28) plus the
-// 9 gap-x-3 gaps between the wide template's 10 tracks (zero-width tracks
+// 9 gap-x-3 gaps between the wide template's 12 tracks (zero-width tracks
 // still carry gaps).
 const FIXED_TRACKS_WIDTH = 268 + 9 * 12;
 
@@ -136,6 +138,8 @@ function columnTrackVars(
     "--lgc-creator": width("creator"),
     "--lgc-updated": width("updated"),
     "--lgc-created": width("created"),
+    "--lgc-description": width("description"),
+    "--lgc-skilltype": width("skillType"),
     "--lgc-minw": `${minWidth}px`,
   } as React.CSSProperties;
 }
@@ -481,6 +485,13 @@ function SkillListHeader({
       <ListGridHeaderCell sorted={sorted("name")} onSort={() => onSort("name")}>
         {t(($) => $.table.name)}
       </ListGridHeaderCell>
+      {isColVisible("description") ? (
+        <ListGridHeaderCell className="hidden @2xl:flex" sorted={sorted("description")} onSort={() => onSort("description")}>
+          {t(($) => $.table.description)}
+        </ListGridHeaderCell>
+      ) : (
+        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
+      )}
       {isColVisible("usedBy") ? (
         <ListGridHeaderCell
           sorted={sorted("usedBy")}
@@ -553,6 +564,7 @@ function LoadingSkeleton() {
         <ListGridHeaderCell>
           <Skeleton className="h-3 w-14" />
         </ListGridHeaderCell>
+        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
         {/* Source and created are hidden by default — keep their tracks
             mapped with empty placeholders so the skeleton matches the
             default layout. */}
@@ -747,6 +759,9 @@ export default function SkillsPage() {
           dir
         );
       }
+      if (sortField === "description") {
+        return (a.skill.description || "").localeCompare(b.skill.description || "") * dir;
+      }
       return (
         (Date.parse(a.skill.updated_at) - Date.parse(b.skill.updated_at)) * dir
       );
@@ -918,6 +933,13 @@ export default function SkillsPage() {
                   onToggle={() => toggleSelected(row.skill.id)}
                 />
                 <NameCell row={row} />
+                {isColVisible("description") ? (
+                  <ListGridCell className="hidden truncate text-xs text-muted-foreground @2xl:flex">
+                    {row.skill.description}
+                  </ListGridCell>
+                ) : (
+                  <ListGridCell className="hidden px-0 @2xl:flex" />
+                )}
                 {isColVisible("usedBy") ? (
                   <UsedByCell agents={row.agents} />
                 ) : (
