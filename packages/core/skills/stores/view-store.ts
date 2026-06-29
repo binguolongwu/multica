@@ -53,15 +53,16 @@ export const EMPTY_SKILL_FILTERS: SkillListFilters = {
 
 // User-hideable columns. Name and the structural columns (checkbox, kebab)
 // are always visible.
-export type SkillColumnKey =
-  | "usedBy"
-  | "source"
-  | "creator"
-  | "updated"
-  | "created";
+	export type SkillColumnKey =
+	  | "usedBy"
+	  | "source"
+	  | "creator"
+	  | "updated"
+	  | "created"
+	  | "skillType";
 
-/** Source and created are opt-in: hidden until the user enables them. */
-export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["source", "created"];
+	/** Source and created are opt-in: hidden until the user enables them. */
+	export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["source", "created", "skillType"];
 
 export interface SkillsViewState {
   sortField: SkillSortField;

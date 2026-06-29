@@ -370,6 +370,22 @@ function SourceCell({
   );
 }
 
+function SkillTypeCell({ skillType }: { skillType: string }) {
+  const labels: Record<string, string> = {
+    builtin: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    platform: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    workspace: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  };
+  const cls = labels[skillType] ?? labels.workspace;
+  return (
+    <ListGridCell className="hidden @2xl:flex">
+      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
+        {skillType}
+      </span>
+    </ListGridCell>
+  );
+}
+
 function CreatorCell({ creator }: { creator: MemberWithUser | null }) {
   return (
     <ListGridCell className="hidden gap-1.5 @2xl:flex">
@@ -500,18 +516,25 @@ function SkillListHeader({
       ) : (
         <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
       )}
-      {isColVisible("created") ? (
-        <ListGridHeaderCell
-          className="hidden @2xl:flex"
-          sorted={sorted("created")}
-          onSort={() => onSort("created")}
-        >
-          {t(($) => $.table.created)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      <span aria-hidden="true" />
+	      {isColVisible("created") ? (
+	        <ListGridHeaderCell
+	          className="hidden @2xl:flex"
+	          sorted={sorted("created")}
+	          onSort={() => onSort("created")}
+	        >
+	          {t(($) => $.table.created)}
+	        </ListGridHeaderCell>
+	      ) : (
+	        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
+	      )}
+	      {isColVisible("skillType") ? (
+	        <ListGridHeaderCell className="hidden @2xl:flex">
+	          {t(($) => $.table.type)}
+	        </ListGridHeaderCell>
+	      ) : (
+	        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
+	      )}
+	      <span aria-hidden="true" />
     </ListGridHeader>
   );
 }
@@ -921,6 +944,11 @@ export default function SkillsPage() {
                   <ListGridCell className="hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground @2xl:flex">
                     {timeAgo(row.skill.created_at)}
                   </ListGridCell>
+                ) : (
+                  <ListGridCell className="hidden px-0 @2xl:flex" />
+                )}
+                {isColVisible("skillType") ? (
+                  <SkillTypeCell skillType={row.skill.skill_type} />
                 ) : (
                   <ListGridCell className="hidden px-0 @2xl:flex" />
                 )}

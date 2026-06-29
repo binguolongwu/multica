@@ -96,7 +96,18 @@ export function SkillsTab({
             >
               <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{skill.name}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium">{skill.name}</div>
+                  {(skill.skill_type === 'builtin' || skill.skill_type === 'platform') && (
+                    <span className={`rounded-md px-1 py-0 text-[10px] font-medium ${
+                      skill.skill_type === 'builtin' 
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                    }`}>
+                      {skill.skill_type}
+                    </span>
+                  )}
+                </div>
                 {skill.description && (
                   <div className="truncate text-xs text-muted-foreground">
                     {skill.description}

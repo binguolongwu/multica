@@ -65,7 +65,8 @@
     "source_github": "来自 GitHub",
     "type_builtin": "内置",
     "type_platform": "平台",
-    "type_workspace": "工作区"
+    "type_workspace": "工作区",
+    "type": "类型"
   },
   "actions": {
     "row_menu": "操作",

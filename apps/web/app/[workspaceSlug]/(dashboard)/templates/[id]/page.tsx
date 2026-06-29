@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Trash2, Plus, FileText } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, FileText, Search } from "lucide-react";
 import {
   useAgentTemplate,
   useUpdateAgentTemplate,
@@ -11,21 +11,18 @@ import {
 } from "@multica/core/agents/queries";
 import type { UpdateAgentTemplateRequest } from "@multica/core/types";
 import { useWorkspacePaths } from "@multica/core/paths";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@multica/core/api";
+import type { SkillSummary } from "@multica/core/types";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";
 import { Badge } from "@multica/ui/components/ui/badge";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@multica/ui/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@multica/ui/components/ui/dialog";
 import { toast } from "sonner";
 import { useT } from "@multica/views/i18n";
-
-function extractSkillName(url: string): string {
-  try {
-    const parts = url.replace(/\/$/, "").split("/");
-    return parts[parts.length - 1] || url;
-  } catch { return url; }
-}
 
 export default function TemplateDetailPage() {
   const params = useParams<{ id: string }>();
@@ -49,13 +46,39 @@ export default function TemplateDetailPage() {
   // Tab state
   const [instructions, setInstructions] = useState("");
   const [instructionsDraft, setInstructionsDraft] = useState("");
-  const [skillUrls, setSkillUrls] = useState<string[]>([]);
-  const [skillUrlsDraft, setSkillUrlsDraft] = useState<string[]>([]);
-  const [newSkillUrl, setNewSkillUrl] = useState("");
+  const [skillIds, setSkillIds] = useState<string[]>([]);
+  const [skillIdsDraft, setSkillIdsDraft] = useState<string[]>([]);
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
+  const [skillSearch, setSkillSearch] = useState("");
   const [mcpConfigInput, setMcpConfigInput] = useState("");
   const [mcpConfigDraft, setMcpConfigDraft] = useState("");
 
   const [saving, setSaving] = useState(false);
+
+  // Fetch platform skills for the picker
+  const { data: allSkills = [] } = useQuery({
+    queryKey: ["platform-skills", id],
+    queryFn: () => api.listSkills(),
+    staleTime: 30_000,
+  });
+
+  const platformSkills = useMemo(() =>
+    allSkills.filter((s: SkillSummary) => s.skill_type === 'builtin' || s.skill_type === 'platform'),
+    [allSkills]
+  );
+
+  const selectedSkills = useMemo(() =>
+    platformSkills.filter((s: SkillSummary) => skillIdsDraft.includes(s.id)),
+    [platformSkills, skillIdsDraft]
+  );
+
+  const availableSkills = useMemo(() =>
+    platformSkills.filter((s: SkillSummary) =>
+      !skillIdsDraft.includes(s.id) &&
+      (skillSearch === "" || s.name.toLowerCase().includes(skillSearch.toLowerCase()))
+    ),
+    [platformSkills, skillIdsDraft, skillSearch]
+  );
 
   useEffect(() => {
     if (template) {
@@ -65,9 +88,9 @@ export default function TemplateDetailPage() {
       setTagsInput((template.tags ?? []).join(", "));
       setInstructions(template.instructions);
       setInstructionsDraft(template.instructions);
-      const urls = template.skill_ids ?? [];
-      setSkillUrls(urls);
-      setSkillUrlsDraft([...urls]);
+      const ids = template.skill_ids ?? [];
+      setSkillIds(ids);
+      setSkillIdsDraft([...ids]);
       const mcp = template.mcp_config ? JSON.stringify(template.mcp_config, null, 2) : "";
       setMcpConfigInput(mcp);
       setMcpConfigDraft(mcp);
@@ -76,7 +99,7 @@ export default function TemplateDetailPage() {
   }, [template]);
 
   const instructionsDirty = instructionsDraft !== instructions;
-  const skillsDirty = JSON.stringify(skillUrlsDraft) !== JSON.stringify(skillUrls);
+  const skillsDirty = JSON.stringify(skillIdsDraft) !== JSON.stringify(skillIds);
   const mcpDirty = mcpConfigDraft !== mcpConfigInput;
 
   const doSave = async (data: UpdateAgentTemplateRequest) => {
@@ -112,8 +135,8 @@ export default function TemplateDetailPage() {
   };
 
   const handleSaveSkills = async () => {
-    if (await doSave({ skill_ids: skillUrlsDraft })) {
-      setSkillUrls([...skillUrlsDraft]); toast.success(t(($) => $.template_editor.updated));
+    if (await doSave({ skill_ids: skillIdsDraft })) {
+      setSkillIds([...skillIdsDraft]); toast.success(t(($) => $.template_editor.updated));
     }
   };
 
@@ -126,17 +149,6 @@ export default function TemplateDetailPage() {
     if (await doSave(data)) { setMcpConfigInput(mcpConfigDraft); toast.success(t(($) => $.template_editor.updated)); }
   };
 
-  const addSkillUrl = () => {
-    const url = newSkillUrl.trim();
-    if (!url) return;
-    if (skillUrlsDraft.includes(url)) { toast.error("URL already exists"); return; }
-    setSkillUrlsDraft([...skillUrlsDraft, url]);
-    setNewSkillUrl("");
-  };
-
-  const removeSkillUrl = (url: string) => {
-    setSkillUrlsDraft(skillUrlsDraft.filter((u) => u !== url));
-  };
 
   const handleDelete = async () => {
     if (!template) return;
@@ -250,7 +262,7 @@ export default function TemplateDetailPage() {
             <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
                 <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.skills)}</span>
-                <span className="text-xs">{skillUrlsDraft.length}</span>
+                <span className="text-xs">{skillIdsDraft.length}</span>
               </div>
               <div className="-mx-2 col-span-2 grid min-h-8 grid-cols-subgrid items-center rounded-md px-2">
                 <span className="text-xs text-muted-foreground">{t(($) => $.template_editor.created)}</span>
@@ -305,38 +317,34 @@ export default function TemplateDetailPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">
-                      Skill URLs for this template. Imported when an agent is created from this template.
+                      Select platform and built-in skills for this template.
                     </p>
-                    <Button size="sm" variant="outline" className="shrink-0" onClick={addSkillUrl} disabled={!newSkillUrl.trim()}>
-                      <Plus className="h-3 w-3" /> Add URL
+                    <Button size="sm" variant="outline" className="shrink-0" onClick={() => setShowSkillPicker(true)}>
+                      <Plus className="h-3 w-3" /> Add Skill
                     </Button>
                   </div>
 
-                  {/* New URL input */}
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-8 text-xs flex-1"
-                      value={newSkillUrl}
-                      onChange={(e) => setNewSkillUrl(e.target.value)}
-                      placeholder="https://github.com/org/repo/blob/main/skills/my-skill/SKILL.md"
-                      onKeyDown={(e) => { if (e.key === "Enter") addSkillUrl(); }}
-                    />
-                  </div>
-
-                  {/* URL list */}
-                  {skillUrlsDraft.length > 0 && (
+                  {/* Selected skills list */}
+                  {selectedSkills.length > 0 && (
                     <ul className="space-y-1.5">
-                      {skillUrlsDraft.map((url) => (
-                        <li key={url} className="flex items-center gap-2.5 rounded-md border px-3 py-2">
+                      {selectedSkills.map((skill) => (
+                        <li key={skill.id} className="flex items-center gap-2.5 rounded-md border px-3 py-2">
                           <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium truncate">{extractSkillName(url)}</div>
-                            <div className="truncate text-xs text-muted-foreground">{url}</div>
+                            <div className="text-sm font-medium truncate">{skill.name}</div>
+                            {skill.description && (
+                              <div className="truncate text-xs text-muted-foreground">{skill.description}</div>
+                            )}
                           </div>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${
+                            skill.skill_type === "builtin" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          }`}>
+                            {skill.skill_type}
+                          </span>
                           <Button
                             variant="ghost" size="icon-sm"
                             className="text-muted-foreground hover:text-destructive shrink-0"
-                            onClick={() => removeSkillUrl(url)}
+                            onClick={() => setSkillIdsDraft(prev => prev.filter(id => id !== skill.id))}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -345,8 +353,8 @@ export default function TemplateDetailPage() {
                     </ul>
                   )}
 
-                  {skillUrlsDraft.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No skill URLs added yet.</p>
+                  {selectedSkills.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No skills selected yet.</p>
                   )}
                 </div>
 
@@ -357,6 +365,53 @@ export default function TemplateDetailPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* Skill picker dialog */}
+                <Dialog open={showSkillPicker} onOpenChange={setShowSkillPicker}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-sm">Add Skills</DialogTitle>
+                    </DialogHeader>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input className="h-8 pl-8 text-xs" placeholder="Search skills..."
+                        value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {availableSkills.map((skill) => (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          onClick={() => { setSkillIdsDraft(prev => [...prev, skill.id]); setSkillSearch(""); }}
+                          className="w-full text-left flex items-center gap-2.5 rounded-md border px-3 py-2 hover:bg-accent"
+                        >
+                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{skill.name}</div>
+                            {skill.description && (
+                              <div className="truncate text-xs text-muted-foreground">{skill.description}</div>
+                            )}
+                          </div>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${
+                            skill.skill_type === "builtin" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          }`}>
+                            {skill.skill_type}
+                          </span>
+                        </button>
+                      ))}
+                      {availableSkills.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          All available skills are already selected.
+                        </p>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => { setShowSkillPicker(false); setSkillSearch(""); }}>
+                        Done
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </TabsContent>
 

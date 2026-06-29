@@ -65,7 +65,8 @@
     "source_github": "From GitHub",
     "type_builtin": "Built-in",
     "type_platform": "Platform",
-    "type_workspace": "Workspace"
+    "type_workspace": "Workspace",
+    "type": "Type"
   },
   "actions": {
     "row_menu": "Actions",
