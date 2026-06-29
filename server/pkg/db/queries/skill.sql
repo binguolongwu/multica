@@ -44,6 +44,8 @@ UPDATE skill SET
     description = COALESCE(sqlc.narg('description'), description),
     content = COALESCE(sqlc.narg('content'), content),
     config = COALESCE(sqlc.narg('config'), config),
+    skill_type = COALESCE(sqlc.narg('skill_type'), skill_type),
+    workspace_id = COALESCE(sqlc.narg('workspace_id'), workspace_id),
     updated_at = now()
 WHERE id = $1
 RETURNING *;

@@ -616,6 +616,8 @@ UPDATE skill SET
     description = COALESCE($3, description),
     content = COALESCE($4, content),
     config = COALESCE($5, config),
+    skill_type = COALESCE($6, skill_type),
+    workspace_id = COALESCE($7, workspace_id),
     updated_at = now()
 WHERE id = $1
 RETURNING id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type
@@ -627,6 +629,8 @@ type UpdateSkillParams struct {
 	Description pgtype.Text `json:"description"`
 	Content     pgtype.Text `json:"content"`
 	Config      []byte      `json:"config"`
+	SkillType   pgtype.Text `json:"skill_type"`
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
 }
 
 func (q *Queries) UpdateSkill(ctx context.Context, arg UpdateSkillParams) (Skill, error) {
@@ -636,6 +640,8 @@ func (q *Queries) UpdateSkill(ctx context.Context, arg UpdateSkillParams) (Skill
 		arg.Description,
 		arg.Content,
 		arg.Config,
+		arg.SkillType,
+		arg.WorkspaceID,
 	)
 	var i Skill
 	err := row.Scan(

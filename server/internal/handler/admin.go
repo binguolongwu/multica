@@ -50,3 +50,21 @@ func (h *Handler) CheckPlatformAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// isPlatformAdmin checks whether the request's authenticated user is a
+// platform admin. Returns false on any error (no response written).
+func (h *Handler) isPlatformAdmin(r *http.Request) bool {
+	userID := requestUserID(r)
+	if userID == "" {
+		return false
+	}
+	userUUID, err := util.ParseUUID(userID)
+	if err != nil {
+		return false
+	}
+	admin, err := h.Queries.GetUserPlatformAdmin(r.Context(), userUUID)
+	if err != nil {
+		return false
+	}
+	return admin
+}

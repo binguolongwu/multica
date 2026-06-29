@@ -40,11 +40,12 @@ func sanitizeNullBytes(s string) string {
 
 type SkillResponse struct {
 	ID          string  `json:"id"`
-	WorkspaceID string  `json:"workspace_id"`
+	WorkspaceID *string `json:"workspace_id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Content     string  `json:"content"`
 	Config      any     `json:"config"`
+	SkillType   string  `json:"skill_type"`
 	CreatedBy   *string `json:"created_by"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
@@ -57,10 +58,11 @@ type SkillResponse struct {
 // SkillResponse with content.
 type SkillSummaryResponse struct {
 	ID          string  `json:"id"`
-	WorkspaceID string  `json:"workspace_id"`
+	WorkspaceID *string `json:"workspace_id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Config      any     `json:"config"`
+	SkillType   string  `json:"skill_type"`
 	CreatedBy   *string `json:"created_by"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
@@ -75,6 +77,7 @@ type AgentSkillSummary struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	SkillType   string `json:"skill_type"`
 }
 
 type SkillFileResponse struct {
@@ -125,11 +128,12 @@ func writeSkillImportDuplicateConflict(w http.ResponseWriter, existing ExistingS
 func skillToResponse(s db.Skill) SkillResponse {
 	return SkillResponse{
 		ID:          uuidToString(s.ID),
-		WorkspaceID: uuidToString(s.WorkspaceID),
+		WorkspaceID: uuidToPtr(s.WorkspaceID),
 		Name:        s.Name,
 		Description: s.Description,
 		Content:     s.Content,
 		Config:      decodeSkillConfig(s.Config),
+		SkillType:   s.SkillType,
 		CreatedBy:   uuidToPtr(s.CreatedBy),
 		CreatedAt:   timestampToString(s.CreatedAt),
 		UpdatedAt:   timestampToString(s.UpdatedAt),
@@ -177,17 +181,18 @@ func decodeSkillConfig(raw []byte) any {
 
 func skillSummaryToResponse(
 	id, workspaceID pgtype.UUID,
-	name, description string,
+	name, description, skillType string,
 	config []byte,
 	createdBy pgtype.UUID,
 	createdAt, updatedAt pgtype.Timestamptz,
 ) SkillSummaryResponse {
 	return SkillSummaryResponse{
 		ID:          uuidToString(id),
-		WorkspaceID: uuidToString(workspaceID),
+		WorkspaceID: uuidToPtr(workspaceID),
 		Name:        name,
 		Description: description,
 		Config:      decodeSkillConfig(config),
+		SkillType:   skillType,
 		CreatedBy:   uuidToPtr(createdBy),
 		CreatedAt:   timestampToString(createdAt),
 		UpdatedAt:   timestampToString(updatedAt),
@@ -221,12 +226,14 @@ type CreateSkillFileRequest struct {
 }
 
 type UpdateSkillRequest struct {
-	Name        *string                  `json:"name"`
-	Description *string                  `json:"description"`
-	Content     *string                  `json:"content"`
-	Config      any                      `json:"config"`
-	Files       []CreateSkillFileRequest `json:"files,omitempty"`
-}
+		Name        *string                  `json:"name"`
+		Description *string                  `json:"description"`
+		Content     *string                  `json:"content"`
+		Config      any                      `json:"config"`
+		SkillType   *string                  `json:"skill_type,omitempty"`
+		WorkspaceID *string                  `json:"workspace_id,omitempty"`
+		Files       []CreateSkillFileRequest `json:"files,omitempty"`
+	}
 
 type SetAgentSkillsRequest struct {
 	SkillIDs []string `json:"skill_ids"`
@@ -255,23 +262,23 @@ func validateFilePath(p string) bool {
 
 func (h *Handler) loadSkillForUser(w http.ResponseWriter, r *http.Request, id string) (db.Skill, bool) {
 	workspaceID := h.resolveWorkspaceID(r)
-	if workspaceID == "" {
-		writeError(w, http.StatusBadRequest, "workspace_id is required")
-		return db.Skill{}, false
-	}
 
 	skillUUID, ok := parseUUIDOrBadRequest(w, id, "skill id")
 	if !ok {
 		return db.Skill{}, false
 	}
 
-	skill, err := h.Queries.GetSkillInWorkspace(r.Context(), db.GetSkillInWorkspaceParams{
-		ID:          skillUUID,
-		WorkspaceID: parseUUID(workspaceID),
-	})
+	skill, err := h.Queries.GetSkill(r.Context(), skillUUID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "skill not found")
-		return skill, false
+		return db.Skill{}, false
+	}
+
+	// Platform and builtin skills are global; workspace skills must belong
+	// to the resolved workspace.
+	if skill.WorkspaceID.Valid && uuidToString(skill.WorkspaceID) != workspaceID {
+		writeError(w, http.StatusNotFound, "skill not found")
+		return db.Skill{}, false
 	}
 	return skill, true
 }
@@ -290,7 +297,7 @@ func (h *Handler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.Config,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
 			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
@@ -397,6 +404,15 @@ func (h *Handler) CreateSkill(w http.ResponseWriter, r *http.Request) {
 // canManageSkill checks whether the current user can update or delete a skill.
 // The skill creator or workspace owner/admin can manage any skill.
 func (h *Handler) canManageSkill(w http.ResponseWriter, r *http.Request, skill db.Skill) bool {
+	// Platform and builtin skills: only platform admins can manage
+	if !skill.WorkspaceID.Valid {
+		if !h.isPlatformAdmin(r) {
+			writeError(w, http.StatusForbidden, "only platform admins can manage platform skills")
+			return false
+		}
+		return true
+	}
+
 	wsID := uuidToString(skill.WorkspaceID)
 	member, ok := h.requireWorkspaceRole(w, r, wsID, "skill not found", "owner", "admin", "member")
 	if !ok {
@@ -2122,7 +2138,7 @@ func (h *Handler) ListAgentSkills(w http.ResponseWriter, r *http.Request) {
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.Config,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
 			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
@@ -2262,7 +2278,7 @@ func (h *Handler) writeUpdatedAgentSkills(w http.ResponseWriter, r *http.Request
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.Config,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
 			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
