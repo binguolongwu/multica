@@ -6,10 +6,22 @@
     "new_skill": "New skill",
     "search_placeholder": "Search skills…",
     "scopes": {
-      "all": { "label": "All", "description": "All skills in this workspace" },
-      "used": { "label": "In use", "description": "Skills assigned to at least one agent" },
-      "unused": { "label": "Unused", "description": "Skills not assigned to any agent" },
-      "mine": { "label": "Created by me", "description": "Skills you created" }
+      "all": {
+        "label": "All",
+        "description": "All skills in this workspace"
+      },
+      "used": {
+        "label": "In use",
+        "description": "Skills assigned to at least one agent"
+      },
+      "unused": {
+        "label": "Unused",
+        "description": "Skills not assigned to any agent"
+      },
+      "mine": {
+        "label": "Created by me",
+        "description": "Skills you created"
+      }
     },
     "empty": {
       "title": "No skills yet",
@@ -50,7 +62,10 @@
     "source_runtime_unknown": "From a runtime",
     "source_clawhub": "From ClawHub",
     "source_skills_sh": "From Skills.sh",
-    "source_github": "From GitHub"
+    "source_github": "From GitHub",
+    "type_builtin": "Built-in",
+    "type_platform": "Platform",
+    "type_workspace": "Workspace"
   },
   "actions": {
     "row_menu": "Actions",
@@ -141,7 +156,8 @@
       "permissions_owner": "You can edit and delete this skill. Changes take effect on the next agent run.",
       "permissions_locked_creator": "Only the creator ({{name}}) or a workspace admin can edit this skill.",
       "permissions_locked": "Only the creator or a workspace admin can edit this skill.",
-      "used_by_empty": "Not assigned to any agent yet. Open an agent's Skills tab to assign."
+      "used_by_empty": "Not assigned to any agent yet. Open an agent's Skills tab to assign.",
+      "type": "Type"
     },
     "origin_card": {
       "imported_runtime": "Imported from local runtime",
@@ -180,7 +196,17 @@
         "reserved": "SKILL.md is reserved for the main file.",
         "exists": "A file at this path already exists."
       }
-    }
+    },
+    "share_to_platform": "Share to platform",
+    "share_to_platform_tooltip": "Make this skill available to all workspaces",
+    "share_confirm": "Share this skill to the platform? It will be visible in all workspaces.",
+    "toast_shared": "Skill shared to platform",
+    "toast_share_failed": "Failed to share skill",
+    "unshare_from_platform": "Unshare from platform",
+    "unshare_from_platform_tooltip": "Move this skill back to its original workspace",
+    "unshare_confirm": "Unshare this skill from the platform? It will only be available in its original workspace.",
+    "toast_unshared": "Skill unshared from platform",
+    "toast_unshare_failed": "Failed to unshare skill"
   },
   "create": {
     "back": "Back",

@@ -11,8 +11,10 @@ import {
   Pencil,
   Plus,
   Save,
+  Share2,
   Sparkles,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import type {
   Agent,
@@ -28,6 +30,7 @@ import { api } from "@multica/core/api";
 import { useTimeAgo } from "../../i18n";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
+import { usePlatformAdmin } from "@multica/core/agents/queries";
 import {
   agentListOptions,
   memberListOptions,
@@ -272,6 +275,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
 
   const canEdit = useCanEditSkill(skill, wsId);
   const skillPermissions = useSkillPermissions(skill ?? null, wsId);
+  const { data: isPlatformAdmin } = usePlatformAdmin();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -438,6 +442,49 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
     setConflictPending(false);
   };
 
+  const handleShareToPlatform = async () => {
+    if (!skill) return;
+    setSaving(true);
+    try {
+      const updatedConfig = {
+        ...(skill.config as Record<string, unknown>),
+        original_workspace_id: wsId,
+      };
+      await api.updateSkill(skill.id, {
+        skill_type: 'platform',
+        workspace_id: null,
+        config: updatedConfig,
+      });
+      qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
+      toast.success(t(($) => $.detail.toast_shared));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t(($) => $.detail.toast_share_failed));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUnshareFromPlatform = async () => {
+    if (!skill) return;
+    const originalWsId = (skill.config as any)?.original_workspace_id;
+    if (!originalWsId) return;
+    setSaving(true);
+    try {
+      const { original_workspace_id, ...restConfig } = skill.config as any;
+      await api.updateSkill(skill.id, {
+        skill_type: 'workspace',
+        workspace_id: originalWsId,
+        config: restConfig,
+      });
+      qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
+      toast.success(t(($) => $.detail.toast_unshared));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t(($) => $.detail.toast_unshare_failed));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!skill) return;
     setDeleting(true);
@@ -568,7 +615,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
                 {t(($) => $.detail.read_only)}
               </span>
             )}
-            {canEdit && (
+            {canEdit && skill.skill_type !== 'builtin' && (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -584,6 +631,42 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
                   }
                 />
                 <TooltipContent>{t(($) => $.detail.delete_tooltip)}</TooltipContent>
+              </Tooltip>
+            )}
+            {isPlatformAdmin && skill.skill_type === 'workspace' && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => { if (confirm(t(($) => $.detail.share_confirm))) handleShareToPlatform(); }}
+                      className="text-muted-foreground hover:text-purple-500"
+                      aria-label={t(($) => $.detail.share_to_platform)}
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </Button>
+                  }
+                />
+                <TooltipContent>{t(($) => $.detail.share_to_platform_tooltip)}</TooltipContent>
+              </Tooltip>
+            )}
+            {isPlatformAdmin && skill.skill_type === 'platform' && (skill.config as any)?.original_workspace_id && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => { if (confirm(t(($) => $.detail.unshare_confirm))) handleUnshareFromPlatform(); }}
+                      className="text-muted-foreground hover:text-orange-500"
+                      aria-label={t(($) => $.detail.unshare_from_platform)}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                    </Button>
+                  }
+                />
+                <TooltipContent>{t(($) => $.detail.unshare_from_platform_tooltip)}</TooltipContent>
               </Tooltip>
             )}
           </>
@@ -618,7 +701,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {t(($) => $.detail.files_label, { count: totalFileCount(skill) })}
             </span>
-            {canEdit && (
+            {canEdit && skill.skill_type !== 'builtin' && (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -652,7 +735,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
               onSelect={setSelectedPath}
             />
           </div>
-          {selectedPath !== SKILL_MD && canEdit && (
+          {selectedPath !== SKILL_MD && canEdit && skill.skill_type !== 'builtin' && (
             <div className="border-t px-3 py-2">
               <Button
                 type="button"
@@ -813,6 +896,20 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
               {t(($) => $.detail.sidebar.metadata)}
             </h3>
             <dl className="space-y-1.5 text-xs">
+              <div className="flex gap-2">
+                <dt className="min-w-20 text-muted-foreground">
+                  {t(($) => $.detail.sidebar.type)}
+                </dt>
+                <dd className="min-w-0 flex-1">
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                    skill.skill_type === 'builtin' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                    skill.skill_type === 'platform' ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  }`}>
+                    {skill.skill_type}
+                  </span>
+                </dd>
+              </div>
               <div className="flex gap-2">
                 <dt className="min-w-20 text-muted-foreground">
                   {t(($) => $.detail.sidebar.created)}
