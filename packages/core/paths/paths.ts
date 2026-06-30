@@ -39,6 +39,7 @@ function workspaceScoped(slug: string) {
     settings: () => `${ws}/settings`,
 	    llm: () => `${ws}/llm`,
 	    templates: () => `${ws}/templates`,
+    sharedSkills: () => `${ws}/shared-skills`,
     wiki: () => `${ws}/wiki`,
     oss: () => `${ws}/oss`,
     attachmentPreview: (id: string) => `${ws}/attachments/${encode(id)}/preview`,
@@ -50,8 +51,7 @@ export const paths = {
 
   // Global (pre-workspace) routes
   login: () => "/login",
-  sharedSkills: () => "/shared-skills",
-  sharedSkillDetail: (id: string) => `/shared-skills/${encode(id)}`,
+
   newWorkspace: () => "/workspaces/new",
   invite: (id: string) => `/invite/${encode(id)}`,
   invitations: () => "/invitations",

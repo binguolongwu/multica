@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { BookOpen, Plus } from "lucide-react";
 import type { SkillSummary } from "@multica/core/types";
 import { useQuery } from "@tanstack/react-query";
@@ -9,7 +8,6 @@ import { usePlatformAdmin } from "@multica/core/agents/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { useNavigation } from "@multica/views/navigation";
-import { PageHeader } from "@multica/views/layout/page-header";
 import { useT, useTimeAgo } from "@multica/views/i18n";
 
 export default function SharedSkillsPage() {
@@ -25,7 +23,8 @@ export default function SharedSkillsPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <PageHeader className="justify-between px-5">
+      {/* Header */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b px-5">
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-muted-foreground" />
           <h1 className="text-sm font-medium">Shared Skills</h1>
@@ -34,15 +33,14 @@ export default function SharedSkillsPage() {
           </span>
         </div>
         {isAdmin && (
-          <Button
-            type="button" size="sm" variant="outline" className="h-8 gap-1"
-          >
+          <Button type="button" size="sm" variant="outline" className="h-8 gap-1">
             <Plus className="h-3.5 w-3.5" />
             New Skill
           </Button>
         )}
-      </PageHeader>
+      </div>
 
+      {/* Body */}
       {isLoading ? (
         <div className="space-y-2 p-6">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -65,7 +63,7 @@ export default function SharedSkillsPage() {
                 <tr
                   key={skill.id}
                   className="border-b hover:bg-accent/50 cursor-pointer"
-                  onClick={() => navigation.push(`/shared-skills/${skill.id}`)}
+                  onClick={() => navigation.push(`shared-skills/${skill.id}`)}
                 >
                   <td className="px-5 py-3">
                     <span className="text-sm font-medium truncate">{skill.name}</span>
