@@ -39,16 +39,18 @@ func sanitizeNullBytes(s string) string {
 // --- Response structs ---
 
 type SkillResponse struct {
-	ID          string  `json:"id"`
-	WorkspaceID *string `json:"workspace_id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Content     string  `json:"content"`
-	Config      any     `json:"config"`
-	SkillType   string  `json:"skill_type"`
-	CreatedBy   *string `json:"created_by"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID             string  `json:"id"`
+	WorkspaceID    *string `json:"workspace_id"`
+	Name           string  `json:"name"`
+	Description    string  `json:"description"`
+	Content        string  `json:"content"`
+	Config         any     `json:"config"`
+	SkillType      string  `json:"skill_type"`
+	IsBuiltin      bool    `json:"is_builtin"`
+	SourceSkillID  *string `json:"source_skill_id"`
+	CreatedBy      *string `json:"created_by"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 // SkillSummaryResponse is the list-endpoint shape: everything SkillResponse
@@ -57,15 +59,17 @@ type SkillResponse struct {
 // links (GH multica-ai/multica#2174). Detail endpoints still return the full
 // SkillResponse with content.
 type SkillSummaryResponse struct {
-	ID          string  `json:"id"`
-	WorkspaceID *string `json:"workspace_id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Config      any     `json:"config"`
-	SkillType   string  `json:"skill_type"`
-	CreatedBy   *string `json:"created_by"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID            string  `json:"id"`
+	WorkspaceID   *string `json:"workspace_id"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Config        any     `json:"config"`
+	SkillType     string  `json:"skill_type"`
+	IsBuiltin     bool    `json:"is_builtin"`
+	SourceSkillID *string `json:"source_skill_id"`
+	CreatedBy     *string `json:"created_by"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 // AgentSkillSummary is the still-narrower shape used for skills embedded in
@@ -78,6 +82,7 @@ type AgentSkillSummary struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	SkillType   string `json:"skill_type"`
+	IsBuiltin   bool   `json:"is_builtin"`
 }
 
 type SkillFileResponse struct {
@@ -127,16 +132,18 @@ func writeSkillImportDuplicateConflict(w http.ResponseWriter, existing ExistingS
 
 func skillToResponse(s db.Skill) SkillResponse {
 	return SkillResponse{
-		ID:          uuidToString(s.ID),
-		WorkspaceID: uuidToPtr(s.WorkspaceID),
-		Name:        s.Name,
-		Description: s.Description,
-		Content:     s.Content,
-		Config:      decodeSkillConfig(s.Config),
-		SkillType:   s.SkillType,
-		CreatedBy:   uuidToPtr(s.CreatedBy),
-		CreatedAt:   timestampToString(s.CreatedAt),
-		UpdatedAt:   timestampToString(s.UpdatedAt),
+		ID:            uuidToString(s.ID),
+		WorkspaceID:   uuidToPtr(s.WorkspaceID),
+		Name:          s.Name,
+		Description:   s.Description,
+		Content:       s.Content,
+		Config:        decodeSkillConfig(s.Config),
+		SkillType:     s.SkillType,
+		IsBuiltin:     s.IsBuiltin,
+		SourceSkillID: uuidToPtr(s.SourceSkillID),
+		CreatedBy:     uuidToPtr(s.CreatedBy),
+		CreatedAt:     timestampToString(s.CreatedAt),
+		UpdatedAt:     timestampToString(s.UpdatedAt),
 	}
 }
 
@@ -182,20 +189,24 @@ func decodeSkillConfig(raw []byte) any {
 func skillSummaryToResponse(
 	id, workspaceID pgtype.UUID,
 	name, description, skillType string,
+	isBuiltin bool,
+	sourceSkillID pgtype.UUID,
 	config []byte,
 	createdBy pgtype.UUID,
 	createdAt, updatedAt pgtype.Timestamptz,
 ) SkillSummaryResponse {
 	return SkillSummaryResponse{
-		ID:          uuidToString(id),
-		WorkspaceID: uuidToPtr(workspaceID),
-		Name:        name,
-		Description: description,
-		Config:      decodeSkillConfig(config),
-		SkillType:   skillType,
-		CreatedBy:   uuidToPtr(createdBy),
-		CreatedAt:   timestampToString(createdAt),
-		UpdatedAt:   timestampToString(updatedAt),
+		ID:            uuidToString(id),
+		WorkspaceID:   uuidToPtr(workspaceID),
+		Name:          name,
+		Description:   description,
+		Config:        decodeSkillConfig(config),
+		SkillType:     skillType,
+		IsBuiltin:     isBuiltin,
+		SourceSkillID: uuidToPtr(sourceSkillID),
+		CreatedBy:     uuidToPtr(createdBy),
+		CreatedAt:     timestampToString(createdAt),
+		UpdatedAt:     timestampToString(updatedAt),
 	}
 }
 
@@ -297,8 +308,9 @@ func (h *Handler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
-			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType,
+			s.IsBuiltin, s.SourceSkillID,
+			s.Config, s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
 
@@ -316,8 +328,9 @@ func (h *Handler) ListPlatformSkills(w http.ResponseWriter, r *http.Request) {
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
-			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType,
+			s.IsBuiltin, s.SourceSkillID,
+			s.Config, s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
 
@@ -363,10 +376,27 @@ func (h *Handler) GetSkill(w http.ResponseWriter, r *http.Request) {
 		fileResps[i] = skillFileToResponse(f)
 	}
 
-	writeJSON(w, http.StatusOK, SkillWithFilesResponse{
+	resp := SkillWithFilesResponse{
 		SkillResponse: skillToResponse(skill),
 		Files:         fileResps,
-	})
+	}
+
+	// Check for upstream updates if this skill has a source
+	if skill.SourceSkillID.Valid {
+		source, err := h.Queries.GetSkill(r.Context(), skill.SourceSkillID)
+		if err == nil && source.UpdatedAt.Time.After(skill.UpdatedAt.Time) {
+			resp.SkillResponse.SkillType = "workspace" // preserve type
+		}
+		// We can't add UpstreamUpdated to SkillResponse without modifying the struct.
+		// Instead, return it in a wrapper map for the frontend to read.
+		writeJSON(w, http.StatusOK, map[string]any{
+			"skill":            resp,
+			"upstream_updated": err == nil && source.UpdatedAt.Time.After(skill.UpdatedAt.Time),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) CreateSkill(w http.ResponseWriter, r *http.Request) {
@@ -2159,8 +2189,9 @@ func (h *Handler) ListAgentSkills(w http.ResponseWriter, r *http.Request) {
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
-			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType,
+			s.IsBuiltin, s.SourceSkillID,
+			s.Config, s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -2299,8 +2330,9 @@ func (h *Handler) writeUpdatedAgentSkills(w http.ResponseWriter, r *http.Request
 	resp := make([]SkillSummaryResponse, len(skills))
 	for i, s := range skills {
 		resp[i] = skillSummaryToResponse(
-			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
-			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType,
+			s.IsBuiltin, s.SourceSkillID,
+			s.Config, s.CreatedBy, s.CreatedAt, s.UpdatedAt,
 		)
 	}
 	actorType, actorID := h.resolveActor(r, requestUserID(r), uuidToString(agent.WorkspaceID))
