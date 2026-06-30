@@ -1,17 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BookOpen, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Plus, ChevronLeft, ChevronRight, Search, Filter, ArrowUpDown } from "lucide-react";
 import type { SkillSummary } from "@multica/core/types";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@multica/core/api";
 import { usePlatformAdmin } from "@multica/core/agents/queries";
 import { Button } from "@multica/ui/components/ui/button";
+import { Input } from "@multica/ui/components/ui/input";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@multica/ui/components/ui/dropdown-menu";
 import { useNavigation } from "@multica/views/navigation";
 import { useT, useTimeAgo } from "@multica/views/i18n";
 
 const PAGE_SIZE = 20;
+
+type SortField = "name" | "updated";
 
 export default function SharedSkillsPage() {
   const { t } = useT("skills");
@@ -19,22 +28,46 @@ export default function SharedSkillsPage() {
   const navigation = useNavigation();
   const { data: isAdmin } = usePlatformAdmin();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<Set<"builtin" | "platform">>(new Set(["builtin", "platform"]));
+  const [sortField, setSortField] = useState<SortField>("updated");
 
   const { data: skills = [], isLoading } = useQuery({
     queryKey: ["platform-skills"],
     queryFn: () => api.listPlatformSkills(),
   });
 
-  const totalPages = Math.max(1, Math.ceil(skills.length / PAGE_SIZE));
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let result = skills.filter((s) => typeFilter.has(s.skill_type as "builtin" | "platform"));
+    if (q) result = result.filter((s) => s.name.toLowerCase().includes(q));
+    result.sort((a, b) => {
+      if (sortField === "name") return a.name.localeCompare(b.name);
+      return Date.parse(b.updated_at) - Date.parse(a.updated_at);
+    });
+    return result;
+  }, [skills, search, typeFilter, sortField]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagedSkills = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return skills.slice(start, start + PAGE_SIZE);
-  }, [skills, page]);
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
-  // Reset page when data changes
-  if (page > totalPages) {
+  if (page > totalPages) setPage(1);
+
+  const toggleTypeFilter = (type: "builtin" | "platform") => {
+    setTypeFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
     setPage(1);
-  }
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -44,7 +77,7 @@ export default function SharedSkillsPage() {
           <BookOpen className="h-4 w-4 text-muted-foreground" />
           <h1 className="text-sm font-medium">Shared Skills</h1>
           <span className="font-mono text-xs tabular-nums text-muted-foreground/70">
-            {skills.length}
+            {filtered.length}
           </span>
         </div>
         {isAdmin && (
@@ -53,6 +86,72 @@ export default function SharedSkillsPage() {
             New Skill
           </Button>
         )}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-5">
+        <div className="relative hidden md:block">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-8 w-64 pl-8 text-sm"
+            placeholder="搜索 skill..."
+            value={search}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" className="h-8 gap-1 px-2 text-muted-foreground md:px-2.5">
+                  <Filter className="size-3.5" />
+                  <span className="hidden md:inline">筛选</span>
+                </Button>
+              }
+            />
+            <DropdownMenuContent className="w-40">
+              <DropdownMenuCheckboxItem
+                checked={typeFilter.has("builtin")}
+                onCheckedChange={() => toggleTypeFilter("builtin")}
+              >
+                <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">builtin</span>
+                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => s.skill_type === "builtin").length}</span>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={typeFilter.has("platform")}
+                onCheckedChange={() => toggleTypeFilter("platform")}
+              >
+                <span className="rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">platform</span>
+                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => s.skill_type === "platform").length}</span>
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" className="h-8 gap-1 px-2 text-muted-foreground md:px-2.5">
+                  <ArrowUpDown className="size-3.5" />
+                  <span className="hidden md:inline">{sortField === "name" ? "名称" : "更新时间"}</span>
+                </Button>
+              }
+            />
+            <DropdownMenuContent className="w-36">
+              <DropdownMenuCheckboxItem
+                checked={sortField === "updated"}
+                onCheckedChange={() => setSortField("updated")}
+              >
+                更新时间
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={sortField === "name"}
+                onCheckedChange={() => setSortField("name")}
+              >
+                名称
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Body */}
@@ -105,6 +204,13 @@ export default function SharedSkillsPage() {
                     </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && skills.length > 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-16 text-center text-sm text-muted-foreground">
+                      No skills match your filters.
+                    </td>
+                  </tr>
+                )}
                 {skills.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-5 py-16 text-center text-sm text-muted-foreground">
