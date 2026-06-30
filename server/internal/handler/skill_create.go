@@ -12,13 +12,16 @@ import (
 )
 
 type skillCreateInput struct {
-	WorkspaceID pgtype.UUID
-	CreatorID   pgtype.UUID
-	Name        string
-	Description string
-	Content     string
-	Config      any
-	Files       []CreateSkillFileRequest
+	WorkspaceID   pgtype.UUID
+	CreatorID     pgtype.UUID
+	Name          string
+	Description   string
+	Content       string
+	Config        any
+	SkillType     string
+	IsBuiltin     bool
+	SourceSkillID pgtype.UUID
+	Files         []CreateSkillFileRequest
 }
 
 // createSkillWithFilesInTx writes a skill plus its supporting files using the
@@ -36,12 +39,15 @@ func createSkillWithFilesInTx(ctx context.Context, qtx *db.Queries, input skillC
 	}
 
 	skill, err := qtx.CreateSkill(ctx, db.CreateSkillParams{
-		WorkspaceID: input.WorkspaceID,
-		Name:        sanitizeNullBytes(input.Name),
-		Description: sanitizeNullBytes(input.Description),
-		Content:     sanitizeNullBytes(input.Content),
-		Config:      config,
-		CreatedBy:   input.CreatorID,
+		WorkspaceID:   input.WorkspaceID,
+		Name:          sanitizeNullBytes(input.Name),
+		Description:   sanitizeNullBytes(input.Description),
+		Content:       sanitizeNullBytes(input.Content),
+		Config:        config,
+		SkillType:     input.SkillType,
+		IsBuiltin:     input.IsBuiltin,
+		SourceSkillID: input.SourceSkillID,
+		CreatedBy:     input.CreatorID,
 	})
 	if err != nil {
 		return SkillWithFilesResponse{}, err

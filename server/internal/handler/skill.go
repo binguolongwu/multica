@@ -437,6 +437,8 @@ func (h *Handler) CreateSkill(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		Content:     req.Content,
 		Config:      req.Config,
+		SkillType:   "workspace",
+		IsBuiltin:   false,
 		Files:       req.Files,
 	})
 	if err != nil {
