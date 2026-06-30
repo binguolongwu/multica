@@ -488,6 +488,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
     }
   };
 
+  const handleDeleteFile = () => {
     if (selectedPath === SKILL_MD) return;
     setFiles((prev) => prev.filter((f) => f.path !== selectedPath));
     setSelectedPath(SKILL_MD);
