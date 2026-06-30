@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BookOpen, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SkillSummary } from "@multica/core/types";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@multica/core/api";
@@ -10,16 +11,30 @@ import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { useNavigation } from "@multica/views/navigation";
 import { useT, useTimeAgo } from "@multica/views/i18n";
 
+const PAGE_SIZE = 20;
+
 export default function SharedSkillsPage() {
   const { t } = useT("skills");
   const timeAgo = useTimeAgo();
   const navigation = useNavigation();
   const { data: isAdmin } = usePlatformAdmin();
+  const [page, setPage] = useState(1);
 
   const { data: skills = [], isLoading } = useQuery({
     queryKey: ["platform-skills"],
     queryFn: () => api.listPlatformSkills(),
   });
+
+  const totalPages = Math.max(1, Math.ceil(skills.length / PAGE_SIZE));
+  const pagedSkills = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return skills.slice(start, start + PAGE_SIZE);
+  }, [skills, page]);
+
+  // Reset page when data changes
+  if (page > totalPages) {
+    setPage(1);
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -48,56 +63,81 @@ export default function SharedSkillsPage() {
           ))}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b text-left text-xs text-muted-foreground">
-                <th className="px-5 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium hidden lg:table-cell">Type</th>
-                <th className="px-3 py-2 font-medium hidden lg:table-cell">Description</th>
-                <th className="px-3 py-2 font-medium hidden md:table-cell">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {skills.map((skill: SkillSummary) => (
-                <tr
-                  key={skill.id}
-                  className="border-b hover:bg-accent/50 cursor-pointer"
-                  onClick={() => navigation.push(`shared-skills/${skill.id}`)}
-                >
-                  <td className="px-5 py-3">
-                    <span className="text-sm font-medium truncate">{skill.name}</span>
-                  </td>
-                  <td className="px-3 py-3 hidden lg:table-cell">
-                    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                      skill.skill_type === 'builtin'
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                    }`}>
-                      {skill.skill_type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 hidden lg:table-cell">
-                    <span className="text-xs text-muted-foreground truncate max-w-[300px] block">
-                      {skill.description}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 hidden md:table-cell">
-                    <span className="text-xs text-muted-foreground">
-                      {timeAgo(skill.updated_at)}
-                    </span>
-                  </td>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="px-5 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium hidden lg:table-cell">Type</th>
+                  <th className="px-3 py-2 font-medium hidden lg:table-cell">Description</th>
+                  <th className="px-3 py-2 font-medium hidden md:table-cell">Updated</th>
                 </tr>
-              ))}
-              {skills.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-5 py-16 text-center text-sm text-muted-foreground">
-                    No shared skills yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagedSkills.map((skill: SkillSummary) => (
+                  <tr
+                    key={skill.id}
+                    className="border-b hover:bg-accent/50 cursor-pointer"
+                    onClick={() => navigation.push(`shared-skills/${skill.id}`)}
+                  >
+                    <td className="px-5 py-3">
+                      <span className="text-sm font-medium truncate">{skill.name}</span>
+                    </td>
+                    <td className="px-3 py-3 hidden lg:table-cell">
+                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                        skill.skill_type === 'builtin'
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                      }`}>
+                        {skill.skill_type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 hidden lg:table-cell">
+                      <span className="text-xs text-muted-foreground truncate max-w-[300px] block">
+                        {skill.description}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 hidden md:table-cell">
+                      <span className="text-xs text-muted-foreground">
+                        {timeAgo(skill.updated_at)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {skills.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-16 text-center text-sm text-muted-foreground">
+                      No shared skills yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 border-t py-3 shrink-0">
+              <Button
+                variant="outline" size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline" size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
