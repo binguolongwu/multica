@@ -652,6 +652,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Get("/api/llm-provider-templates", h.ListLLMProviderTemplates)
 		// Model catalog (merged from all workspaces, used by agent picker).
 		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
+		// Platform skills (global, builtin + platform, no workspace context required).
+		r.Get("/api/platform-skills", h.ListPlatformSkills)
 
 		// Attachment download — user-scoped (auth-only), NOT
 		// workspace-scoped. The handler self-resolves the workspace

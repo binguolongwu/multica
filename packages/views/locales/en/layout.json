@@ -14,7 +14,8 @@
     "oss": "Cloud Storage",
     "settings": "Settings",
     "llm": "LLM Models",
-    "templates": "Templates"
+    "templates": "Templates",
+    "sharedSkills": "Shared Skills"
   },
   "help": {
     "trigger": "Help",

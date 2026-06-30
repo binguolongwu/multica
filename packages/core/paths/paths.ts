@@ -50,6 +50,8 @@ export const paths = {
 
   // Global (pre-workspace) routes
   login: () => "/login",
+  sharedSkills: () => "/shared-skills",
+  sharedSkillDetail: (id: string) => `/shared-skills/${encode(id)}`,
   newWorkspace: () => "/workspaces/new",
   invite: (id: string) => `/invite/${encode(id)}`,
   invitations: () => "/invitations",

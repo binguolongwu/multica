@@ -1699,6 +1699,10 @@ export class ApiClient {
     return this.fetch("/api/skills");
   }
 
+  async listPlatformSkills(): Promise<SkillSummary[]> {
+    return this.fetch("/api/platform-skills");
+  }
+
   async getSkill(id: string): Promise<Skill> {
     return this.fetch(`/api/skills/${id}`);
   }

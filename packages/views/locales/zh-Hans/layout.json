@@ -14,7 +14,8 @@
     "oss": "云存储",
     "settings": "设置",
     "llm": "大模型",
-    "templates": "智能体模板"
+    "templates": "智能体模板",
+    "sharedSkills": "共享Skills"
   },
   "help": {
     "trigger": "帮助",

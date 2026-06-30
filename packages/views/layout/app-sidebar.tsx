@@ -167,6 +167,7 @@ const configureNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[]
   { key: "settings", labelKey: "settings", icon: Settings },
   { key: "llm", labelKey: "llm", icon: Cpu },
   { key: "templates", labelKey: "templates", icon: Library },
+  { key: "sharedSkills", labelKey: "sharedSkills", icon: BookOpenText },
 ];
 
 function DraftDot() {
@@ -669,7 +670,7 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {personalNav.map((item) => {
-                  const href = p[item.key]();
+                  const href = item.key === "sharedSkills" ? paths.sharedSkills() : p[item.key]();
                   const isActive = isNavActive(pathname, href);
                   return (
                     <SidebarMenuItem key={item.key}>
@@ -733,7 +734,7 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {workspaceNav.map((item) => {
-                  const href = p[item.key]();
+                  const href = item.key === "sharedSkills" ? paths.sharedSkills() : p[item.key]();
                   const isActive = !isActivePinnedRoute && isNavActive(pathname, href);
                   return (
                     <SidebarMenuItem key={item.key}>
@@ -757,7 +758,7 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {configureNav.map((item) => {
-                  const href = p[item.key]();
+                  const href = item.key === "sharedSkills" ? paths.sharedSkills() : p[item.key]();
                   const isActive = isNavActive(pathname, href);
                   return (
                     <SidebarMenuItem key={item.key}>

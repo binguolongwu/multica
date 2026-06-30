@@ -304,6 +304,27 @@ func (h *Handler) ListSkills(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, resp)
 }
+// ListPlatformSkills returns all builtin + platform skills. Global route,
+// no workspace context required.
+func (h *Handler) ListPlatformSkills(w http.ResponseWriter, r *http.Request) {
+	skills, err := h.Queries.ListPlatformSkills(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list platform skills")
+		return
+	}
+
+	resp := make([]SkillSummaryResponse, len(skills))
+	for i, s := range skills {
+		resp[i] = skillSummaryToResponse(
+			s.ID, s.WorkspaceID, s.Name, s.Description, s.SkillType, s.Config,
+			s.CreatedBy, s.CreatedAt, s.UpdatedAt,
+		)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+
 
 func (h *Handler) SearchSkills(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
