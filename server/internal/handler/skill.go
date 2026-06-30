@@ -39,18 +39,19 @@ func sanitizeNullBytes(s string) string {
 // --- Response structs ---
 
 type SkillResponse struct {
-	ID             string  `json:"id"`
-	WorkspaceID    *string `json:"workspace_id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	Content        string  `json:"content"`
-	Config         any     `json:"config"`
-	SkillType      string  `json:"skill_type"`
-	IsBuiltin      bool    `json:"is_builtin"`
-	SourceSkillID  *string `json:"source_skill_id"`
-	CreatedBy      *string `json:"created_by"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
+	ID              string  `json:"id"`
+	WorkspaceID     *string `json:"workspace_id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Content         string  `json:"content"`
+	Config          any     `json:"config"`
+	SkillType       string  `json:"skill_type"`
+	IsBuiltin       bool    `json:"is_builtin"`
+	SourceSkillID   *string `json:"source_skill_id"`
+	UpstreamUpdated *bool   `json:"upstream_updated,omitempty"`
+	CreatedBy       *string `json:"created_by"`
+	CreatedAt       string  `json:"created_at"`
+	UpdatedAt       string  `json:"updated_at"`
 }
 
 // SkillSummaryResponse is the list-endpoint shape: everything SkillResponse
@@ -384,16 +385,9 @@ func (h *Handler) GetSkill(w http.ResponseWriter, r *http.Request) {
 	// Check for upstream updates if this skill has a source
 	if skill.SourceSkillID.Valid {
 		source, err := h.Queries.GetSkill(r.Context(), skill.SourceSkillID)
-		if err == nil && source.UpdatedAt.Time.After(skill.UpdatedAt.Time) {
-			resp.SkillResponse.SkillType = "workspace" // preserve type
-		}
-		// We can't add UpstreamUpdated to SkillResponse without modifying the struct.
-		// Instead, return it in a wrapper map for the frontend to read.
-		writeJSON(w, http.StatusOK, map[string]any{
-			"skill":            resp,
-			"upstream_updated": err == nil && source.UpdatedAt.Time.After(skill.UpdatedAt.Time),
-		})
-		return
+		upstreamUpdated := err == nil && source.UpdatedAt.Time.After(skill.UpdatedAt.Time)
+		resp.SkillResponse.SkillType = skill.SkillType // preserve type
+		resp.SkillResponse.UpstreamUpdated = &upstreamUpdated
 	}
 
 	writeJSON(w, http.StatusOK, resp)

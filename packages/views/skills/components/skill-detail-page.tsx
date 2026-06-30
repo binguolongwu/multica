@@ -442,19 +442,6 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
 
 
   const handleDelete = async () => {
-  const handleShareToPlatform = async () => {
-    if (!skill) return;
-    try {
-      const platformSkill = await api.shareToPlatform(skill.id);
-      toast.success(`Shared "${platformSkill.name}" to platform`);
-      qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to share to platform",
-      );
-    }
-  };
-
     if (!skill) return;
     setDeleting(true);
     try {
@@ -475,13 +462,6 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
     }
   };
 
-  const handleAddFile = (path: string) => {
-    setFiles((prev) => [...prev, { path, content: "" }]);
-    setSelectedPath(path);
-    setAddingFile(false);
-  };
-
-  const handleDeleteFile = () => {
   const handleShareToPlatform = async () => {
     if (!skill) return;
     try {
@@ -491,6 +471,19 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to share to platform",
+      );
+    }
+  };
+
+  const handleSyncUpstream = async () => {
+    if (!skill) return;
+    try {
+      const updated = await api.syncUpstream(skill.id);
+      toast.success(`Synced "${updated.name}" to latest version`);
+      qc.setQueryData(skillDetailOptions(wsId, skill.id).queryKey, updated);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to sync upstream",
       );
     }
   };
@@ -626,6 +619,16 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
             resource="skill"
             ownerName={creator?.name}
           />
+        </div>
+      )}
+
+      {skill?.upstream_updated && (
+        <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">A newer version is available from the platform.</span>
+          <Button size="sm" variant="outline" onClick={handleSyncUpstream}>
+            Update
+          </Button>
         </div>
       )}
 
