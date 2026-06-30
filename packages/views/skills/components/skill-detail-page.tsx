@@ -12,6 +12,7 @@ import {
   Plus,
   Save,
   Sparkles,
+  Share2,
   Trash2,
 } from "lucide-react";
 import type {
@@ -441,6 +442,19 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
 
 
   const handleDelete = async () => {
+  const handleShareToPlatform = async () => {
+    if (!skill) return;
+    try {
+      const platformSkill = await api.shareToPlatform(skill.id);
+      toast.success(`Shared "${platformSkill.name}" to platform`);
+      qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to share to platform",
+      );
+    }
+  };
+
     if (!skill) return;
     setDeleting(true);
     try {
@@ -468,6 +482,19 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
   };
 
   const handleDeleteFile = () => {
+  const handleShareToPlatform = async () => {
+    if (!skill) return;
+    try {
+      const platformSkill = await api.shareToPlatform(skill.id);
+      toast.success(`Shared "${platformSkill.name}" to platform`);
+      qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to share to platform",
+      );
+    }
+  };
+
     if (selectedPath === SKILL_MD) return;
     setFiles((prev) => prev.filter((f) => f.path !== selectedPath));
     setSelectedPath(SKILL_MD);
