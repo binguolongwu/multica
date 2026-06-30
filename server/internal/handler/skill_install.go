@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	skillpkg "github.com/multica-ai/multica/server/internal/skill"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
@@ -63,7 +64,7 @@ func (h *Handler) InstallSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "a skill with this name already exists in this workspace")
 		return
 	}
-	if !pgx.ErrNoRows(err) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, http.StatusInternalServerError, "failed to check existing skills")
 		return
 	}

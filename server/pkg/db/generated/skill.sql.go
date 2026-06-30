@@ -616,13 +616,13 @@ ORDER BY name ASC
 `
 
 type ListSkillsByTypeParams struct {
-	SkillType string `json:"skill_type"`
-	Column2   bool   `json:"column_2"`
+	SkillType string      `json:"skill_type"`
+	IsBuiltin pgtype.Bool `json:"is_builtin"`
 }
 
 // Skill type queries (platform / builtin skill discovery)
 func (q *Queries) ListSkillsByType(ctx context.Context, arg ListSkillsByTypeParams) ([]Skill, error) {
-	rows, err := q.db.Query(ctx, listSkillsByType, arg.SkillType, arg.Column2)
+	rows, err := q.db.Query(ctx, listSkillsByType, arg.SkillType, arg.IsBuiltin)
 	if err != nil {
 		return nil, err
 	}

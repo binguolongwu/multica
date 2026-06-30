@@ -127,7 +127,7 @@ ORDER BY s.name ASC;
 
 -- name: ListSkillsByType :many
 SELECT * FROM skill
-WHERE skill_type = $1 AND ($2::boolean IS NULL OR is_builtin = $2)
+WHERE skill_type = $1 AND (sqlc.narg('is_builtin')::boolean IS NULL OR is_builtin = sqlc.narg('is_builtin'))
 ORDER BY name ASC;
 
 -- name: ListPlatformSkills :many

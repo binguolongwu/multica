@@ -23,7 +23,7 @@ func (h *Handler) ShareSkillToPlatform(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !member.IsAdmin && member.Role != "owner" {
+	if member.Role != "admin" && member.Role != "owner" {
 		writeError(w, http.StatusForbidden, "only workspace admins can share skills to platform")
 		return
 	}
@@ -69,7 +69,7 @@ func (h *Handler) ShareSkillToPlatform(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update original workspace skill with source_skill_id link
-	err = h.Queries.UpdateSkill(r.Context(), db.UpdateSkillParams{
+	_, err = h.Queries.UpdateSkill(r.Context(), db.UpdateSkillParams{
 		ID: skill.ID,
 		SourceSkillID: pgtype.UUID{
 			Bytes: platformSkill.ID.Bytes,

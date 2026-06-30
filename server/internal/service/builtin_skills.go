@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"log/slog"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
 // BuiltinSkills returns the platform's built-in skills from the database.
@@ -16,7 +19,10 @@ import (
 // them in-place without a redeploy.
 func (s *TaskService) BuiltinSkills() []AgentSkillData {
 	ctx := context.Background()
-	skills, err := s.Queries.ListSkillsByType(ctx, "builtin")
+	skills, err := s.Queries.ListSkillsByType(ctx, db.ListSkillsByTypeParams{
+		SkillType: "platform",
+		IsBuiltin: pgtype.Bool{Bool: true, Valid: true},
+	})
 	if err != nil {
 		slog.Error("failed to load builtin skills from DB", "error", err)
 		return nil
