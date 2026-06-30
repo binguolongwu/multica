@@ -43,16 +43,12 @@ func UUIDToString(u pgtype.UUID) string {
 		return ""
 	}
 	b := u.Bytes
-	dst := make([]byte, 36)
+	dst := make([]byte, 32)
 	hex.Encode(dst[0:8], b[0:4])
-	dst[8] = '-'
-	hex.Encode(dst[9:13], b[4:6])
-	dst[13] = '-'
-	hex.Encode(dst[14:18], b[6:8])
-	dst[18] = '-'
-	hex.Encode(dst[19:23], b[8:10])
-	dst[23] = '-'
-	hex.Encode(dst[24:36], b[10:16])
+	hex.Encode(dst[8:12], b[4:6])
+	hex.Encode(dst[12:16], b[6:8])
+	hex.Encode(dst[16:20], b[8:10])
+	hex.Encode(dst[20:32], b[10:16])
 	return string(dst)
 }
 
