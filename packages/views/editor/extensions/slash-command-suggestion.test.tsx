@@ -98,8 +98,8 @@ describe("slash command suggestion items", () => {
         agent({
           id: "agent-1",
           skills: [
-            { id: "s1", name: "deploy", description: "Ship changes" },
-            { id: "s2", name: "review", description: "Review code" },
+            { id: "s1", name: "deploy", description: "Ship changes", skill_type: "platform", is_builtin: false },
+            { id: "s2", name: "review", description: "Review code", skill_type: "platform", is_builtin: false },
           ],
         }),
       ],
@@ -116,8 +116,8 @@ describe("slash command suggestion items", () => {
         agent({
           id: "agent-1",
           skills: [
-            { id: "s1", name: "Deploy", description: "" },
-            { id: "s2", name: "Review", description: "" },
+            { id: "s1", name: "Deploy", description: "", skill_type: "platform", is_builtin: false },
+            { id: "s2", name: "Review", description: "", skill_type: "platform", is_builtin: false },
           ],
         }),
       ],
@@ -134,8 +134,8 @@ describe("slash command suggestion items", () => {
         agent({
           id: "agent-1",
           skills: [
-            { id: "s1", name: "deploy", description: "Ship changes" },
-            { id: "s2", name: "review", description: "Read a pull request" },
+            { id: "s1", name: "deploy", description: "Ship changes", skill_type: "platform", is_builtin: false },
+            { id: "s2", name: "review", description: "Read a pull request", skill_type: "platform", is_builtin: false },
           ],
         }),
       ],
@@ -185,6 +185,8 @@ describe("slash command suggestion items", () => {
             id: `s${i}`,
             name: `skill-${i}`,
             description: "",
+            skill_type: "platform" as const,
+            is_builtin: false,
           })),
         }),
       ],
@@ -200,7 +202,7 @@ describe("slash command suggestion items", () => {
       agents: [
         agent({
           id: "agent-1",
-          skills: [{ id: "s1", name: "deploy", description: "" }],
+          skills: [{ id: "s1", name: "deploy", description: "", skill_type: "platform", is_builtin: false }],
         }),
       ],
     });
@@ -229,7 +231,7 @@ describe("slash command suggestion items", () => {
           id: "private-agent",
           visibility: "private",
           owner_id: "u2",
-          skills: [{ id: "private-skill", name: "secret", description: "" }],
+          skills: [{ id: "private-skill", name: "secret", description: "", skill_type: "platform", is_builtin: false }],
         }),
       ],
     });

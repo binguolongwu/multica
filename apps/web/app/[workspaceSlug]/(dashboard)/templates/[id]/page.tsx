@@ -63,7 +63,7 @@ export default function TemplateDetailPage() {
   });
 
   const platformSkills = useMemo(() =>
-    allSkills.filter((s: SkillSummary) => s.skill.is_builtin || s.skill_type === 'platform'),
+    allSkills.filter((s: SkillSummary) => s.is_builtin || s.skill_type === 'platform'),
     [allSkills]
   );
 

@@ -12,6 +12,7 @@ type Reason =
   | "not_resource_owner"
   | "last_owner"
   | "private_visibility"
+  | "builtin_skill"
   | "unknown";
 
 const RESOURCE_NOUN: Record<Resource, string> = {
