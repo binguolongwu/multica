@@ -52,6 +52,8 @@ function makeSkill(createdBy: string | null): Skill {
     content: "",
     config: {},
     skill_type: "workspace" as const,
+    is_builtin: false,
+    source_skill_id: null,
     files: [],
     created_by: createdBy,
     created_at: "2026-04-01T00:00:00Z",

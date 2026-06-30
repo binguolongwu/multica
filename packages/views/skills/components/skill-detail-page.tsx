@@ -570,7 +570,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
                 {t(($) => $.detail.read_only)}
               </span>
             )}
-            {canEdit && skill.skill_type !== 'builtin' && (
+            {canEdit && skill.!skill.is_builtin && (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -620,7 +620,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {t(($) => $.detail.files_label, { count: totalFileCount(skill) })}
             </span>
-            {canEdit && skill.skill_type !== 'builtin' && (
+            {canEdit && skill.!skill.is_builtin && (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -654,7 +654,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
               onSelect={setSelectedPath}
             />
           </div>
-          {selectedPath !== SKILL_MD && canEdit && skill.skill_type !== 'builtin' && (
+          {selectedPath !== SKILL_MD && canEdit && skill.!skill.is_builtin && (
             <div className="border-t px-3 py-2">
               <Button
                 type="button"
@@ -821,7 +821,7 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
                 </dt>
                 <dd className="min-w-0 flex-1">
                   <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                    skill.skill_type === 'builtin' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                    skill.skill.is_builtin ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
                     skill.skill_type === 'platform' ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
                     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                   }`}>

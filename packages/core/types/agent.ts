@@ -318,7 +318,8 @@ export interface AgentSkillSummary {
   id: string;
   name: string;
   description: string;
-  skill_type: 'builtin' | 'platform' | 'workspace';
+  skill_type: 'platform' | 'workspace';
+  is_builtin: boolean;
 }
 
 export interface CreateAgentRequest {
@@ -512,7 +513,9 @@ export interface SkillSummary {
   name: string;
   description: string;
   config: Record<string, unknown>;
-  skill_type: 'builtin' | 'platform' | 'workspace';
+  skill_type: 'platform' | 'workspace';
+  is_builtin: boolean;
+  source_skill_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -521,6 +524,7 @@ export interface SkillSummary {
 export interface Skill extends SkillSummary {
   content: string;
   files: SkillFile[];
+  upstream_updated?: boolean;
 }
 
 export interface SkillFile {
@@ -545,7 +549,7 @@ export interface UpdateSkillRequest {
   description?: string;
   content?: string;
   config?: Record<string, unknown>;
-  skill_type?: 'builtin' | 'platform' | 'workspace';
+  skill_type?: 'platform' | 'workspace';
   workspace_id?: string | null;
   files?: { path: string; content: string }[];
 }

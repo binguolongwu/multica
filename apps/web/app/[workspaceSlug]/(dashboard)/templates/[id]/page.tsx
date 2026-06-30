@@ -63,7 +63,7 @@ export default function TemplateDetailPage() {
   });
 
   const platformSkills = useMemo(() =>
-    allSkills.filter((s: SkillSummary) => s.skill_type === 'builtin' || s.skill_type === 'platform'),
+    allSkills.filter((s: SkillSummary) => s.skill.is_builtin || s.skill_type === 'platform'),
     [allSkills]
   );
 
@@ -337,9 +337,9 @@ export default function TemplateDetailPage() {
                             )}
                           </div>
                           <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${
-                            skill.skill_type === "builtin" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                            skill.is_builtin ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                           }`}>
-                            {skill.skill_type}
+                            {skill.is_builtin ? "builtin" : "platform"}
                           </span>
                           <Button
                             variant="ghost" size="icon-sm"
@@ -393,9 +393,9 @@ export default function TemplateDetailPage() {
                             )}
                           </div>
                           <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${
-                            skill.skill_type === "builtin" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                            skill.is_builtin ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                           }`}>
-                            {skill.skill_type}
+                            {skill.is_builtin ? "builtin" : "platform"}
                           </span>
                         </button>
                       ))}

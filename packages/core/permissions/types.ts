@@ -27,6 +27,7 @@ export type DecisionReason =
   | "not_resource_owner"
   | "last_owner"
   | "private_visibility"
+  | "builtin_skill"
   | "unknown";
 
 export interface Decision {

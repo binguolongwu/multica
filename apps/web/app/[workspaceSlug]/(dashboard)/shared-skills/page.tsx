@@ -39,7 +39,11 @@ export default function SharedSkillsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let result = skills.filter((s) => typeFilter.has(s.skill_type as "builtin" | "platform"));
+	let result = skills;
+    if (typeFilter.size < 2) {
+      if (typeFilter.has("builtin")) result = result.filter((s) => s.is_builtin);
+      else if (typeFilter.has("platform")) result = result.filter((s) => !s.is_builtin);
+    }
     if (q) result = result.filter((s) => s.name.toLowerCase().includes(q));
     result.sort((a, b) => {
       if (sortField === "name") return a.name.localeCompare(b.name);
@@ -115,14 +119,14 @@ export default function SharedSkillsPage() {
                 onCheckedChange={() => toggleTypeFilter("builtin")}
               >
                 <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">builtin</span>
-                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => s.skill_type === "builtin").length}</span>
+                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => s.is_builtin).length}</span>
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={typeFilter.has("platform")}
                 onCheckedChange={() => toggleTypeFilter("platform")}
               >
                 <span className="rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">platform</span>
-                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => s.skill_type === "platform").length}</span>
+                <span className="ml-auto text-xs text-muted-foreground">{skills.filter((s) => !s.is_builtin).length}</span>
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -185,7 +189,7 @@ export default function SharedSkillsPage() {
                     </td>
                     <td className="px-3 py-3 hidden lg:table-cell">
                       <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                        skill.skill_type === 'builtin'
+                        skill.skill.is_builtin
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                       }`}>

@@ -98,9 +98,9 @@ export function SkillsTab({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <div className="text-sm font-medium">{skill.name}</div>
-                  {(skill.skill_type === 'builtin' || skill.skill_type === 'platform') && (
+                  {(skill.skill.is_builtin || skill.skill_type === 'platform') && (
                     <span className={`rounded-md px-1 py-0 text-[10px] font-medium ${
-                      skill.skill_type === 'builtin' 
+                      skill.skill.is_builtin 
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                         : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                     }`}>

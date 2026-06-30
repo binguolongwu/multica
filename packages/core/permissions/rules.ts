@@ -70,9 +70,13 @@ export function canAssignAgentToIssue(
 
 // ---- Skills ----------------------------------------------------------------
 
-export function canEditSkill(skill: Skill, ctx: PermissionContext): Decision {
+export function canEditSkill(skill: { is_builtin?: boolean; created_by: string | null }, ctx: PermissionContext): Decision {
   if (ctx.userId === null) {
     return deny("not_authenticated", "Sign in to edit this skill.");
+  }
+  // Built-in skills are read-only for everyone
+  if (skill.is_builtin) {
+    return deny("builtin_skill", "Built-in skills cannot be modified.");
   }
   if (isAdminLike(ctx.role)) return ALLOW;
   if (skill.created_by !== null && skill.created_by === ctx.userId) {
