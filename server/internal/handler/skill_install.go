@@ -50,10 +50,14 @@ func (h *Handler) InstallSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "skill not found")
 		return
 	}
-	if source.SkillType != "platform" {
-		writeError(w, http.StatusBadRequest, "only platform skills can be installed")
-		return
-	}
+		if source.SkillType != "platform" {
+			writeError(w, http.StatusBadRequest, "only platform skills can be installed")
+			return
+		}
+		if source.IsBuiltin {
+			writeError(w, http.StatusBadRequest, "built-in skills are automatically available and cannot be installed")
+			return
+		}
 
 	// Check name conflict in target workspace
 	_, err = h.Queries.GetSkillByWorkspaceAndName(r.Context(), db.GetSkillByWorkspaceAndNameParams{

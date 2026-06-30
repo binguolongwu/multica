@@ -30,9 +30,10 @@ func (h *Handler) SyncUpstreamSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compare updated_at — only sync if source is newer
-	if !source.UpdatedAt.Time.After(skill.UpdatedAt.Time) {
-		writeError(w, http.StatusBadRequest, "platform version is not newer; no sync needed")
+	// Compare updated_at — only block if source is strictly older
+	// (equal timestamps means no content change, so the sync is harmless)
+	if source.UpdatedAt.Time.Before(skill.UpdatedAt.Time) {
+		writeError(w, http.StatusBadRequest, "platform version is older; no sync needed")
 		return
 	}
 
