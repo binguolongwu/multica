@@ -12,7 +12,7 @@ ORDER BY skill_type, name ASC;
 -- by list endpoints (CLI table, web list page) where the body is never read;
 -- shipping it everywhere blew up payload size on workspaces with many skills
 -- and caused 15s CLI timeouts from high-latency regions (GH multica-ai/multica#2174).
-SELECT id, workspace_id, name, description, config, skill_type, created_by, created_at, updated_at
+SELECT id, workspace_id, name, description, config, skill_type, is_builtin, source_skill_id, created_by, created_at, updated_at
 FROM skill
 WHERE workspace_id IS NULL OR workspace_id = $1
 ORDER BY skill_type, name ASC;
@@ -34,8 +34,8 @@ SELECT * FROM skill
 WHERE workspace_id = $1 AND name = $2;
 
 -- name: CreateSkill :one
-INSERT INTO skill (workspace_id, name, description, content, config, created_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO skill (workspace_id, name, description, content, config, skill_type, is_builtin, source_skill_id, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: UpdateSkill :one
@@ -46,6 +46,7 @@ UPDATE skill SET
     config = COALESCE(sqlc.narg('config'), config),
     skill_type = COALESCE(sqlc.narg('skill_type'), skill_type),
     workspace_id = COALESCE(sqlc.narg('workspace_id'), workspace_id),
+    source_skill_id = COALESCE(sqlc.narg('source_skill_id'), source_skill_id),
     updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -90,7 +91,7 @@ ORDER BY s.name ASC;
 -- name: ListAgentSkillSummaries :many
 -- Summary variant for the agent skills list endpoint — omits `content` for
 -- the same reason as ListSkillSummariesByWorkspace.
-SELECT s.id, s.workspace_id, s.name, s.description, s.config, s.skill_type, s.created_by, s.created_at, s.updated_at
+SELECT s.id, s.workspace_id, s.name, s.description, s.config, s.skill_type, s.is_builtin, s.source_skill_id, s.created_by, s.created_at, s.updated_at
 FROM skill s
 JOIN agent_skill ask ON ask.skill_id = s.id
 WHERE ask.agent_id = $1
@@ -126,13 +127,36 @@ ORDER BY s.name ASC;
 
 -- name: ListSkillsByType :many
 SELECT * FROM skill
-WHERE skill_type = $1
+WHERE skill_type = $1 AND ($2::boolean IS NULL OR is_builtin = $2)
 ORDER BY name ASC;
 
 -- name: ListPlatformSkills :many
--- Returns both platform and built-in skills — the set available for
--- agent template skill_ids references.
-SELECT id, workspace_id, name, description, config, skill_type, created_by, created_at, updated_at
+-- Returns platform skills (both is_builtin true and false) — the set available
+-- for agent template skill_ids references and tenant installation.
+SELECT id, workspace_id, name, description, config, skill_type, is_builtin, source_skill_id, created_by, created_at, updated_at
 FROM skill
-WHERE skill_type IN ('builtin', 'platform')
-ORDER BY skill_type, name ASC;
+WHERE skill_type = 'platform'
+ORDER BY is_builtin DESC, name ASC;
+
+-- name: GetSkillBySourceAndWorkspace :one
+-- Find workspace skill that was installed from a given platform skill.
+SELECT * FROM skill
+WHERE workspace_id = $1 AND source_skill_id = $2
+LIMIT 1;
+
+-- name: ListSkillsBySource :many
+-- List all workspace copies of a given platform skill (for usage tracking).
+SELECT * FROM skill
+WHERE source_skill_id = $1
+ORDER BY workspace_id, name ASC;
+
+-- name: SyncUpstreamSkill :one
+-- Overwrite workspace skill content from platform source.
+UPDATE skill SET
+    name = $2,
+    description = $3,
+    content = $4,
+    config = $5,
+    updated_at = now()
+WHERE id = $1
+RETURNING *;
