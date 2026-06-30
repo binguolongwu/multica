@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Download,
+  Globe,
   HardDrive,
   Loader2,
   Pencil,
@@ -39,11 +40,12 @@ import { Textarea } from "@multica/ui/components/ui/textarea";
 import { useScrollFade } from "@multica/ui/hooks/use-scroll-fade";
 import { cn } from "@multica/ui/lib/utils";
 import { openExternal } from "../../platform";
+import { PlatformSkillPicker } from "./platform-skill-picker";
 import { RuntimeLocalSkillImportPanel } from "./runtime-local-skill-import-panel";
 import { useT } from "../../i18n";
 import { isNameConflictError } from "../lib/utils";
 
-type Method = "chooser" | "manual" | "url" | "runtime";
+type Method = "chooser" | "manual" | "url" | "runtime" | "platform";
 
 function seedAfterCreate(
   qc: ReturnType<typeof useQueryClient>,
@@ -64,11 +66,12 @@ function MethodChooser({ onChoose }: { onChoose: (m: Method) => void }) {
   const methods: {
     key: Method;
     icon: typeof Plus;
-    titleKey: "manual" | "url" | "runtime";
+    titleKey: "manual" | "url" | "runtime" | "platform";
   }[] = [
     { key: "manual", icon: Plus, titleKey: "manual" },
     { key: "url", icon: Download, titleKey: "url" },
     { key: "runtime", icon: HardDrive, titleKey: "runtime" },
+    { key: "platform", icon: Globe, titleKey: "platform" },
   ];
   return (
     <div className="grid gap-2 p-5">
@@ -439,7 +442,7 @@ export function CreateSkillDialog({
     onClose();
   };
 
-  const wide = method === "runtime";
+  const wide = method === "runtime" || method === "platform";
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -517,6 +520,12 @@ export function CreateSkillDialog({
           <RuntimeLocalSkillImportPanel
             onImported={handleCreated}
             onBulkDone={onClose}
+          />
+        )}
+        {method === "platform" && (
+          <PlatformSkillPicker
+            onInstalled={handleCreated}
+            onCancel={() => setMethod("chooser")}
           />
         )}
       </DialogContent>

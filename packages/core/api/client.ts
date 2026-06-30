@@ -1732,6 +1732,25 @@ export class ApiClient {
     });
   }
 
+  async installSkill(skillId: string): Promise<Skill> {
+    return this.fetch("/api/skills/install", {
+      method: "POST",
+      body: JSON.stringify({ skill_id: skillId }),
+    });
+  }
+
+  async syncUpstream(skillId: string): Promise<Skill> {
+    return this.fetch(`/api/skills/${skillId}/sync-upstream`, {
+      method: "POST",
+    });
+  }
+
+  async shareToPlatform(skillId: string): Promise<Skill> {
+    return this.fetch(`/api/skills/${skillId}/share-to-platform`, {
+      method: "POST",
+    });
+  }
+
   async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
     return this.fetch(`/api/agents/${agentId}/skills`);
   }
