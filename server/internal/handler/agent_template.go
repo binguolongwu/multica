@@ -239,10 +239,10 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 	allSkillIDs := make([]pgtype.UUID, 0, len(skillsToBind))
 
 	for i, stb := range skillsToBind {
-		// Dedupe by name: reuse existing skill if present in target workspace
-		existing, err := qtx.GetSkillByWorkspaceAndName(r.Context(), db.GetSkillByWorkspaceAndNameParams{
-			WorkspaceID: wsUUID,
-			Name:        stb.Name,
+		// Dedupe by source_skill_id: reuse existing workspace copy if already installed
+		existing, err := qtx.GetSkillBySourceAndWorkspace(r.Context(), db.GetSkillBySourceAndWorkspaceParams{
+			WorkspaceID:   wsUUID,
+			SourceSkillID: stb.ID,
 		})
 		if err == nil {
 			slog.Info("agent-template create: reusing existing skill",
@@ -259,6 +259,23 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 			slog.Error("agent-template create: lookup existing skill failed",
 				append(logger.RequestAttrs(r), "index", i, "name", stb.Name, "error", err)...)
 			writeError(w, http.StatusInternalServerError, "lookup existing skill failed: "+err.Error())
+			return
+		}
+
+		// No source match — check for name conflict before creating
+		_, nerr := qtx.GetSkillByWorkspaceAndName(r.Context(), db.GetSkillByWorkspaceAndNameParams{
+			WorkspaceID: wsUUID,
+			Name:        stb.Name,
+		})
+		if nerr == nil {
+			writeError(w, http.StatusConflict,
+				fmt.Sprintf("a skill named %q already exists in this workspace; remove it first", stb.Name))
+			return
+		}
+		if !errors.Is(nerr, pgx.ErrNoRows) {
+			slog.Error("agent-template create: name conflict check failed",
+				append(logger.RequestAttrs(r), "index", i, "name", stb.Name, "error", nerr)...)
+			writeError(w, http.StatusInternalServerError, "name conflict check failed: "+nerr.Error())
 			return
 		}
 
@@ -285,13 +302,16 @@ func (h *Handler) CreateAgentFromTemplate(w http.ResponseWriter, r *http.Request
 		}
 
 		created, err := createSkillWithFilesInTx(r.Context(), qtx, skillCreateInput{
-			WorkspaceID: wsUUID,
-			CreatorID:   creatorUUID,
-			Name:        stb.Name,
-			Description: stb.Description,
-			Content:     stb.Content,
-			Config:      map[string]any{"origin": origin},
-			Files:       files,
+			WorkspaceID:   wsUUID,
+			CreatorID:     creatorUUID,
+			Name:          stb.Name,
+			Description:   stb.Description,
+			Content:       stb.Content,
+			Config:        map[string]any{"origin": origin},
+			SkillType:     "workspace",
+			IsBuiltin:     false,
+			SourceSkillID: stb.ID,
+			Files:         files,
 		})
 		if err != nil {
 			slog.Error("agent-template create: failed to copy skill",
