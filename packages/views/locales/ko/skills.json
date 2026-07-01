@@ -6,10 +6,22 @@
     "new_skill": "새 스킬",
     "search_placeholder": "스킬 검색...",
     "scopes": {
-      "all": { "label": "전체", "description": "이 워크스페이스의 모든 스킬" },
-      "used": { "label": "사용 중", "description": "하나 이상의 에이전트에 할당된 스킬" },
-      "unused": { "label": "미사용", "description": "어떤 에이전트에도 할당되지 않은 스킬" },
-      "mine": { "label": "내가 만든 스킬", "description": "내가 생성한 스킬" }
+      "all": {
+        "label": "전체",
+        "description": "이 워크스페이스의 모든 스킬"
+      },
+      "used": {
+        "label": "사용 중",
+        "description": "하나 이상의 에이전트에 할당된 스킬"
+      },
+      "unused": {
+        "label": "미사용",
+        "description": "어떤 에이전트에도 할당되지 않은 스킬"
+      },
+      "mine": {
+        "label": "내가 만든 스킬",
+        "description": "내가 생성한 스킬"
+      }
     },
     "empty": {
       "title": "아직 스킬이 없습니다",
@@ -203,6 +215,10 @@
       "runtime": {
         "title": "런타임에서 복사",
         "desc": "로컬 런타임을 스캔해 디스크에 있는 스킬을 이 워크스페이스로 승격합니다."
+      },
+      "platform": {
+        "title": "플랫폼에서 가져오기",
+        "desc": "플랫폼에서 공유하는 스킬을 설치합니다."
       }
     },
     "method_card": {
@@ -211,7 +227,9 @@
       "url_title": "URL에서 가져오기",
       "url_desc": "ClawHub 또는 Skills.sh의 공개 스킬을 가져옵니다.",
       "runtime_title": "런타임에서 복사",
-      "runtime_desc": "로컬 런타임에 이미 설치된 스킬을 워크스페이스로 가져옵니다."
+      "runtime_desc": "로컬 런타임에 이미 설치된 스킬을 워크스페이스로 가져옵니다.",
+      "platform_title": "플랫폼에서",
+      "platform_desc": "플랫폼에서 공유하는 스킬을 설치합니다."
     },
     "manual": {
       "name_label": "이름",

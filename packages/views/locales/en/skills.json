@@ -231,6 +231,10 @@
       "runtime": {
         "title": "Copy from runtime",
         "desc": "Scan a local runtime and promote one of its on-disk skills into this workspace."
+      },
+      "platform": {
+        "title": "Import from Platform",
+        "desc": "Install a skill shared by the platform."
       }
     },
     "method_card": {
@@ -239,7 +243,9 @@
       "url_title": "Import from URL",
       "url_desc": "Pull a published skill from ClawHub or Skills.sh.",
       "runtime_title": "Copy from runtime",
-      "runtime_desc": "Promote a skill already installed on your local runtime."
+      "runtime_desc": "Promote a skill already installed on your local runtime.",
+      "platform_title": "From platform",
+      "platform_desc": "Install a skill shared by the platform."
     },
     "manual": {
       "name_label": "Name",

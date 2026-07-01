@@ -231,6 +231,10 @@
       "runtime": {
         "title": "从运行时复制",
         "desc": "扫描本地运行时，把它磁盘上的 skill 提升到工作区。"
+      },
+      "platform": {
+        "title": "从平台导入",
+        "desc": "安装平台提供的共享 skill。"
       }
     },
     "method_card": {
@@ -239,7 +243,9 @@
       "url_title": "从 URL 导入",
       "url_desc": "从 ClawHub 或 Skills.sh 拉取已发布的 skill。",
       "runtime_title": "从运行时复制",
-      "runtime_desc": "把本地运行时里已经装好的 skill 提升过来。"
+      "runtime_desc": "把本地运行时里已经装好的 skill 提升过来。",
+      "platform_title": "从平台导入",
+      "platform_desc": "安装平台提供的共享 skill。"
     },
     "manual": {
       "name_label": "名称",

@@ -6,10 +6,22 @@
     "new_skill": "新規スキル",
     "search_placeholder": "スキルを検索…",
     "scopes": {
-      "all": { "label": "すべて", "description": "このワークスペースのすべてのスキル" },
-      "used": { "label": "使用中", "description": "1 つ以上のエージェントに割り当てられたスキル" },
-      "unused": { "label": "未使用", "description": "どのエージェントにも割り当てられていないスキル" },
-      "mine": { "label": "自分が作成", "description": "あなたが作成したスキル" }
+      "all": {
+        "label": "すべて",
+        "description": "このワークスペースのすべてのスキル"
+      },
+      "used": {
+        "label": "使用中",
+        "description": "1 つ以上のエージェントに割り当てられたスキル"
+      },
+      "unused": {
+        "label": "未使用",
+        "description": "どのエージェントにも割り当てられていないスキル"
+      },
+      "mine": {
+        "label": "自分が作成",
+        "description": "あなたが作成したスキル"
+      }
     },
     "empty": {
       "title": "まだスキルがありません",
@@ -201,6 +213,10 @@
       "runtime": {
         "title": "ランタイムからコピー",
         "desc": "ローカルランタイムをスキャンし、ディスク上のスキルの 1 つをこのワークスペースに昇格します。"
+      },
+      "platform": {
+        "title": "プラットフォームからインポート",
+        "desc": "プラットフォームで共有されているスキルをインストールします。"
       }
     },
     "method_card": {
@@ -209,7 +225,9 @@
       "url_title": "URL からインポート",
       "url_desc": "ClawHub または Skills.sh の公開スキルを取得します。",
       "runtime_title": "ランタイムからコピー",
-      "runtime_desc": "ローカルランタイムにすでにインストールされているスキルを昇格します。"
+      "runtime_desc": "ローカルランタイムにすでにインストールされているスキルを昇格します。",
+      "platform_title": "プラットフォームから",
+      "platform_desc": "プラットフォームで共有されているスキルをインストールします。"
     },
     "manual": {
       "name_label": "名前",
