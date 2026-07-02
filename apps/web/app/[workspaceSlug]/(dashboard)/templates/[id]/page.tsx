@@ -55,17 +55,12 @@ export default function TemplateDetailPage() {
 
   const [saving, setSaving] = useState(false);
 
-  // Fetch platform skills for the picker
-  const { data: allSkills = [] } = useQuery({
-    queryKey: ["platform-skills", id],
-    queryFn: () => api.listSkills(),
+  // Fetch platform + builtin skills for the picker
+  const { data: platformSkills = [] } = useQuery({
+    queryKey: ["platform-skills"],
+    queryFn: () => api.listPlatformSkills(),
     staleTime: 30_000,
   });
-
-  const platformSkills = useMemo(() =>
-    allSkills.filter((s: SkillSummary) => s.is_builtin || s.skill_type === 'platform'),
-    [allSkills]
-  );
 
   const selectedSkills = useMemo(() =>
     platformSkills.filter((s: SkillSummary) => skillIdsDraft.includes(s.id)),
