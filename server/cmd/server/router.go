@@ -655,6 +655,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 
 		// LLM Provider templates (global, shared across all workspaces).
 		r.Get("/api/llm-provider-templates", h.ListLLMProviderTemplates)
+		// Runtime protocol map (global, read-only for all authenticated users).
+		r.Get("/api/runtime-protocol-map", h.ListRuntimeProtocolMap)
 		// Model catalog (merged from all workspaces, used by agent picker).
 		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
 		// Platform skills (global, builtin + platform, no workspace context required).
@@ -1047,9 +1049,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 							r.Delete("/", h.DeleteAgentTemplateAdmin)
 						})
 					})
-					// Runtime protocol map (platform admin only)
+					// Runtime protocol map management (platform admin only)
 					r.Route("/runtime-protocol-map", func(r chi.Router) {
-						r.Get("/", h.ListRuntimeProtocolMap)
 						r.Put("/{protocolFamily}", h.UpsertRuntimeProtocolMap)
 						r.Delete("/{protocolFamily}", h.DeleteRuntimeProtocolMap)
 					})
