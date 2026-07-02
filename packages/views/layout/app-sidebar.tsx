@@ -124,7 +124,8 @@ type NavKey =
   | "wiki"
   | "oss"
   | "llm"
-  | "templates";
+  | "templates"
+  | "sharedSkills";
 
 // Static schema (key + icon) — labels resolved at render via useT("layout").
 type NavLabelKey =
@@ -142,7 +143,8 @@ type NavLabelKey =
   | "wiki"
   | "oss"
   | "llm"
-  | "templates";
+  | "templates"
+  | "sharedSkills";
 
 const personalNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[] = [
   { key: "inbox", labelKey: "inbox", icon: Inbox },

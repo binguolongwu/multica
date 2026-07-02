@@ -86,6 +86,7 @@ function getCopy(reason: Reason, noun: string, ownerName?: string): string {
       return `Personal ${noun} — only the owner and workspace admins can use this.`;
     case "allowed":
     case "unknown":
-      return ""; // unreachable; component returned null above
+      return "";
   }
+  return "";
 }
