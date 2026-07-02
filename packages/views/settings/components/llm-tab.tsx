@@ -6,7 +6,7 @@ import { Edit, Plus, Trash2, Loader2, ChevronRight, RefreshCw, Search } from "lu
 import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { LLM_CAPABILITIES, CAPABILITY_LABELS } from "@multica/core/types";
-import type { LLMProvider, LLMModel, LLMModelCandidate } from "@multica/core/types";
+import type { LLMProvider, LLMModel, LLMModelCandidate, LLMProviderEndpoint } from "@multica/core/types";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Card, CardContent } from "@multica/ui/components/ui/card";
@@ -14,6 +14,7 @@ import { Checkbox } from "@multica/ui/components/ui/checkbox";
 import { Switch } from "@multica/ui/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@multica/ui/components/ui/dialog";
 import { CapabilityBadges } from "../../common/capability-badges";
+import { LLMEndpointEditor } from "./llm-endpoint-editor";
 import { toast } from "sonner";
 
 const llmKeys = {
@@ -38,10 +39,9 @@ export function LlmSettingsTab() {
   const [editingModel, setEditingModel] = useState<LLMModel | null>(null);
   const [providerDialog, setProviderDialog] = useState(false);
   const [modelDialog, setModelDialog] = useState(false);
-  const [form, setForm] = useState({ name: "", code: "", api_type: "openai", api_base_url: "", api_key: "", env_var_api_key: "OPENAI_API_KEY", env_var_base_url: "OPENAI_BASE_URL", sort: 0 });
+  const [form, setForm] = useState({ name: "", code: "", api_key: "", sort: 0 });
   const [modelForm, setModelForm] = useState({ name: "", model_code: "", temperature: 0.7, max_tokens: 4096, context_window: 0, capabilities: [] as string[], sort: 0, currency: "CNY", input_price: 0, output_price: 0 });
   const [templateCode, setTemplateCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
   // Fetch-models dialog: provider returns candidates; the user multi-selects
   // which to import (avoids dumping the whole remote catalog into the DB).
   const [fetchDialogOpen, setFetchDialogOpen] = useState(false);
@@ -73,7 +73,7 @@ export function LlmSettingsTab() {
   const openCreateProvider = () => {
     setEditingProvider(null);
     setTemplateCode("");
-    setForm({ name: "", code: "", api_type: "openai", api_base_url: "", api_key: "", env_var_api_key: "OPENAI_API_KEY", env_var_base_url: "OPENAI_BASE_URL", sort: 0 });
+    setForm({ name: "", code: "", api_key: "", sort: 0 });
     setProviderDialog(true);
   };
 
@@ -81,7 +81,7 @@ export function LlmSettingsTab() {
     setEditingProvider(p);
     setTemplateCode("");
     const isMasked = p.api_key.includes("****");
-    setForm({ name: p.name, code: p.code, api_type: p.api_type, api_base_url: p.api_base_url, api_key: isMasked ? "" : p.api_key, env_var_api_key: p.env_var_api_key, env_var_base_url: p.env_var_base_url, sort: p.sort });
+    setForm({ name: p.name, code: p.code, api_key: isMasked ? "" : p.api_key, sort: p.sort });
     setProviderDialog(true);
   };
 
@@ -93,28 +93,14 @@ export function LlmSettingsTab() {
       ...form,
       name: tpl.name,
       code: tpl.code,
-      api_type: tpl.api_type,
-      api_base_url: resolveTemplateBaseUrl(tpl, tpl.api_type),
-      env_var_api_key: tpl.env_var_api_key,
-      env_var_base_url: tpl.env_var_base_url,
       api_key: "",
     });
-  };
-
-  // resolveTemplateBaseUrl returns the appropriate base URL from a template
-  // based on the selected API format: anthropic_api_url for anthropic type,
-  // api_base_url for everything else.
-  const resolveTemplateBaseUrl = (tpl: { api_base_url: string; anthropic_api_url?: string }, apiType: string) => {
-    if (apiType === "anthropic" && tpl.anthropic_api_url) {
-      return tpl.anthropic_api_url;
-    }
-    return tpl.api_base_url;
   };
 
   const saveProviderMutation = useMutation({
     mutationFn: async () => {
       const payload = editingProvider && !form.api_key
-        ? { name: form.name, code: form.code, api_type: form.api_type, api_base_url: form.api_base_url, env_var_api_key: form.env_var_api_key, env_var_base_url: form.env_var_base_url, sort: form.sort }
+        ? { name: form.name, code: form.code, sort: form.sort }
         : form;
       if (editingProvider) return api.updateLLMProvider(wsId, editingProvider.id, payload);
       return api.createLLMProvider(wsId, payload);
@@ -268,7 +254,9 @@ export function LlmSettingsTab() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold">{selectedProvider.name}</h3>
-                <p className="text-xs text-muted-foreground font-mono">{selectedProvider.api_base_url}</p>
+                <p className="text-xs text-muted-foreground">
+                  {((selectedProvider as any).endpoints || []).length} 个端点 · {models.length} 个模型
+                </p>
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon-sm" onClick={() => openEditProvider(selectedProvider)}><Edit className="h-4 w-4" /></Button>
@@ -329,7 +317,7 @@ export function LlmSettingsTab() {
 
       {/* ── Provider Dialog ────────────── */}
       <Dialog open={providerDialog} onOpenChange={setProviderDialog}>
-        <DialogContent className="overflow-y-auto" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "60vh" }}>
+        <DialogContent className="overflow-y-auto" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "70vh" }}>
           <DialogTitle>{editingProvider ? "编辑供应商" : "新增供应商"}</DialogTitle>
           <div className="space-y-3">
             <div>
@@ -345,26 +333,6 @@ export function LlmSettingsTab() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs font-medium">API 格式</label>
-              <select
-                className="w-full border rounded px-2 py-1.5 text-sm mt-1"
-                value={form.api_type}
-                onChange={(e) => {
-                  const newType = e.target.value;
-                  const tpl = templateCode ? (templatesQuery.data || []).find((t) => t.code === templateCode) : null;
-                  setForm({
-                    ...form,
-                    api_type: newType,
-                    api_base_url: tpl ? resolveTemplateBaseUrl(tpl, newType) : form.api_base_url,
-                  });
-                }}
-              >
-                <option value="openai">Chat Completions (/chat/completions)</option>
-                <option value="anthropic">Anthropic Messages (/v1/messages)</option>
-                <option value="responses">OpenAI Responses (/responses)</option>
-              </select>
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium">名称 *</label>
@@ -375,54 +343,24 @@ export function LlmSettingsTab() {
                 <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. deepseek" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium">API Base URL</label>
-                <Input value={form.api_base_url} onChange={(e) => setForm({ ...form, api_base_url: e.target.value })} placeholder="https://api.openai.com/v1" />
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                  填到域名+路径即可，<span className="font-mono">/v1</span> 带不带都行——系统会自动识别并拼接模型端点。例：https://api.openai.com/v1、https://api.deepseek.com、https://opencode.ai/zen/v1
-                </p>
-              </div>
-              <div>
-                <label className="text-xs font-medium">API Key</label>
-                <Input type="password" value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder={editingProvider ? "（不修改则留空）" : "sk-..."} />
-              </div>
+            <div>
+              <label className="text-xs font-medium">API Key</label>
+              <Input type="password" value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder={editingProvider ? "（不修改则留空）" : "sk-..."} />
+              <p className="text-[11px] text-muted-foreground mt-1">供应商级别密钥，所有端点共用。</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium">Env Var (Key)</label>
-                <Input value={form.env_var_api_key} onChange={(e) => setForm({ ...form, env_var_api_key: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Env Var (Base URL)</label>
-                <Input value={form.env_var_base_url} onChange={(e) => setForm({ ...form, env_var_base_url: e.target.value })} />
-              </div>
-            </div>
+            {editingProvider && (
+              <LLMEndpointEditor
+                workspaceId={wsId}
+                providerId={editingProvider.id}
+                endpoints={(editingProvider as any).endpoints || []}
+              />
+            )}
+            {!editingProvider && (
+              <p className="text-xs text-muted-foreground italic">保存后可添加 API 端点</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setProviderDialog(false)}>取消</Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                setVerifying(true);
-                try {
-                  const result = await api.testLLMConnection(wsId, { api_base_url: form.api_base_url, api_key: form.api_key, api_type: form.api_type });
-                  if (result.ok === "true") {
-                    toast.success("API Key 有效");
-                  } else {
-                    toast.error(result.error || "验证失败");
-                  }
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "验证失败");
-                } finally {
-                  setVerifying(false);
-                }
-              }}
-              disabled={!form.api_base_url || !form.api_key || verifying}
-            >
-              {verifying ? "验证中..." : "验证"}
-            </Button>
             <Button size="sm" onClick={() => saveProviderMutation.mutate()} disabled={!form.name || !form.code || saveProviderMutation.isPending}>
               {saveProviderMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
               保存
