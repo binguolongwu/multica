@@ -37,10 +37,10 @@ export default function NewTemplatePage() {
       if (model) data.model = model;
 
       const created = await createMutation.mutateAsync(data);
-      toast.success("Template created");
+      toast.success("模板已创建");
       router.push(p.templates() + "/" + created.id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Create failed");
+      toast.error(err instanceof Error ? err.message : "创建失败");
     } finally {
       setSaving(false);
     }
@@ -55,12 +55,12 @@ export default function NewTemplatePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-sm font-semibold">New Template</h1>
-            <p className="text-xs text-muted-foreground">Create a new agent template</p>
+            <h1 className="text-sm font-semibold">新建模板</h1>
+            <p className="text-xs text-muted-foreground">创建新的 Agent 模板</p>
           </div>
         </div>
         <Button size="sm" onClick={handleCreate} disabled={saving || !name.trim()}>
-          {saving ? "Creating..." : "Create Template"}
+          {saving ? "创建中..." : "创建模板"}
         </Button>
       </div>
 
@@ -68,36 +68,36 @@ export default function NewTemplatePage() {
       <div className="flex-1 min-h-0 overflow-y-auto p-6 max-w-2xl">
         <div className="space-y-5">
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">Name *</Label>
+            <Label className="text-xs font-medium text-muted-foreground">名称 *</Label>
             <Input
               className="mt-1"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Template name"
+              placeholder="模板名称"
               autoFocus
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">Description</Label>
+            <Label className="text-xs font-medium text-muted-foreground">描述</Label>
             <Input
               className="mt-1"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description"
+              placeholder="简要描述"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">Category</Label>
+              <Label className="text-xs font-medium text-muted-foreground">分类</Label>
               <Input
                 className="mt-1"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g. Engineering"
+                placeholder="如：工程"
               />
             </div>
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">Model</Label>
+              <Label className="text-xs font-medium text-muted-foreground">模型</Label>
               <Input
                 className="mt-1"
                 value={model}
@@ -107,7 +107,7 @@ export default function NewTemplatePage() {
             </div>
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">Tags (comma-separated)</Label>
+            <Label className="text-xs font-medium text-muted-foreground">标签（逗号分隔）</Label>
             <Input
               className="mt-1"
               value={tagsInput}
@@ -116,12 +116,12 @@ export default function NewTemplatePage() {
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">Instructions</Label>
+            <Label className="text-xs font-medium text-muted-foreground">指令</Label>
             <textarea
               className="w-full min-h-[300px] mt-1 rounded-md border p-3 font-mono text-sm bg-background resize-y"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Agent instructions (markdown)..."
+              placeholder="Agent 指令（Markdown）..."
             />
           </div>
         </div>
