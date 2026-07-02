@@ -9,8 +9,37 @@ export interface LLMProvider {
   env_var_base_url: string;
   status: number;
   sort: number;
+  endpoints?: LLMProviderEndpoint[];
   created_at: string;
   updated_at: string;
+}
+
+export type APIType = "openai_chat" | "openai_responses" | "anthropic";
+
+export interface LLMProviderEndpoint {
+  endpoint_id: string;
+  provider_id: string;
+  api_type: APIType;
+  api_base_url: string;
+  status: number;
+  sort: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuntimeProtocolMapEntry {
+  protocol_map_id: string;
+  protocol_family: string;
+  api_type: string;
+  env_var_api_key: string;
+  env_var_base_url: string;
+}
+
+export interface CreateEndpointRequest {
+  api_type: APIType;
+  api_base_url: string;
+  status?: number;
+  sort?: number;
 }
 
 export interface LLMProviderTemplate {

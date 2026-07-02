@@ -2558,4 +2558,36 @@ export class ApiClient {
   async sshConnectRuntime(workspaceId: string, data: { host: string; port: string; username: string; password: string; runtimes: string[] }): Promise<{ ok: string; error?: string }> {
     return this.fetch(`/api/workspaces/${workspaceId}/runtimes/ssh-connect`, { method: "POST", body: JSON.stringify(data) });
   }
+
+  // ── LLM Provider Endpoints ──────────────────────────────────────────────
+
+  async listProviderEndpoints(workspaceId: string, providerId: string): Promise<LLMProviderEndpoint[]> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/endpoints`);
+  }
+
+  async createProviderEndpoint(workspaceId: string, providerId: string, data: CreateEndpointRequest): Promise<LLMProviderEndpoint> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/endpoints`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async updateProviderEndpoint(workspaceId: string, providerId: string, endpointId: string, data: Partial<CreateEndpointRequest>): Promise<LLMProviderEndpoint> {
+    return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/endpoints/${endpointId}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+
+  async deleteProviderEndpoint(workspaceId: string, providerId: string, endpointId: string): Promise<void> {
+    await this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/endpoints/${endpointId}`, { method: "DELETE" });
+  }
+
+  // ── Runtime Protocol Map (global, admin-only) ──────────────────────────
+
+  async listRuntimeProtocolMap(): Promise<RuntimeProtocolMapEntry[]> {
+    return this.fetch("/api/admin/runtime-protocol-map");
+  }
+
+  async upsertRuntimeProtocolMap(family: string, data: { api_type: string; env_var_api_key: string; env_var_base_url: string }): Promise<RuntimeProtocolMapEntry> {
+    return this.fetch(`/api/admin/runtime-protocol-map/${family}`, { method: "PUT", body: JSON.stringify(data) });
+  }
+
+  async deleteRuntimeProtocolMap(family: string): Promise<void> {
+    await this.fetch(`/api/admin/runtime-protocol-map/${family}`, { method: "DELETE" });
+  }
 }
