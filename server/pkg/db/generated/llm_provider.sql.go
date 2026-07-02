@@ -73,6 +73,51 @@ func (q *Queries) DeleteLLMProvider(ctx context.Context, arg DeleteLLMProviderPa
 	return err
 }
 
+const getLLMEndpointForInjection = `-- name: GetLLMEndpointForInjection :one
+SELECT
+    p.api_key,
+    e.api_base_url,
+    rpm.env_var_api_key,
+    rpm.env_var_base_url
+FROM llm_model t
+JOIN llm_provider p ON p.id = t.provider_id
+JOIN llm_provider_endpoint e ON e.provider_id = p.id AND e.workspace_id = t.workspace_id
+JOIN runtime_protocol_map rpm ON rpm.api_type = e.api_type
+WHERE t.model_code = $1
+  AND t.workspace_id = $2
+  AND rpm.protocol_family = $3
+  AND e.status = 1
+  AND p.status = 1
+  AND t.status = 1
+`
+
+type GetLLMEndpointForInjectionParams struct {
+	ModelCode      string      `json:"model_code"`
+	WorkspaceID    pgtype.UUID `json:"workspace_id"`
+	ProtocolFamily string      `json:"protocol_family"`
+}
+
+type GetLLMEndpointForInjectionRow struct {
+	ApiKey        string `json:"api_key"`
+	ApiBaseUrl    string `json:"api_base_url"`
+	EnvVarApiKey  string `json:"env_var_api_key"`
+	EnvVarBaseUrl string `json:"env_var_base_url"`
+}
+
+// 4-table JOIN: model → provider → endpoint → protocol_map
+// Returns the endpoint matching the runtime's protocol_family.
+func (q *Queries) GetLLMEndpointForInjection(ctx context.Context, arg GetLLMEndpointForInjectionParams) (GetLLMEndpointForInjectionRow, error) {
+	row := q.db.QueryRow(ctx, getLLMEndpointForInjection, arg.ModelCode, arg.WorkspaceID, arg.ProtocolFamily)
+	var i GetLLMEndpointForInjectionRow
+	err := row.Scan(
+		&i.ApiKey,
+		&i.ApiBaseUrl,
+		&i.EnvVarApiKey,
+		&i.EnvVarBaseUrl,
+	)
+	return i, err
+}
+
 const getLLMProvider = `-- name: GetLLMProvider :one
 SELECT id, workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE id = $1 AND workspace_id = $2
 `

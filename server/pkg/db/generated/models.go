@@ -671,6 +671,18 @@ type LlmProvider struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LlmProviderEndpoint struct {
+	EndpointID  pgtype.UUID        `json:"endpoint_id"`
+	ProviderID  pgtype.UUID        `json:"provider_id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	ApiType     string             `json:"api_type"`
+	ApiBaseUrl  string             `json:"api_base_url"`
+	Status      int16              `json:"status"`
+	Sort        int32              `json:"sort"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LlmProviderTemplate struct {
 	ID pgtype.UUID `json:"id"`
 	// Template display name.
@@ -797,6 +809,16 @@ type RuntimeProfile struct {
 	Visibility     string             `json:"visibility"`
 	CreatedBy      pgtype.UUID        `json:"created_by"`
 	Enabled        bool               `json:"enabled"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type RuntimeProtocolMap struct {
+	ProtocolMapID  pgtype.UUID        `json:"protocol_map_id"`
+	ProtocolFamily string             `json:"protocol_family"`
+	ApiType        string             `json:"api_type"`
+	EnvVarApiKey   string             `json:"env_var_api_key"`
+	EnvVarBaseUrl  string             `json:"env_var_base_url"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
