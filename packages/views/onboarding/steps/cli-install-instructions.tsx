@@ -8,8 +8,17 @@ import { cn } from "@multica/ui/lib/utils";
 import { copyText } from "@multica/ui/lib/clipboard";
 import { useT } from "../../i18n";
 
-const INSTALL_CMD =
-  "curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash";
+import { useConfigStore } from "@multica/core/config";
+
+const CLOUD_INSTALL_URL =
+  "https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh";
+
+function useInstallCommand() {
+  const daemonServerUrl = useConfigStore((s) => s.daemonServerUrl);
+  const base = daemonServerUrl?.trim().replace(/\/+$/, "") ?? "";
+  const url = base ? `${base}/install.sh` : CLOUD_INSTALL_URL;
+  return `curl -fsSL ${url} | bash`;
+}
 const SETUP_CMD = "multica setup";
 
 function CopyButton({ text }: { text: string }) {
@@ -78,7 +87,7 @@ export function CliInstallInstructions() {
         <p className="text-xs leading-[1.55] text-muted-foreground">
           {t(($) => $.cli_install.intro)}
         </p>
-        <Step n={1} label={t(($) => $.cli_install.step1_label)} cmd={INSTALL_CMD} />
+        <Step n={1} label={t(($) => $.cli_install.step1_label)} cmd={useInstallCommand()} />
         <Step n={2} label={t(($) => $.cli_install.step2_label)} cmd={SETUP_CMD} />
       </CardContent>
     </Card>

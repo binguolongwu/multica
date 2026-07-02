@@ -25,10 +25,21 @@ import { useT } from "../../i18n";
 
 type Step = "instructions" | "success";
 
-const INSTALL_CMD =
-  "curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash";
+const CLOUD_INSTALL_URL =
+  "https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh";
 const CLOUD_SERVER_URL = "https://api.multica.ai";
 const CLOUD_APP_URL = "https://multica.ai";
+
+/**
+ * Build the install command dynamically. When the backend provides a
+ * daemonServerUrl (self-hosted deployments), the install script is served
+ * from the backend itself; otherwise fall back to the GitHub-hosted copy.
+ */
+function installCommand(daemonServerUrl: string | undefined) {
+  const base = normalizeCommandURL(daemonServerUrl);
+  const url = base ? `${base}/install.sh` : CLOUD_INSTALL_URL;
+  return `curl -fsSL ${url} | bash`;
+}
 
 function normalizeCommandURL(url: string | undefined) {
   return url?.trim().replace(/\/+$/, "") ?? "";
@@ -193,6 +204,7 @@ function InstructionsStep({ onClose }: { onClose: () => void }) {
   const daemonServerUrl = useConfigStore((s) => s.daemonServerUrl);
   const daemonAppUrl = useConfigStore((s) => s.daemonAppUrl);
   const { setupCmd, tokenCmd } = daemonCommands(daemonServerUrl, daemonAppUrl);
+  const installCmd = installCommand(daemonServerUrl);
   return (
     <>
       <DialogHeader className="px-6 pt-6 pb-2">

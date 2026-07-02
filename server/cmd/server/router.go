@@ -517,6 +517,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	r.Get("/readyz", health.readyHandler)
 	r.Get("/healthz", health.readyHandler)
 
+	// Serve the CLI install script from the running server so self-hosted
+	// deployments can give users a curl one-liner that points at THIS
+	// server instead of raw.githubusercontent.com.
+	r.Get("/install.sh", h.ServeInstallScript)
+
 	// Realtime subsystem metrics — connection counts, slow-client evictions,
 	// and per-event-type send QPS counters. Exposed as JSON so it can be
 	// scraped by ops or surfaced in the admin UI without adding a Prometheus
