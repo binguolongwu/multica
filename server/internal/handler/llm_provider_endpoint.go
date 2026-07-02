@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"log/slog"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -81,6 +82,14 @@ func (h *Handler) CreateLLMProviderEndpoint(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	// Verify the provider belongs to this workspace (defense against cross-workspace IDOR).
+	if _, err := h.Queries.GetLLMProvider(r.Context(), db.GetLLMProviderParams{
+		ID:          pUUID,
+		WorkspaceID: wsUUID,
+	}); err != nil {
+		writeError(w, http.StatusNotFound, "provider not found in workspace")
+		return
+	}
 	var req CreateLLMProviderEndpointRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -107,7 +116,8 @@ func (h *Handler) CreateLLMProviderEndpoint(w http.ResponseWriter, r *http.Reque
 		Sort:        sortVal,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create endpoint: "+err.Error())
+		slog.Warn("llm: failed to create endpoint", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create endpoint")
 		return
 	}
 	writeJSON(w, http.StatusCreated, llmEndpointToResponse(endpoint))
@@ -147,7 +157,8 @@ func (h *Handler) UpdateLLMProviderEndpoint(w http.ResponseWriter, r *http.Reque
 	}
 	endpoint, err := h.Queries.UpdateLLMProviderEndpoint(r.Context(), params)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update endpoint: "+err.Error())
+		slog.Warn("llm: failed to update endpoint", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update endpoint")
 		return
 	}
 	writeJSON(w, http.StatusOK, llmEndpointToResponse(endpoint))
