@@ -715,16 +715,22 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 						r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
 						// SSH connect runtime (admin-only).
 						r.Post("/runtimes/ssh-connect", h.SSHConnectRuntime)
-						// LLM providers and models (admin-only mutations).
-					r.Post("/llm-providers", h.CreateLLMProvider)
-					r.Put("/llm-providers/{providerId}", h.UpdateLLMProvider)
-					r.Delete("/llm-providers/{providerId}", h.DeleteLLMProvider)
-					r.Post("/llm-providers/test", h.TestLLMConnection)
-					r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
-					r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
-					r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
-					r.Post("/llm-providers/{providerId}/models/bulk", h.ImportLLMModels)
-					r.Post("/llm-providers/{providerId}/fetch-models", h.FetchProviderModels)
+					// LLM providers and models (admin-only mutations).
+				r.Post("/llm-providers", h.CreateLLMProvider)
+				r.Put("/llm-providers/{providerId}", h.UpdateLLMProvider)
+				r.Delete("/llm-providers/{providerId}", h.DeleteLLMProvider)
+				r.Post("/llm-providers/test", h.TestLLMConnection)
+				r.Post("/llm-providers/{providerId}/models", h.CreateLLMModel)
+				r.Put("/llm-providers/{providerId}/models/{modelId}", h.UpdateLLMModel)
+				r.Delete("/llm-providers/{providerId}/models/{modelId}", h.DeleteLLMModel)
+				r.Post("/llm-providers/{providerId}/models/bulk", h.ImportLLMModels)
+				r.Post("/llm-providers/{providerId}/fetch-models", h.FetchProviderModels)
+
+				// LLM provider endpoints (multi-api_type per provider)
+				r.Get("/llm-providers/{providerId}/endpoints", h.ListLLMProviderEndpoints)
+				r.Post("/llm-providers/{providerId}/endpoints", h.CreateLLMProviderEndpoint)
+				r.Put("/llm-providers/{providerId}/endpoints/{endpointId}", h.UpdateLLMProviderEndpoint)
+				r.Delete("/llm-providers/{providerId}/endpoints/{endpointId}", h.DeleteLLMProviderEndpoint)
 				})
 				// Owner-only access
 				r.With(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner")).Delete("/", h.DeleteWorkspace)
@@ -1040,6 +1046,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 							r.Put("/", h.UpdateAgentTemplateAdmin)
 							r.Delete("/", h.DeleteAgentTemplateAdmin)
 						})
+					})
+					// Runtime protocol map (platform admin only)
+					r.Route("/runtime-protocol-map", func(r chi.Router) {
+						r.Get("/", h.ListRuntimeProtocolMap)
+						r.Put("/{protocolFamily}", h.UpsertRuntimeProtocolMap)
+						r.Delete("/{protocolFamily}", h.DeleteRuntimeProtocolMap)
 					})
 				})
 

@@ -78,13 +78,23 @@ func (h *Handler) ListLLMProviders(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list llm providers")
 		return
 	}
-	for i := range providers {
-		providers[i].ApiKey = maskAPIKey(providers[i].ApiKey)
+	type providerWithEndpoints struct {
+		db.LlmProvider
+		Endpoints []LLMProviderEndpointResponse `json:"endpoints"`
 	}
-	if providers == nil {
-		providers = []db.LlmProvider{}
+	result := make([]providerWithEndpoints, 0, len(providers))
+	for _, p := range providers {
+		p.ApiKey = maskAPIKey(p.ApiKey)
+		endpoints, _ := h.Queries.ListLLMProviderEndpoints(r.Context(), db.ListLLMProviderEndpointsParams{
+			ProviderID:  p.ID,
+			WorkspaceID: wsUUID,
+		})
+		result = append(result, providerWithEndpoints{
+			LlmProvider: p,
+			Endpoints:   llmEndpointsToResponses(endpoints),
+		})
 	}
-	writeJSON(w, http.StatusOK, providers)
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
