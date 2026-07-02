@@ -899,8 +899,8 @@ export default function SkillsPage() {
             search={search}
             onSearchChange={(v) => { setSearch(v); setPage(1); }}
             filters={filters}
-            onToggleFilter={toggleFilter}
-            onClearFilters={clearFilters}
+            onToggleFilter={(key, value) => { toggleFilter(key, value); setPage(1); }}
+            onClearFilters={() => { clearFilters(); setPage(1); }}
             sortField={sortField}
             sortDirection={sortDirection}
             onSortFieldChange={handleSortFieldSelect}
