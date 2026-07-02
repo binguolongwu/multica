@@ -1,10 +1,11 @@
 -- Skill CRUD
 
 -- name: ListSkillsByWorkspace :many
--- Includes platform and built-in skills (workspace_id IS NULL) plus
--- workspace-bound skills for the given workspace.
+-- Returns workspace-bound skills plus built-in skills (workspace_id IS NULL
+-- AND is_builtin = true). Platform skills (is_builtin = false, workspace_id IS NULL)
+-- are NOT included — they are only visible on the /shared-skills page.
 SELECT * FROM skill
-WHERE workspace_id IS NULL OR workspace_id = $1
+WHERE workspace_id = $1 OR (workspace_id IS NULL AND is_builtin = true)
 ORDER BY skill_type, name ASC;
 
 -- name: ListSkillSummariesByWorkspace :many
@@ -14,7 +15,7 @@ ORDER BY skill_type, name ASC;
 -- and caused 15s CLI timeouts from high-latency regions (GH multica-ai/multica#2174).
 SELECT id, workspace_id, name, description, config, skill_type, is_builtin, source_skill_id, created_by, created_at, updated_at
 FROM skill
-WHERE workspace_id IS NULL OR workspace_id = $1
+WHERE workspace_id = $1 OR (workspace_id IS NULL AND is_builtin = true)
 ORDER BY skill_type, name ASC;
 
 -- name: GetSkill :one

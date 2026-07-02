@@ -2305,10 +2305,17 @@ func (h *Handler) validateAgentSkillIDsInWorkspace(w http.ResponseWriter, r *htt
 			continue
 		}
 		seen[key] = struct{}{}
-		if _, err := h.Queries.GetSkillInWorkspace(r.Context(), db.GetSkillInWorkspaceParams{
-			ID:          skillID,
-			WorkspaceID: agent.WorkspaceID,
-		}); err != nil {
+		// A skill is valid for this workspace if:
+		//  1. It belongs to this workspace (workspace_id matches), OR
+		//  2. It is a built-in skill (workspace_id IS NULL AND is_builtin = true)
+		skill, err := h.Queries.GetSkill(r.Context(), skillID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "skill not found")
+			return false
+		}
+		isWorkspaceSkill := skill.WorkspaceID.Valid && uuidToString(skill.WorkspaceID) == uuidToString(agent.WorkspaceID)
+		isBuiltinSkill := !skill.WorkspaceID.Valid && skill.IsBuiltin
+		if !isWorkspaceSkill && !isBuiltinSkill {
 			writeError(w, http.StatusNotFound, "skill not found")
 			return false
 		}

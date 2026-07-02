@@ -1,11 +1,11 @@
 {
     "schema_version": 1,
-    "commit": "86d7a3c4d53797eaf2cb0d50676dbb33d5e3dc60",
-    "indexed_at": "2026-07-02T08:08:23Z",
+    "commit": "64f018abf229ebad60996ce5a22bb5ec07b2a895",
+    "indexed_at": "2026-07-02T08:28:01Z",
     "project": "home-longwu-multica",
-    "nodes": 42297,
-    "edges": 143372,
-    "original_size": 103350272,
-    "compressed_size": 19689912,
+    "nodes": 42298,
+    "edges": 143337,
+    "original_size": 103284736,
+    "compressed_size": 19676404,
     "compression_level": 3
 }

@@ -514,7 +514,7 @@ func (q *Queries) ListSkillFiles(ctx context.Context, skillID pgtype.UUID) ([]Sk
 const listSkillSummariesByWorkspace = `-- name: ListSkillSummariesByWorkspace :many
 SELECT id, workspace_id, name, description, config, skill_type, is_builtin, source_skill_id, created_by, created_at, updated_at
 FROM skill
-WHERE workspace_id IS NULL OR workspace_id = $1
+WHERE workspace_id = $1 OR (workspace_id IS NULL AND is_builtin = true)
 ORDER BY skill_type, name ASC
 `
 
@@ -657,13 +657,14 @@ func (q *Queries) ListSkillsByType(ctx context.Context, arg ListSkillsByTypePara
 const listSkillsByWorkspace = `-- name: ListSkillsByWorkspace :many
 
 SELECT id, workspace_id, name, description, content, config, created_by, created_at, updated_at, skill_type, is_builtin, source_skill_id FROM skill
-WHERE workspace_id IS NULL OR workspace_id = $1
+WHERE workspace_id = $1 OR (workspace_id IS NULL AND is_builtin = true)
 ORDER BY skill_type, name ASC
 `
 
 // Skill CRUD
-// Includes platform and built-in skills (workspace_id IS NULL) plus
-// workspace-bound skills for the given workspace.
+// Returns workspace-bound skills plus built-in skills (workspace_id IS NULL
+// AND is_builtin = true). Platform skills (is_builtin = false, workspace_id IS NULL)
+// are NOT included — they are only visible on the /shared-skills page.
 func (q *Queries) ListSkillsByWorkspace(ctx context.Context, workspaceID pgtype.UUID) ([]Skill, error) {
 	rows, err := q.db.Query(ctx, listSkillsByWorkspace, workspaceID)
 	if err != nil {
