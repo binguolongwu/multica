@@ -642,6 +642,7 @@ export default function SkillsPage() {
     new Set(),
   );
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   // Persisted view preferences (per workspace, per user/device). Header sort
   // buttons and the toolbar's display panel mutate the SAME store, so both
@@ -780,6 +781,16 @@ export default function SkillsPage() {
     return filtered;
   }, [allRows, search, filters, sortField, sortDirection]);
 
+  // Pagination — reset page when filters/search change, then slice rows
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return rows.slice(start, start + PAGE_SIZE);
+  }, [rows, page]);
+  // Reset page to 1 when filters/search change
+  if (page > totalPages) setPage(1);
+
   // Row virtualization — Linear-style: the virtualizer only does the math
   // (visible index range + offsets); the DOM stays ours. Offsets become
   // padding on the rows wrapper, so the mounted rows remain direct subgrid
@@ -789,7 +800,7 @@ export default function SkillsPage() {
   // scroll structure was retired.
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: pagedRows.length,
     getScrollElement: () => listScrollRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10,
@@ -799,12 +810,12 @@ export default function SkillsPage() {
     navigation.push(paths.skillDetail(skill.id));
   };
 
-  const selectedRows = rows.filter((row) => selectedIds.has(row.skill.id));
-  const allSelected = rows.length > 0 && selectedRows.length === rows.length;
+  const selectedRows = pagedRows.filter((row) => selectedIds.has(row.skill.id));
+  const allSelected = pagedRows.length > 0 && selectedRows.length === pagedRows.length;
   const someSelected = selectedRows.length > 0 && !allSelected;
   const handleToggleAll = () => {
     setSelectedIds(
-      allSelected ? new Set() : new Set(rows.map((r) => r.skill.id)),
+      allSelected ? new Set() : new Set(pagedRows.map((r) => r.skill.id)),
     );
   };
 
@@ -886,7 +897,7 @@ export default function SkillsPage() {
         <>
           <SkillListToolbar
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={(v) => { setSearch(v); setPage(1); }}
             filters={filters}
             onToggleFilter={toggleFilter}
             onClearFilters={clearFilters}
@@ -923,13 +934,13 @@ export default function SkillsPage() {
                   virtualPadding.bottom + LIST_GRID_BOTTOM_CLEARANCE,
               }}
             >
-              {rows.length === 0 && (
+              {pagedRows.length === 0 && (
                 <div className="col-span-full py-16 text-center text-sm text-muted-foreground">
                   {t(($) => $.page.no_matches.title)}
                 </div>
               )}
               {virtualItems.map((vi) => {
-                const row = rows[vi.index];
+                const row = pagedRows[vi.index];
                 if (!row) return null;
                 return (
               <ListGridRow
@@ -994,6 +1005,31 @@ export default function SkillsPage() {
             </ListGridBody>
           </ListGrid>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex shrink-0 items-center justify-center gap-3 border-t px-5 py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => { setPage((p) => Math.max(1, p - 1)); listScrollRef.current?.scrollTo(0, 0); }}
+              >
+                ← 上一页
+              </Button>
+              <span className="min-w-0 text-center text-xs tabular-nums text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); listScrollRef.current?.scrollTo(0, 0); }}
+              >
+                下一页 →
+              </Button>
+            </div>
+          )}
         </>
       )}
 

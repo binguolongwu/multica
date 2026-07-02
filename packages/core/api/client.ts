@@ -142,7 +142,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
-import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry, LLMModelCandidate } from "../types/llm";
+import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry, LLMModelCandidate, LLMProviderEndpoint, RuntimeProtocolMapEntry, CreateEndpointRequest } from "../types/llm";
 import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type {
