@@ -8,8 +8,8 @@ import {
   useDeleteAgentTemplate,
   usePlatformAdmin,
 } from "@multica/core/agents/queries";
-import type { AgentTemplate } from "@multica/core/types";
 import { useWorkspacePaths } from "@multica/core/paths";
+import { useT } from "@multica/views/i18n";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Badge } from "@multica/ui/components/ui/badge";
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 const PAGE_SIZE = 20;
 
 export function TemplateLibraryPage() {
+  const { t } = useT("templates");
   const { data: templates = [], isLoading } = useAgentTemplates();
   const { data: isAdmin } = usePlatformAdmin();
   const deleteMutation = useDeleteAgentTemplate();
@@ -46,9 +47,9 @@ export function TemplateLibraryPage() {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0 px-5 py-3 border-b">
         <div>
-          <h1 className="text-sm font-semibold">Agent 模板</h1>
+          <h1 className="text-sm font-semibold">{t($ => $.list.title)}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {filtered.length} 个模板
+            {t($ => $.list.count, { count: filtered.length })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -56,14 +57,14 @@ export function TemplateLibraryPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9 w-64"
-              placeholder="搜索模板..."
+              placeholder={t($ => $.list.search_placeholder)}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             />
           </div>
           {isAdmin && (
             <Button onClick={() => router.push(p.templates() + "/new")}>
-              <Plus className="h-4 w-4 mr-1" /> 新建模板
+              <Plus className="h-4 w-4 mr-1" /> {t($ => $.list.new_template)}
             </Button>
           )}
         </div>
@@ -74,13 +75,13 @@ export function TemplateLibraryPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-muted-foreground text-xs sticky top-0">
-              <th className="text-left font-medium px-5 py-2 w-[200px]">名称</th>
-              <th className="text-left font-medium px-3 py-2">描述</th>
-              <th className="text-left font-medium px-3 py-2 w-[100px]">分类</th>
-              <th className="text-left font-medium px-3 py-2 w-[200px]">标签</th>
-              <th className="text-left font-medium px-3 py-2 w-[60px]">技能</th>
-              <th className="text-left font-medium px-3 py-2 w-[120px]">创建时间</th>
-              <th className="text-right font-medium px-5 py-2 w-[80px]">操作</th>
+              <th className="text-left font-medium px-5 py-2 w-[200px]">{t($ => $.list.table.name)}</th>
+              <th className="text-left font-medium px-3 py-2">{t($ => $.list.table.description)}</th>
+              <th className="text-left font-medium px-3 py-2 w-[100px]">{t($ => $.list.table.category)}</th>
+              <th className="text-left font-medium px-3 py-2 w-[200px]">{t($ => $.list.table.tags)}</th>
+              <th className="text-left font-medium px-3 py-2 w-[60px]">{t($ => $.list.table.skills)}</th>
+              <th className="text-left font-medium px-3 py-2 w-[120px]">{t($ => $.list.table.created)}</th>
+              <th className="text-right font-medium px-5 py-2 w-[80px]">{t($ => $.list.table.actions)}</th>
             </tr>
           </thead>
           <tbody>
@@ -125,9 +126,9 @@ export function TemplateLibraryPage() {
                       <Button
                         variant="ghost" size="icon-sm"
                         onClick={async () => {
-                          if (confirm(`删除模板「${row.name}」？`)) {
-                            try { await deleteMutation.mutateAsync(row.id); toast.success("模板已删除"); }
-                            catch (err) { toast.error(err instanceof Error ? err.message : "删除失败"); }
+                          if (confirm(t($ => $.list.confirm_delete, { name: row.name }))) {
+                            try { await deleteMutation.mutateAsync(row.id); toast.success(t($ => $.list.toast_deleted)); }
+                            catch (err) { toast.error(err instanceof Error ? err.message : t($ => $.list.toast_delete_failed)); }
                           }
                         }}
                       >
@@ -139,7 +140,7 @@ export function TemplateLibraryPage() {
               </tr>
             ))}
             {!isLoading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center text-muted-foreground py-12">暂无模板</td></tr>
+              <tr><td colSpan={7} className="text-center text-muted-foreground py-12">{t($ => $.list.empty)}</td></tr>
             )}
           </tbody>
         </table>

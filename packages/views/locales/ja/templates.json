@@ -1,0 +1,44 @@
+{
+  "list": {
+    "title": "Agentテンプレート",
+    "count_one": "テンプレート {{count}}件",
+    "count_other": "テンプレート {{count}}件",
+    "search_placeholder": "テンプレートを検索...",
+    "new_template": "新規テンプレート",
+    "empty": "テンプレートなし",
+    "confirm_delete": "テンプレート「{{name}}」を削除しますか？",
+    "toast_deleted": "テンプレートを削除しました",
+    "toast_delete_failed": "削除に失敗しました",
+    "table": {
+      "name": "名前",
+      "description": "説明",
+      "category": "カテゴリ",
+      "tags": "タグ",
+      "skills": "スキル",
+      "created": "作成日",
+      "actions": "操作"
+    }
+  },
+  "new": {
+    "title": "新規テンプレート",
+    "subtitle": "新しいAgentテンプレートを作成",
+    "create": "テンプレート作成",
+    "creating": "作成中...",
+    "toast_created": "テンプレートを作成しました",
+    "toast_create_failed": "作成に失敗しました",
+    "fields": {
+      "name_label": "名前 *",
+      "name_placeholder": "テンプレート名",
+      "description_label": "説明",
+      "description_placeholder": "簡単な説明",
+      "category_label": "カテゴリ",
+      "category_placeholder": "例: エンジニアリング",
+      "model_label": "モデル",
+      "model_placeholder": "claude-sonnet-4-5",
+      "tags_label": "タグ（カンマ区切り）",
+      "tags_placeholder": "backend, api, go",
+      "instructions_label": "指示",
+      "instructions_placeholder": "Agentへの指示（Markdown）..."
+    }
+  }
+}

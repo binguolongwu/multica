@@ -6,12 +6,14 @@ import { ArrowLeft } from "lucide-react";
 import { useCreateAgentTemplate } from "@multica/core/agents/queries";
 import type { CreateAgentTemplateRequest } from "@multica/core/types";
 import { useWorkspacePaths } from "@multica/core/paths";
+import { useT } from "@multica/views/i18n";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";
 import { toast } from "sonner";
 
 export default function NewTemplatePage() {
+  const { t } = useT("templates");
   const router = useRouter();
   const p = useWorkspacePaths();
   const createMutation = useCreateAgentTemplate();
@@ -37,10 +39,10 @@ export default function NewTemplatePage() {
       if (model) data.model = model;
 
       const created = await createMutation.mutateAsync(data);
-      toast.success("模板已创建");
+      toast.success(t($ => $.new.toast_created));
       router.push(p.templates() + "/" + created.id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "创建失败");
+      toast.error(err instanceof Error ? err.message : t($ => $.new.toast_create_failed));
     } finally {
       setSaving(false);
     }
@@ -55,12 +57,12 @@ export default function NewTemplatePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-sm font-semibold">新建模板</h1>
-            <p className="text-xs text-muted-foreground">创建新的 Agent 模板</p>
+            <h1 className="text-sm font-semibold">{t($ => $.new.title)}</h1>
+            <p className="text-xs text-muted-foreground">{t($ => $.new.subtitle)}</p>
           </div>
         </div>
         <Button size="sm" onClick={handleCreate} disabled={saving || !name.trim()}>
-          {saving ? "创建中..." : "创建模板"}
+          {saving ? t($ => $.new.creating) : t($ => $.new.create)}
         </Button>
       </div>
 
@@ -68,60 +70,60 @@ export default function NewTemplatePage() {
       <div className="flex-1 min-h-0 overflow-y-auto p-6 max-w-2xl">
         <div className="space-y-5">
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">名称 *</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.name_label)}</Label>
             <Input
               className="mt-1"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="模板名称"
+              placeholder={t($ => $.new.fields.name_placeholder)}
               autoFocus
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">描述</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.description_label)}</Label>
             <Input
               className="mt-1"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="简要描述"
+              placeholder={t($ => $.new.fields.description_placeholder)}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">分类</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.category_label)}</Label>
               <Input
                 className="mt-1"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="如：工程"
+                placeholder={t($ => $.new.fields.category_placeholder)}
               />
             </div>
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">模型</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.model_label)}</Label>
               <Input
                 className="mt-1"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="claude-sonnet-4-5"
+                placeholder={t($ => $.new.fields.model_placeholder)}
               />
             </div>
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">标签（逗号分隔）</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.tags_label)}</Label>
             <Input
               className="mt-1"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="backend, api, go"
+              placeholder={t($ => $.new.fields.tags_placeholder)}
             />
           </div>
           <div>
-            <Label className="text-xs font-medium text-muted-foreground">指令</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t($ => $.new.fields.instructions_label)}</Label>
             <textarea
               className="w-full min-h-[300px] mt-1 rounded-md border p-3 font-mono text-sm bg-background resize-y"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Agent 指令（Markdown）..."
+              placeholder={t($ => $.new.fields.instructions_placeholder)}
             />
           </div>
         </div>

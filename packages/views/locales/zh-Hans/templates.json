@@ -1,0 +1,44 @@
+{
+  "list": {
+    "title": "Agent 模板",
+    "count_one": "{{count}} 个模板",
+    "count_other": "{{count}} 个模板",
+    "search_placeholder": "搜索模板...",
+    "new_template": "新建模板",
+    "empty": "暂无模板",
+    "confirm_delete": "删除模板「{{name}}」？",
+    "toast_deleted": "模板已删除",
+    "toast_delete_failed": "删除失败",
+    "table": {
+      "name": "名称",
+      "description": "描述",
+      "category": "分类",
+      "tags": "标签",
+      "skills": "技能",
+      "created": "创建时间",
+      "actions": "操作"
+    }
+  },
+  "new": {
+    "title": "新建模板",
+    "subtitle": "创建新的 Agent 模板",
+    "create": "创建模板",
+    "creating": "创建中...",
+    "toast_created": "模板已创建",
+    "toast_create_failed": "创建失败",
+    "fields": {
+      "name_label": "名称 *",
+      "name_placeholder": "模板名称",
+      "description_label": "描述",
+      "description_placeholder": "简要描述",
+      "category_label": "分类",
+      "category_placeholder": "如：工程",
+      "model_label": "模型",
+      "model_placeholder": "claude-sonnet-4-5",
+      "tags_label": "标签（逗号分隔）",
+      "tags_placeholder": "backend, api, go",
+      "instructions_label": "指令",
+      "instructions_placeholder": "Agent 指令（Markdown）..."
+    }
+  }
+}

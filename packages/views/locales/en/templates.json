@@ -1,0 +1,44 @@
+{
+  "list": {
+    "title": "Agent Templates",
+    "count_one": "{{count}} template",
+    "count_other": "{{count}} templates",
+    "search_placeholder": "Search templates…",
+    "new_template": "New template",
+    "empty": "No templates",
+    "confirm_delete": "Delete template \"{{name}}\"?",
+    "toast_deleted": "Template deleted",
+    "toast_delete_failed": "Delete failed",
+    "table": {
+      "name": "Name",
+      "description": "Description",
+      "category": "Category",
+      "tags": "Tags",
+      "skills": "Skills",
+      "created": "Created",
+      "actions": "Actions"
+    }
+  },
+  "new": {
+    "title": "New Template",
+    "subtitle": "Create a new Agent template",
+    "create": "Create template",
+    "creating": "Creating…",
+    "toast_created": "Template created",
+    "toast_create_failed": "Create failed",
+    "fields": {
+      "name_label": "Name *",
+      "name_placeholder": "Template name",
+      "description_label": "Description",
+      "description_placeholder": "Brief description",
+      "category_label": "Category",
+      "category_placeholder": "e.g. Engineering",
+      "model_label": "Model",
+      "model_placeholder": "claude-sonnet-4-5",
+      "tags_label": "Tags (comma-separated)",
+      "tags_placeholder": "backend, api, go",
+      "instructions_label": "Instructions",
+      "instructions_placeholder": "Agent instructions (Markdown)…"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "list": {
+    "title": "Agent 템플릿",
+    "count_one": "템플릿 {{count}}개",
+    "count_other": "템플릿 {{count}}개",
+    "search_placeholder": "템플릿 검색...",
+    "new_template": "새 템플릿",
+    "empty": "템플릿 없음",
+    "confirm_delete": "템플릿 \"{{name}}\"을(를) 삭제하시겠습니까?",
+    "toast_deleted": "템플릿이 삭제되었습니다",
+    "toast_delete_failed": "삭제 실패",
+    "table": {
+      "name": "이름",
+      "description": "설명",
+      "category": "카테고리",
+      "tags": "태그",
+      "skills": "스킬",
+      "created": "생성일",
+      "actions": "작업"
+    }
+  },
+  "new": {
+    "title": "새 템플릿",
+    "subtitle": "새 Agent 템플릿 만들기",
+    "create": "템플릿 만들기",
+    "creating": "생성 중...",
+    "toast_created": "템플릿이 생성되었습니다",
+    "toast_create_failed": "생성 실패",
+    "fields": {
+      "name_label": "이름 *",
+      "name_placeholder": "템플릿 이름",
+      "description_label": "설명",
+      "description_placeholder": "간단한 설명",
+      "category_label": "카테고리",
+      "category_placeholder": "예: 엔지니어링",
+      "model_label": "모델",
+      "model_placeholder": "claude-sonnet-4-5",
+      "tags_label": "태그 (쉼표로 구분)",
+      "tags_placeholder": "backend, api, go",
+      "instructions_label": "지침",
+      "instructions_placeholder": "Agent 지침 (Markdown)..."
+    }
+  }
+}
