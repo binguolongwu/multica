@@ -68,6 +68,17 @@ export function LlmSettingsTab() {
     [providersQuery.data, selectedPid],
   );
 
+  // editingProviderLive is the real-time provider data for the provider being
+  // edited in the dialog. Unlike the editingProvider snapshot (captured at
+  // dialog open), this reflects the latest React Query data so the endpoint
+  // list refreshes immediately after add/delete/update operations.
+  const editingProviderLive = useMemo(
+    () => editingProvider
+      ? (providersQuery.data || []).find((p) => p.id === editingProvider.id) || editingProvider
+      : null,
+    [editingProvider, providersQuery.data],
+  );
+
   // ── Provider Dialog ──────────────────────────────────────────────────────
 
   const openCreateProvider = () => {
@@ -348,12 +359,15 @@ export function LlmSettingsTab() {
               <Input type="password" value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder={editingProvider ? "（不修改则留空）" : "sk-..."} />
               <p className="text-[11px] text-muted-foreground mt-1">供应商级别密钥，所有端点共用。</p>
             </div>
-            {editingProvider && (
+            {editingProviderLive && (
               <LLMEndpointEditor
                 workspaceId={wsId}
-                providerId={editingProvider.id}
-                endpoints={(editingProvider as any).endpoints || []}
+                providerId={editingProviderLive.id}
+                endpoints={(editingProviderLive as any).endpoints || []}
               />
+            )}
+            {editingProvider && !editingProviderLive && (
+              <p className="text-xs text-muted-foreground italic">保存后可添加 API 端点</p>
             )}
             {!editingProvider && (
               <p className="text-xs text-muted-foreground italic">保存后可添加 API 端点</p>
