@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HardDrive, Upload, FolderPlus, Trash2, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Search } from "lucide-react";
 import { useWorkspaceId } from "@multica/core/hooks";
@@ -44,6 +44,14 @@ export function OssFileBrowser() {
     queryKey: ["oss", "configs", wsId],
     queryFn: () => api.listOssConfigs(),
   });
+
+  // Auto-select the default (or first) config when configs load
+  useEffect(() => {
+    if (configs && configs.length > 0 && !selectedConfig) {
+      const defaultCfg = configs.find(c => c.is_default) ?? configs[0];
+      setSelectedConfig(defaultCfg.id);
+    }
+  }, [configs, selectedConfig]);
 
   const folderPrefix = configs?.find(c => c.id === selectedConfig)?.folder_prefix || "";
 
