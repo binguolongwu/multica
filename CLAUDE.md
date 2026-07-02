@@ -11,6 +11,14 @@ The source of truth for code naming, i18n glossary, and Chinese product voice is
 
 Read it before editing translations in `packages/views/locales/`, naming routes/packages/files/DB columns/types, or writing Chinese UI/docs copy. Do not rely on `packages/views/locales/glossary.md`; it is only a redirect stub.
 
+### Database Primary Key Naming
+
+New tables must use **business-meaningful primary key names**, not a generic `id`.
+
+- Name the PK column after the entity it represents, e.g. `llm_provider` → `provider_id`, `llm_provider_endpoint` → `endpoint_id`, `runtime_protocol_map` → `protocol_map_id`.
+- This makes FK references self-documenting — a reader seeing `provider_id` in a JOIN or foreign key immediately knows which table it references, without cross-checking.
+- Existing tables with `id` PKs are grandfathered; do not rename them. Only new tables follow this rule.
+
 ## Project Shape
 
 Multica is an AI-native task management platform for small teams, with agents as first-class assignees that can own issues, comment, and change status.
