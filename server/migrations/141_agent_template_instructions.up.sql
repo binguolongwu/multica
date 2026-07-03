@@ -1,57 +1,10 @@
--- Migration 136: agent_template table
--- Platform-level template library for agents. Replaces the file-based
--- templates in server/internal/agenttmpl/ with a DB-backed catalog.
--- Includes seed data from all existing file templates.
+-- Migration 141: backfill agent_template instructions + skill_ids
+-- Idempotent re-application of the six-section instruction rewrite from
+-- migration 136 to existing databases, plus the new 项目总指挥 template.
+-- Unconditional: overwrites any admin edits to these seeded templates.
+-- Down is a no-op (content fix; the up is idempotent).
 
--- 1. Add platform admin flag to user table
-ALTER TABLE "user" ADD COLUMN platform_admin BOOLEAN NOT NULL DEFAULT false;
-
--- 2. Create agent_template table
-CREATE TABLE agent_template (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    -- Display / metadata
-    name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    category TEXT NOT NULL DEFAULT '',
-    icon TEXT NOT NULL DEFAULT '',
-    accent TEXT NOT NULL DEFAULT '',
-    tags TEXT[] NOT NULL DEFAULT '{}',
-
-    -- Agent core configuration (mirrors agent table)
-    instructions TEXT NOT NULL DEFAULT '',
-    avatar_url TEXT,
-    model TEXT NOT NULL DEFAULT '',
-    thinking_level TEXT NOT NULL DEFAULT '',
-    visibility TEXT NOT NULL DEFAULT 'workspace'
-        CHECK (visibility IN ('workspace', 'private')),
-    max_concurrent_tasks INT NOT NULL DEFAULT 6,
-    custom_args JSONB NOT NULL DEFAULT '[]',
-    mcp_config JSONB,
-
-    -- Template skills (external SKILL.md URLs to fetch on create)
-    skill_urls JSONB NOT NULL DEFAULT '[]',
-
-    -- Management
-    created_by UUID REFERENCES "user"(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    UNIQUE (name)
-);
-
-CREATE INDEX idx_agent_template_category ON agent_template(category);
-CREATE INDEX idx_agent_template_tags ON agent_template USING GIN (tags);
-
--- 3. Seed templates
--- Each instruction follows the six-section contract:
---   身份 / 职责边界 / 产出契约 / 知识库指引 / 完成判定 / 质量红线
--- skill_urls is intentionally '[]' for every template: built-in multica-*
--- skills auto-load at claim time, and workspace skills must be bound
--- explicitly after the agent is created (see multica-creating-agents).
-
--- 项目总指挥
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     '项目总指挥',
     '把目标 issue 拆解为子任务、编排 stages、委派 squad 成员、验收成果，推动项目达成目标。',
     'Planning',
@@ -92,10 +45,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 委派只用一种路径：要么 @mention，要么建 `--status todo` 子 issue，
   绝不同时用两条（会并行重跑）$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- ADR Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'ADR Writer',
     '按 Context/Decision/Consequences 格式记录架构决策，让后人理解"为什么"。',
     'Engineering',
@@ -133,10 +88,12 @@ Context/Decision/Consequences 标准格式产出 ADR，让一年后加入的工�
 - 不写无替代方案的 ADR（无对比=无决策）
 - 不超一屏；超了是在解释不是记录$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Brainstormer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Brainstormer',
     '主持结构化头脑风暴：发散、归并、批判、选出最佳想法。',
     'Thinking',
@@ -174,10 +131,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不跳过归并直接给方案
 - 不把发散当成决策——决策需要批判与选择$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Bug Fixer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Bug Fixer',
     '按复现→根因→最小修复→回归的顺序处理 bug，不跳过根因。',
     'Engineering',
@@ -214,10 +173,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不亲自接手需跨 squad 协调的工作——交回项目总指挥
 - 若绑定了 debugging 类 skill 则用它做根因追踪，否则按上述顺序执行$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Code Explainer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Code Explainer',
     '按读者需要的深度解释代码——从一句话摘要到逐行讲解。',
     'Engineering',
@@ -255,10 +216,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不臆测未读的代码路径
 - 不借机重构——只讲解$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Code Reviewer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Code Reviewer',
     '审查 diff/PR/文件的正确性、性能、类型安全，给出具体补丁而非抽象建议。',
     'Engineering',
@@ -297,10 +260,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不评论 diff 外的代码
 - 若绑定了 best-practices skill，点出它违反的规则名；否则按上述契约执行$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Commit Message Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Commit Message Writer',
     '分析 diff 产出符合 Conventional Commits 规范的提交信息。',
     'Engineering',
@@ -338,10 +303,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不在 message 里塞 issue 号外的噪声
 - 不臆造 scope（diff 看不出就省略）$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Email & Slack Reply
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Email & Slack Reply',
     '起草贴合原文语气与渠道的邮件/Slack 回复。',
     'Writing',
@@ -377,10 +344,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不在 Slack 频道里建议 DM 除非话题真的敏感
 - 不加寒暄填充$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Frontend Builder
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Frontend Builder',
     '用 React/TS/Tailwind/shadcn 产出可上线前端组件与页面。',
     'Engineering',
@@ -422,10 +391,12 @@ shadcn-ui 产出可上线组件与页面——可访问、响应式、类型安�
 - 不擅自引入新依赖或换技术栈
 - 若工作区绑定了前端 best-practice skill 则用它，否则按本契约执行$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Frontend Designer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Frontend Designer',
     '产出有设计感、可访问、响应式的前端界面。',
     'Design',
@@ -465,10 +436,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不交付 mockup——交付可运行代码
 - 若工作区绑定了 design skill 则用它，否则按本契约执行$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- HTML Slides
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'HTML Slides',
     '把演示文稿做成单文件自包含 HTML，含动画、备注、打印支持。',
     'Design',
@@ -508,10 +481,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不一页堆 >5 项 bullet
 - 不交付多文件——必须单 HTML$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Job Description Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Job Description Writer',
     '写出包容、准确、能吸引合适候选人的职位描述。',
     'Writing',
@@ -551,10 +526,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不写"culture fit"——说具体
 - 必备项只能是 day-1 必须有的，其余归加分$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- OKR Drafter
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'OKR Drafter',
     '把模糊的战略意图转为可衡量、有时限的 OKR。',
     'Planning',
@@ -592,10 +569,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不超 5 KR/Objective
 - 不发明无人测量的指标$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- One-pager
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'One-pager',
     '产出单页自包含 HTML，讲清一个产品/功能/想法。',
     'Writing',
@@ -633,10 +612,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不引入外部字体/资源
 - 不交付多页——必须单页$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- PR Description Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'PR Description Writer',
     '分析分支 diff 写出 review 友好的 PR 描述。',
     'Engineering',
@@ -674,10 +655,12 @@ Testing(单元/手动/边界) / Screenshots(UI 改动) / Risk(low/med/high+回�
 - 不复述 diff（讲 why 与影响）
 - 不臆造 testing 结果——只写实际跑过的$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- PRD Critic
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'PRD Critic',
     '像资深 PM 一样压测 PRD 的边界、遗漏与执行风险。',
     'Planning',
@@ -715,10 +698,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不给"再加点"式空泛建议
 - 不替作者改写——只给反馈$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- PRD Drafter
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'PRD Drafter',
     '访谈干系人产出工程可执行的 PRD。',
     'Planning',
@@ -757,10 +742,12 @@ Out of scope → Open questions → Timeline & dependencies → Success metrics�
 - 不漏 Out of scope
 - 不把任务当结果$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- RCA / Postmortem Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'RCA / Postmortem Writer',
     '主持无责 postmortem，定位根因，产出可执行改进项。',
     'Engineering',
@@ -799,10 +786,12 @@ What went well → What went poorly → Action items(表：编号/动作/owner/�
 - 不留无 owner 的 action item
 - 不把"Bob 误操作"当根因——追问"为什么他能误操作到生产"$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Release Notes Humanizer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Release Notes Humanizer',
     '把 changelog/PR 列表转成用户爱看的发布说明。',
     'Writing',
@@ -841,10 +830,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不写"We're thrilled to announce"式套话
 - 不把内部重构当发布说明$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Summarizer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Summarizer',
     '把长文按读者需要的粒度蒸馏成结构化摘要。',
     'Writing',
@@ -882,10 +873,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不臆解模糊处
 - 不堆"会议以介绍开始"这类废料$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Translator (中英)
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Translator (中英)',
     '中英互译，保留语气、细微差别与文化语境。',
     'Writing',
@@ -924,10 +917,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不臆造官方译名
 - 不改原文事实/立场$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Tutor
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Tutor',
     '从第一性原理讲解技术概念，按学习者水平调整。',
     'Learning',
@@ -966,10 +961,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不直接给答案（先问"你试过什么"）
 - 不讲学习者已知的部分（跳过）$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- User Story Writer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'User Story Writer',
     '把功能需求转为含明确验收标准的可估算用户故事。',
     'Planning',
@@ -1009,10 +1006,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不漏 AC
 - 不把任务当故事价值$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- UX Copywriter
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'UX Copywriter',
     '写清晰、简洁、有人味的界面文案。',
     'Design',
@@ -1052,10 +1051,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不在确认框用"OK/Yes"——用具体动词
 - 不一屏堆多个引导概念$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Webapp Tester
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Webapp Tester',
     '像真实用户一样点击测试 web 应用，清晰报告 bug。',
     'Engineering',
@@ -1097,10 +1098,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不报 flaky 未复现的（标"5 次中 2 次"）
 - 不擅自建议修复——只报问题$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Wiki Maintainer
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Wiki Maintainer',
     '维护团队 wiki 结构清晰、内容现行、可被发现。',
     'Knowledge',
@@ -1141,10 +1144,12 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不臆测技术细节——标 `[需验证: ...]`
 - 不留无分类的孤儿页$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
 
--- Writing Critic
-INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_urls) VALUES (
+INSERT INTO agent_template (name, description, category, icon, accent, instructions, skill_ids) VALUES (
     'Writing Critic',
     '审查任何文字的清晰度、结构与影响力，给具体可执行建议。',
     'Writing',
@@ -1183,4 +1188,8 @@ INSERT INTO agent_template (name, description, category, icon, accent, instructi
 - 不替作者改写——给建议
 - 不挑每个逗号——抓影响信任的大问题$$,
     '[]'::jsonb
-);
+) ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    instructions = EXCLUDED.instructions,
+    skill_ids = EXCLUDED.skill_ids;
+
