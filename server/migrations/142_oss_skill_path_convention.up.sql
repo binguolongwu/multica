@@ -1,4 +1,11 @@
----
+-- Migration 142: sync multica-oss-operations skill content (path convention) to DB
+-- The embedded SKILL.md (loaded by the daemon at runtime) already carries the
+-- unified OSS path convention; this mirrors it into the skill table row so
+-- `multica skill list` stays consistent. Matched by name + workspace_id IS NULL
+-- because migration 138 renamed skill_type 'builtin' to 'platform'. Idempotent;
+-- down is a no-op.
+
+UPDATE skill SET content = $$---
 name: multica-oss-operations
 description: "Upload, download, and list files in the workspace Object Storage Service (OSS)."
 user-invocable: false
@@ -79,3 +86,5 @@ workspace/tasks/{task_id}/{category}/{filename}
   `[Download report](https://files.example.com/projects/.../...)`
 - Check `multica oss list --prefix projects/{project_id}/` before overwriting.
 - Do NOT store credentials, secrets, or .env files in OSS.
+$$
+  WHERE name = 'multica-oss-operations' AND workspace_id IS NULL;
