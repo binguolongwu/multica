@@ -169,6 +169,23 @@ JSON
     "SELECT content_hash FROM wiki_page WHERE space_id=(SELECT id FROM wiki_space WHERE slug='$WIKI_SPACE_SLUG') AND path='$WIKI_PAGE_PATH'"
 }
 
+phase_ceo() {
+  log "=== Phase 5: create CEO agent from template ==="
+  # Resolve template UUID by name (do NOT hardcode the UUID — it may differ across DBs).
+  local template_id
+  template_id="$(psql_at "SELECT id::text FROM agent_template WHERE name='$CEO_TEMPLATE_NAME' LIMIT 1")"
+  [[ -n "$template_id" ]] || die "template '$CEO_TEMPLATE_NAME' not found"
+  log "  template id: $template_id"
+  local agent_name="CEO E2E $(date +%s)"
+  local resp
+  resp="$(api_post /api/agents/from-template "{\"template_id\":\"$template_id\",\"name\":\"$agent_name\",\"runtime_id\":\"$CLAUDE_RUNTIME_ID\",\"visibility\":\"workspace\"}")"
+  CEO_AGENT_ID="$(printf '%s' "$resp" | jq -r '.agent.id // .id // empty')"
+  [[ -n "$CEO_AGENT_ID" ]] || die "no agent id in response: $resp"
+  log "  CEO agent: $CEO_AGENT_ID ($agent_name)"
+  assert_exists "agent row" \
+    "SELECT name FROM agent WHERE id='$CEO_AGENT_ID' AND runtime_id='$CLAUDE_RUNTIME_ID' AND archived_at IS NULL"
+}
+
 # ---------- Dispatcher ----------
 run_phases() {
   local stop_after="$1"
