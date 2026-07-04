@@ -297,7 +297,7 @@ phase_poll() {
 
   # Assert uploaded files on disk (local storage: multica oss upload → /api/upload-file
   # → server/data/uploads/...; oss_object is empty — no cloud OSS config in dev).
-  local upload_dir="server/data/uploads/workspaces/$WORKSPACE_ID"
+  local upload_dir="server/data/uploads/workspaces/${WORKSPACE_ID//-/}"  # local storage strips dashes from UUIDs
   local upload_count
   upload_count=$(find "$upload_dir" -name "*.md" -newer "$LOG_FILE" 2>/dev/null | wc -l) || true  # set -o pipefail: find exits 1 if dir missing
   if (( upload_count > 0 )); then
