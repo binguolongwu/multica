@@ -44,20 +44,20 @@
 | # | 组件 | 职责 |
 |---|---|---|
 | 1 | **auth** | 用 `MULTICA_DEV_VERIFICATION_CODE=123456` 走验证码登录拿 JWT（复用 TestApiClient 流程） |
-| 2 | **minio_setup** | `docker run minio`（S3 兼容）→ `POST /api/oss/configs` 建配置（provider=s3_compatible）→ 设默认 → 验证 `oss_provider_config` 落库 |
+| 2 | **oss_verify** | 验证 workspace 已有 `七牛华北` OSS 配置（provider=qiniu, region=z1, is_default=true）可用；**不新建配置** |
 | 3 | **wiki_seed** | `POST /api/wiki/spaces` 建 space `e2e-core-flow` → `PUT` 一页"项目约定"（含模块命名/文档路径约定） |
 | 4 | **ceo_setup** | `POST /api/agents` 从 `👔 CEO · 缤果软件` 模板实例化 CEO，绑定 Claude runtime（`019f2b3c-3971-...`）。**=「自动创建 agent」** |
 | 5 | **task_trigger** | `POST /api/issues` 创建 issue，`assignee=CEO` + `@squad` mention → stamp `squad_id` → `enqueueSquadLeaderTask` |
 | 6 | **poller** | 轮询 `agent_task_queue`（CEO 任务到 completed）→ 断言 squad 创建 + `multica-creating-agents` skill 被调 + sub-agent 记录落库 → 再轮询 sub-agent 任务到 completed |
 | 7 | **assertions** | 每步 SQL 断言：`agent_skill` 绑定、wiki 读取、`oss_object` 记录 + 文件可下载 |
 | 8 | **evidence** | dump 任务 result、OSS 下载链接、关键 `task_message` 到 `/tmp/e2e-core-flow-report.md` |
-| 9 | **teardown** | 默认保留数据供人工查看；`--cleanup` 标志清理 issue/agent/space/minio |
+| 9 | **teardown** | 默认保留数据供人工查看；`--cleanup` 标志清理 issue/agent/space + 删 OSS 测试对象 |
 
 ### 关键决策
-- **复用现有 workspace** `8279ae9b-16f5-4904-92f0-b19fd8e18c5d`（已有 runtimes + providers + CEO 模板）
+- **复用现有 workspace** `8279ae9b-16f5-4904-92f0-b19fd8e18c5d`（已有 runtimes + providers + CEO 模板 + OSS 配置）
 - **复用现有 Claude runtime** `019f2b3c-3971-79e0-b588-be9e048591b4`，不新建
 - **CEO 模板**用已有的 `👔 CEO · 缤果软件`（visibility=workspace，已落库）
-- **MinIO** 用 Docker（S3 兼容，真走 `oss_provider_config` driver，不依赖云账号）
+- **OSS** 复用 workspace 已有的 `七牛华北` 配置（qiniu, bucket=huabei, region=z1, custom_domain=files.binguosoft.net, folder_prefix=multica/, is_default=true），**不新建、不起 MinIO、不需要 Docker**
 - **「自动创建 agent」** = 脚本通过 API 从模板实例化 CEO（自动化的创建步骤）
 
 ### 需在实现期确认的点
@@ -71,7 +71,6 @@
 ```bash
 curl /healthz → 200
 claude --version → OK
-docker info → OK
 psql: SELECT u.email FROM member m JOIN "user" u ON u.id=m.user_id
       WHERE m.workspace_id='8279ae9b-...' AND m.role='owner' → OWNER_EMAIL
 ```
@@ -91,19 +90,13 @@ psql 轮询(每 3s, 超时 60s):
 断言: status='idle'|'working' AND now()-last_seen_at < 30s
 ```
 
-### Phase 3 — MinIO + OSS 配置
+### Phase 3 — 验证 OSS 配置（七牛华北，已存在）
 ```
-docker run -d --name multica-minio-e2e -p 9000:9000 \
-  -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio123 \
-  minio/minio server /data
-docker run --rm minio/mc sh -c "mc alias set m http://host.docker.internal:9000 minio minio123 && mc mb m/multica-e2e"
-
-POST /api/oss/configs {
-  name:"e2e-minio", provider:"s3_compatible", bucket:"multica-e2e",
-  region:"us-east-1", endpoint:"http://localhost:9000",
-  access_key:"minio", secret_key:"minio123", is_default:true
-}
-断言: SELECT is_default FROM oss_provider_config WHERE name='e2e-minio' → true
+psql: SELECT provider, region, is_default, custom_domain, folder_prefix
+      FROM oss_provider_config WHERE name='七牛华北' AND workspace_id='8279ae9b-...'
+断言: provider='qiniu' AND region='z1' AND is_default=true
+      AND custom_domain='files.binguosoft.net' AND folder_prefix='multica/'
+(配置已存在且为默认, 不新建)
 ```
 
 ### Phase 4 — Wiki 种子
@@ -156,9 +149,9 @@ POST /api/issues {
   SELECT count(*) FROM task_message WHERE task_id=<sub-task> AND content LIKE '%multica wiki%' → >=1
 断言 OSS 保存:
   SELECT key, filename FROM oss_object WHERE uploaded_by=<sub-agent id> → >=1
-  且 key LIKE 'projects/%/tasks/%/docs/%'
+  且 key LIKE 'multica/projects/%/tasks/%/docs/%'  # folder_prefix=multica/ 自动拼前缀
 断言文件可下载:
-  GET /api/oss/.../files/{fileId} → 200 + content
+  GET <custom_domain>/<key> → 200  # 即 https://files.binguosoft.net/multica/projects/.../api-design.md
 ```
 
 ### Phase 9 — 证据收集
@@ -167,14 +160,15 @@ dump 到 /tmp/e2e-core-flow-report.md:
 - CEO task result + duration
 - sub-agent task result + duration
 - task_message 摘要(tool calls 序列)
-- oss_object 记录 + 下载链接
+- oss_object 记录 + 下载链接(files.binguosoft.net/<key>)
 - wiki 读取的页面
 打印 PASS/FAIL 汇总
 ```
 
 ### Phase 10 — Teardown（默认保留, `--cleanup` 清理）
 ```
---cleanup: DELETE issue/agents/wiki_space/oss_config; docker stop minio; kill daemon
+--cleanup: DELETE issue/agents/wiki_space; 删本次 oss_object 记录 + 七牛云对应对象(按 key 前缀); kill daemon
+           不删 「七牛华北」 OSS 配置(pre-existing, 共享)
 ```
 
 ## 5. 错误处理、可观测性、前置条件、清理（§3）
@@ -182,13 +176,13 @@ dump 到 /tmp/e2e-core-flow-report.md:
 ### 前置条件（运行前必须满足）
 - 后端在 :8080 跑（`curl /healthz` → 200）
 - Claude CLI 已装 + 已认证（`claude --version` + 一次小调用验证 Anthropic 认证）
-- Docker 可用（MinIO 用）
 - 环境变量：`DATABASE_URL`、`MULTICA_DEV_VERIFICATION_CODE=123456`
-- workspace `8279ae9b-...` 存在，且含：Claude runtime `019f2b3c-3971-...`、CEO 模板 `👔 CEO · 缤果软件`
+- workspace `8279ae9b-...` 存在，且含：Claude runtime `019f2b3c-3971-...`、CEO 模板 `👔 CEO · 缤果软件`、OSS 配置 `七牛华北`（qiniu, is_default=true）
 - `make daemon` target 可用
+- 不需要 Docker（OSS 走真实七牛云）
 
 ### 错误处理策略（分层）
-- **Phase 0–5（setup）**：fail-fast。auth / daemon / minio / wiki / CEO 创建任一失败 → 立即 abort
+- **Phase 0–5（setup）**：fail-fast。auth / daemon / OSS 配置缺失 / wiki / CEO 创建任一失败 → 立即 abort
 - **Phase 6–8（flow）**：diagnosis 模式。超时或断言失败时**不 abort**——dump 当前状态（任务状态、task_message、agent 记录）继续到证据收集，标记 FAIL 但保留诊断。真实 LLM 抖动常见，关键是知道**在哪断的**
 - **Phase 9（evidence）**：trap on exit，永远跑——即使失败也产出报告
 
@@ -207,19 +201,19 @@ dump 到 /tmp/e2e-core-flow-report.md:
   - 汇总表（phase | 状态 | 耗时 | 关键 ID）
   - CEO 任务：result、duration、tool-call 序列（从 task_message）
   - sub-agent 任务：result、duration、tool-call 序列
-  - OSS 对象：key、filename、size、下载链接
+  - OSS 对象：key、filename、size、下载链接（files.binguosoft.net/<key>）
   - wiki 读取的页面
   - 失败诊断（若有）：哪个 phase、期望 vs 实际、相关 task_message 摘录
 
 ### 幂等 / 重跑
-- MinIO 容器：跑前 `docker rm -f multica-minio-e2e`（幂等）
 - wiki space：`e2e-core-flow` slug —— find-or-create（重跑复用）
 - agent/issue：每次新建，名称带时间戳（`CEO E2E <ts>`）。重跑不清理会累积测试数据（dev 库可接受）
 - daemon：脚本自己起的，exit 时 kill（除非 `--keep-daemon`）；**后端不动**（用户起的）
 
 ### 清理
-- **默认保留**所有数据（issue/agent/wiki/oss 对象/minio）供人工查看，打印 ID + 链接
-- `--cleanup` 标志：DELETE 创建的 issue/agents/wiki space/oss config；`docker stop multica-minio-e2e`；kill daemon
+- **默认保留**所有数据（issue/agent/wiki/oss 对象）供人工查看，打印 ID + 下载链接
+- `--cleanup` 标志：DELETE 创建的 issue/agents/wiki space；删本次产生的 `oss_object` 记录 + 七牛云上的对应对象（按 key 前缀 `multica/projects/<...>`）；kill daemon
+- **不删** `七牛华北` OSS 配置（pre-existing，共享）
 - 后端进程：**永不杀**（脚本没起，不归它管）
 
 ### 退出码
@@ -234,6 +228,7 @@ dump 到 /tmp/e2e-core-flow-report.md:
 2. **sub-agent 用哪个 runtime** → CEO 创建时大概率继承 Claude runtime；若 sub-agent 任务一直没人 claim（runtimes 不匹配），report 里标记 + 列出 sub-agent 的 runtime_id
 3. **真实 LLM 慢/抖动** → 5min × 2 轮询超时，失败时 dump 已完成阶段 + 任务当前状态，不直接 fail-fast（便于诊断）
 4. **daemon 未注册 Claude runtime** → Phase 2 超时则 fail，提示检查 `MULTICA_CODEX_PATH` / claude CLI 认证
+5. **真实云上传产生费用/持久化对象** → 上传的是小 markdown 文档（KB 级），费用可忽略；`--cleanup` 按前缀删本次测试对象；默认保留供查看
 
 ## 7. 不在本期范围
 
