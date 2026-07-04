@@ -103,7 +103,7 @@ api_put()  { curl -sS -X PUT  -H "Authorization: Bearer $TOKEN" -H "X-Workspace-
 main() {
   local stop_phase=""
   local cleanup=0
-  local keep_daemon=0
+  keep_daemon=0  # global: teardown (trap) reads this via ${keep_daemon:-0}
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --phase) stop_phase="$2"; shift 2;;
@@ -129,10 +129,10 @@ EOF
 }
 ```
 
-- [ ] **Step 2: Run `--help` to verify it parses**
+- [ ] **Step 2: Syntax-check the script**
 
-Run: `bash scripts/e2e-core-flow.sh --help`
-Expected: prints usage, exit 0.
+Run: `bash -n scripts/e2e-core-flow.sh`
+Expected: exit 0, no syntax errors. (The script has no `main "$@"` call yet — that's added in Task 2 — so `--help` would do nothing here; a syntax check is the right gate.)
 
 - [ ] **Step 3: Commit**
 
