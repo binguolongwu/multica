@@ -134,6 +134,41 @@ phase_daemon() {
   die "Claude runtime $CLAUDE_RUNTIME_ID did not come online within 60s — check $LOG_FILE.daemon and MULTICA_CODEX_PATH / claude CLI auth"
 }
 
+phase_oss() {
+  log "=== Phase 3: verify 七牛华北 OSS config ==="
+  local row
+  row="$(psql_at "SELECT provider, region, is_default, custom_domain, folder_prefix FROM oss_provider_config WHERE name='七牛华北' AND workspace_id='$WORKSPACE_ID'")"
+  [[ -n "$row" ]] || die "七牛华北 OSS config not found in workspace $WORKSPACE_ID"
+  local provider region is_default
+  provider="$(printf '%s' "$row" | cut -f1)"
+  region="$(printf '%s' "$row" | cut -f2)"
+  is_default="$(printf '%s' "$row" | cut -f3)"
+  [[ "$provider" == "qiniu" ]]      || die "expected provider=qiniu, got $provider"
+  [[ "$region" == "z1" ]]           || die "expected region=z1, got $region"
+  [[ "$is_default" == "t" ]]        || die "七牛华北 is not default"
+  log "  OSS config OK (qiniu, z1, default, folder_prefix=$(printf '%s' "$row" | cut -f5))"
+}
+
+phase_wiki() {
+  log "=== Phase 4: seed wiki ==="
+  local space
+  space="$(api_get "/api/wiki/spaces/$WIKI_SPACE_SLUG")"
+  if printf '%s' "$space" | jq -e '.slug // empty' >/dev/null 2>&1; then
+    log "  wiki space exists, reusing"
+  else
+    api_post /api/wiki/spaces "{\"slug\":\"$WIKI_SPACE_SLUG\",\"display_name\":\"E2E Core Flow\",\"access_scope\":\"shared\",\"template\":\"general\"}" >/dev/null
+    log "  wiki space created"
+  fi
+  local body
+  body=$(cat <<JSON
+{"content":"# 项目约定\n## 模块命名\n模块名使用 kebab-case。\n## 文档路径\n产出存 projects/{project_id}/tasks/{task_id}/docs/api-design.md。"}
+JSON
+)
+  api_put "/api/wiki/spaces/$WIKI_SPACE_SLUG/pages/$WIKI_PAGE_PATH" "$body" >/dev/null
+  assert_exists "wiki page seeded" \
+    "SELECT content_hash FROM wiki_page WHERE space_id=(SELECT id FROM wiki_space WHERE slug='$WIKI_SPACE_SLUG') AND path='$WIKI_PAGE_PATH'"
+}
+
 # ---------- Dispatcher ----------
 run_phases() {
   local stop_after="$1"
