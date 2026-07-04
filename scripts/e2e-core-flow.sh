@@ -122,7 +122,7 @@ phase_daemon() {
   if pgrep -f "cmd/daemon" >/dev/null 2>&1; then
     log "  daemon already running, reusing"
   else
-    (cd server && make daemon) >"$LOG_FILE.daemon" 2>&1 &
+    make daemon >"$LOG_FILE.daemon" 2>&1 &
     DAEMON_PID=$!
     log "  daemon started (pid $DAEMON_PID)"
   fi
@@ -217,6 +217,93 @@ DESC
   CEO_TASK_ID="$(psql_at "SELECT id FROM agent_task_queue WHERE issue_id='$ISSUE_ID' ORDER BY created_at DESC LIMIT 1")"
   [[ -n "$CEO_TASK_ID" ]] || die "no task enqueued for issue $ISSUE_ID"
   log "  task: $CEO_TASK_ID (squad/sub-agent form during CEO execution)"
+}
+
+# Global: track soft-check failures across Phase 7-8 (for the exit code).
+CHECKS_FAILED=0
+
+soft_count_ge() {
+  local label="$1" expected="$2" sql="$3"
+  local actual
+  actual="$(psql_at "$sql")"; actual="${actual:-0}"
+  if (( actual >= expected )); then
+    log "  ✓ $label: $actual (>= $expected)"
+  else
+    log "  ✗ $label: expected >= $expected, got $actual"
+    CHECKS_FAILED=1
+  fi
+}
+
+poll_task_done() {
+  # $1 = task id, $2 = timeout sec, $3 = label. Sets TASK_STATUS.
+  local task_id="$1" deadline=$(( $(date +%s) + $2 )) label="$3"
+  local status=""
+  while [[ $(date +%s) -lt $deadline ]]; do
+    status="$(psql_at "SELECT status FROM agent_task_queue WHERE id='$task_id'")"
+    if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "cancelled" ]]; then
+      log "  $label: $status"
+      TASK_STATUS="$status"
+      return 0
+    fi
+    sleep 5
+  done
+  log "  ✗ $label: TIMEOUT (last status=$status)"
+  TASK_STATUS="timeout"
+  CHECKS_FAILED=1
+}
+
+phase_poll() {
+  log "=== Phase 7: poll CEO task + observe squad/sub-agent ==="
+  poll_task_done "$CEO_TASK_ID" 600 "CEO task"
+
+  # Find the squad the CEO formed (leader=CEO, created after the CEO task started).
+  SQUAD_ID="$(psql_at "SELECT id FROM squad WHERE leader_id='$CEO_AGENT_ID' AND created_at > (SELECT created_at FROM agent_task_queue WHERE id='$CEO_TASK_ID') ORDER BY created_at DESC LIMIT 1")"
+  if [[ -n "$SQUAD_ID" ]]; then
+    log "  squad: $SQUAD_ID"
+    soft_count_ge "squad members" 1 \
+      "SELECT count(*) FROM squad_member WHERE squad_id='$SQUAD_ID'"
+  else
+    log "  ✗ no squad found (leader=$CEO_AGENT_ID) — CEO may not have formed one"
+    CHECKS_FAILED=1
+  fi
+
+  # Find the dynamically-created sub-agent (any agent created after the CEO task, excluding CEO itself).
+  SUB_AGENT_ID="$(psql_at "SELECT a.id FROM agent a WHERE a.workspace_id='$WORKSPACE_ID' AND a.created_at > (SELECT created_at FROM agent_task_queue WHERE id='$CEO_TASK_ID') AND a.id != '$CEO_AGENT_ID' ORDER BY a.created_at DESC LIMIT 1")"
+  if [[ -n "$SUB_AGENT_ID" ]]; then
+    log "  sub-agent: $SUB_AGENT_ID"
+    soft_count_ge "multica-creating-agents skill calls" 1 \
+      "SELECT count(*) FROM task_message WHERE task_id='$CEO_TASK_ID' AND (content LIKE '%multica agent create%' OR content LIKE '%creating-agents%')"
+  else
+    log "  ✗ no dynamically-created sub-agent found"
+    CHECKS_FAILED=1
+  fi
+
+  log "=== Phase 8: poll sub-agent task + assert wiki/oss ==="
+  # Find the sub-task: assigned to the sub-agent, or a child of the CEO task.
+  SUB_TASK_ID="$(psql_at "SELECT id FROM agent_task_queue WHERE agent_id='$SUB_AGENT_ID' ORDER BY created_at DESC LIMIT 1")"
+  if [[ -z "$SUB_TASK_ID" ]]; then
+    SUB_TASK_ID="$(psql_at "SELECT id FROM agent_task_queue WHERE parent_task_id='$CEO_TASK_ID' AND is_leader_task=false ORDER BY created_at DESC LIMIT 1")"
+  fi
+  if [[ -n "$SUB_TASK_ID" ]]; then
+    poll_task_done "$SUB_TASK_ID" 600 "sub-agent task"
+    soft_count_ge "wiki reads" 1 \
+      "SELECT count(*) FROM task_message WHERE task_id='$SUB_TASK_ID' AND (content LIKE '%wiki%' OR input::text LIKE '%wiki%')"
+  else
+    log "  ✗ no sub-task found (sub-agent=$SUB_AGENT_ID)"
+    CHECKS_FAILED=1
+  fi
+
+  # Assert uploaded files on disk (local storage: multica oss upload → /api/upload-file
+  # → server/data/uploads/...; oss_object is empty — no cloud OSS config in dev).
+  local upload_dir="server/data/uploads/workspaces/$WORKSPACE_ID"
+  local upload_count
+  upload_count=$(find "$upload_dir" -name "*.md" -newer "$LOG_FILE" 2>/dev/null | wc -l)
+  if (( upload_count > 0 )); then
+    log "  ✓ uploaded .md file(s): $upload_count (local storage: $upload_dir)"
+  else
+    log "  ✗ no uploaded .md files found in $upload_dir (newer than $LOG_FILE)"
+    CHECKS_FAILED=1
+  fi
 }
 
 # ---------- Dispatcher ----------
