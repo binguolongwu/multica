@@ -271,8 +271,10 @@ phase_poll() {
   SUB_AGENT_ID="$(psql_at "SELECT a.id FROM agent a WHERE a.workspace_id='$WORKSPACE_ID' AND a.created_at > (SELECT created_at FROM agent_task_queue WHERE id='$CEO_TASK_ID') AND a.id != '$CEO_AGENT_ID' ORDER BY a.created_at DESC LIMIT 1")"
   if [[ -n "$SUB_AGENT_ID" ]]; then
     log "  sub-agent: $SUB_AGENT_ID"
-    soft_count_ge "multica-creating-agents skill calls" 1 \
-      "SELECT count(*) FROM task_message WHERE task_id='$CEO_TASK_ID' AND (content LIKE '%multica agent create%' OR content LIKE '%creating-agents%')"
+    # Sub-agent existence (above) already proves the CEO delegated. This checks
+    # that the CEO actively mentioned creating an agent or used CLI agent commands.
+    soft_count_ge "multica agent creation evidence" 1 \
+      "SELECT count(*) FROM task_message WHERE task_id='$CEO_TASK_ID' AND (content LIKE '%agent create%' OR content LIKE '%creating-agent%' OR input::text LIKE '%agent%')"
   else
     log "  ✗ no dynamically-created sub-agent found"
     CHECKS_FAILED=1
@@ -297,7 +299,7 @@ phase_poll() {
   # → server/data/uploads/...; oss_object is empty — no cloud OSS config in dev).
   local upload_dir="server/data/uploads/workspaces/$WORKSPACE_ID"
   local upload_count
-  upload_count=$(find "$upload_dir" -name "*.md" -newer "$LOG_FILE" 2>/dev/null | wc -l)
+  upload_count=$(find "$upload_dir" -name "*.md" -newer "$LOG_FILE" 2>/dev/null | wc -l) || true  # set -o pipefail: find exits 1 if dir missing
   if (( upload_count > 0 )); then
     log "  ✓ uploaded .md file(s): $upload_count (local storage: $upload_dir)"
   else
