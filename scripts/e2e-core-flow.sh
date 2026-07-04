@@ -107,6 +107,33 @@ phase_auth() {
   log "  JWT obtained"
 }
 
+phase_daemon() {
+  log "=== Phase 2: start daemon + wait for Claude runtime ==="
+  # Only start if not already running.
+  if pgrep -f "cmd/daemon" >/dev/null 2>&1; then
+    log "  daemon already running, reusing"
+  else
+    (cd server && make daemon) >"$LOG_FILE.daemon" 2>&1 &
+    DAEMON_PID=$!
+    log "  daemon started (pid $DAEMON_PID)"
+  fi
+  # Poll until the Claude runtime's last_seen_at is recent and status != offline.
+  local deadline=$(( $(date +%s) + 60 ))
+  while [[ $(date +%s) -lt $deadline ]]; do
+    local row
+    row="$(psql_at "SELECT status, EXTRACT(EPOCH FROM (now()-last_seen_at)) FROM agent_runtime WHERE id='$CLAUDE_RUNTIME_ID'")"
+    local status age
+    status="$(printf '%s' "$row" | cut -f1)"
+    age="$(printf '%s' "$row" | cut -f2)"
+    if [[ "$status" != "offline" && -n "$age" ]] && awk "BEGIN{exit !($age < 30)}"; then
+      log "  runtime online (status=$status, age=${age}s)"
+      return 0
+    fi
+    sleep 3
+  done
+  die "Claude runtime $CLAUDE_RUNTIME_ID did not come online within 60s — check $LOG_FILE.daemon and MULTICA_CODEX_PATH / claude CLI auth"
+}
+
 # ---------- Dispatcher ----------
 run_phases() {
   local stop_after="$1"
