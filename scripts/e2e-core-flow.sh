@@ -2,6 +2,24 @@
 # E2E core-flow functional test: drives a real daemon + Claude agent through
 # the full core loop and asserts each step in the DB. See
 # docs/superpowers/specs/2026-07-04-e2e-core-flow-test-design.md
+#
+# Prerequisites:
+#   1. Backend running on :8080  (make server  or  make dev)
+#   2. Claude CLI authed   (claude --version works)
+#   3. DATABASE_URL env var set (pointing at multica_dev)
+#   4. MULTICA_DEV_VERIFICATION_CODE=123456
+#   5. Workspace 8279ae9b-... has: Claude runtime, CEO template, 七牛华北 OSS config
+#
+# Usage:
+#   bash scripts/e2e-core-flow.sh                 # full run, keep test data
+#   bash scripts/e2e-core-flow.sh --phase wiki    # stop after a phase
+#   bash scripts/e2e-core-flow.sh --cleanup       # remove test data on exit
+#   bash scripts/e2e-core-flow.sh --keep-daemon   # don't kill the daemon
+#
+# Outputs:
+#   /tmp/e2e-core-flow.log        — full output (curl + psql)
+#   /tmp/e2e-core-flow.log.daemon — daemon stdout/stderr
+#   /tmp/e2e-core-flow-report.md  — structured markdown report
 set -euo pipefail
 
 # ---------- Config ----------
@@ -308,10 +326,36 @@ phase_poll() {
   fi
 }
 
+phase_evidence() {
+  log "=== Phase 9: write evidence report ==="
+  {
+    echo "# E2E Core Flow Report"
+    echo
+    echo "- Workspace: \`$WORKSPACE_ID\`"
+    echo "- CEO agent: \`$CEO_AGENT_ID\`"
+    echo "- Issue: \`$ISSUE_ID\`"
+    echo "- Leader task: \`$CEO_TASK_ID\` (squad \`$SQUAD_ID\`)"
+    echo "- Sub-agent: \`$SUB_AGENT_ID\` / task \`$SUB_TASK_ID\`"
+    echo
+    echo "## CEO task result"
+    psql_at "SELECT result FROM agent_task_queue WHERE id='$CEO_TASK_ID'" 2>/dev/null | head -c 4000
+    echo
+    echo "## Sub-agent task result"
+    psql_at "SELECT result FROM agent_task_queue WHERE id='$SUB_TASK_ID'" 2>/dev/null | head -c 4000
+    echo
+    echo "## Sub-agent tool-call sequence"
+    psql_at "SELECT created_at::text || ' | ' || type || ' | ' || left(coalesce(content,''),120) FROM task_message WHERE task_id='$SUB_TASK_ID' ORDER BY seq" 2>/dev/null
+    echo
+    echo "## Local storage files"
+    find "server/data/uploads/workspaces/${WORKSPACE_ID//-/}" -type f -newer "$LOG_FILE" 2>/dev/null | head -20
+  } > "$REPORT_FILE"
+  log "  report: $REPORT_FILE"
+}
+
 # ---------- Dispatcher ----------
 run_phases() {
   local stop_after="$1"
-  local phases=(preflight auth daemon oss wiki ceo trigger poll evidence teardown)
+  local phases=(preflight auth daemon oss wiki ceo trigger poll evidence)
   local p
   for p in "${phases[@]}"; do
     "phase_$p"
@@ -319,15 +363,35 @@ run_phases() {
   done
 }
 
-# ---------- Teardown (stub; filled in Task 8) ----------
+# ---------- Teardown ----------
 CLEANUP=0
 teardown() {
   local rc=$?
-  if [[ -n "$DAEMON_PID" && "$keep_daemon" == 0 ]]; then
+  # Kill the daemon we started (unless --keep-daemon).
+  if [[ -n "$DAEMON_PID" && "${keep_daemon:-0}" == 0 ]]; then
     kill "$DAEMON_PID" 2>/dev/null || true
+    log "daemon (pid $DAEMON_PID) stopped"
   fi
-  # evidence + cleanup added in Task 8
+  # --cleanup: remove test data (reuses the existing 七牛华北 OSS config).
+  if [[ "$CLEANUP" == "1" ]]; then
+    log "=== cleanup: removing test data ==="
+    psql_at "DELETE FROM agent_task_queue WHERE issue_id IN (SELECT id FROM issue WHERE title LIKE '%e2e 测试模块%')" 2>/dev/null || true
+    psql_at "DELETE FROM issue WHERE title LIKE '%e2e 测试模块%'" 2>/dev/null || true
+    psql_at "DELETE FROM agent WHERE name LIKE 'CEO E2E %'" 2>/dev/null || true
+    log "  test data removed (agents + issues + tasks)"
+  fi
+  # On soft-check failures, write evidence + exit 2 (diagnosis mode).
+  if [[ "${CHECKS_FAILED:-0}" != "0" ]]; then
+    log "=== CHECKS_FAILED=$CHECKS_FAILED → exit 2 ==="
+    phase_evidence 2>/dev/null || true
+    exit 2
+  fi
   log "=== exit $rc ==="
 }
 
+# Hard 30-min cap (spec §3): re-exec under timeout so the whole run is bounded.
+# On SIGTERM → bash exits → the EXIT trap above fires to write the report.
+if [[ -z "${E2E_REEXEC:-}" ]]; then
+  E2E_REEXEC=1 exec timeout --signal=TERM 1800 bash "$0" "$@"
+fi
 main "$@"
