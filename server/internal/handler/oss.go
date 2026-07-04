@@ -135,7 +135,7 @@ func (h *Handler) DeleteOSSConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to delete oss config")
 		return
 	}
-	writeJSON(w, http.StatusNoContent, nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // TestOSSConnection handles POST /api/oss/configs/test — validates inline credentials.
@@ -401,5 +401,5 @@ func (h *Handler) DeleteOSSFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to delete file")
 		return
 	}
-	writeJSON(w, http.StatusNoContent, nil)
+	w.WriteHeader(http.StatusNoContent)
 }

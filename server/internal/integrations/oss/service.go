@@ -357,7 +357,7 @@ func (s *Service) GetFileDownloadURL(ctx context.Context, id, configID, workspac
 		return "", err
 	}
 	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
-		ID: configID, WorkspaceID: pgtype.UUID{Valid: false},
+		ID: configID, WorkspaceID: workspaceID, // fix: use real workspaceID, not NULL
 	})
 	if err != nil {
 		return "", err
@@ -366,7 +366,8 @@ func (s *Service) GetFileDownloadURL(ctx context.Context, id, configID, workspac
 	if err != nil {
 		return "", err
 	}
-	return d.PublicURL(s.toProviderConfig(cfgRow), obj.Key), nil
+	pc := s.toProviderConfig(cfgRow)
+	return d.PublicURL(pc, obj.Key), nil
 }
 
 // DeleteFile removes both the object record and the cloud object.
@@ -376,7 +377,7 @@ func (s *Service) DeleteFile(ctx context.Context, id, configID, workspaceID pgty
 		return err
 	}
 	cfgRow, err := s.Queries.GetOSSProviderConfig(ctx, db.GetOSSProviderConfigParams{
-		ID: configID, WorkspaceID: pgtype.UUID{Valid: false},
+		ID: configID, WorkspaceID: workspaceID, // fix: use real workspaceID, not NULL
 	})
 	if err != nil {
 		return err
