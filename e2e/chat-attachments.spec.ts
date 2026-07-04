@@ -18,6 +18,9 @@ const API_BASE =
 const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://multica:multica@localhost:5432/multica?sslmode=disable";
 
+/** Strip dashes from a UUID string to match the API's UUIDToString format. */
+const stripDashes = (s: string | null | undefined): string => s?.replace(/-/g, "") ?? "";
+
 interface UploadRow {
   id: string;
   url: string;
@@ -136,7 +139,7 @@ test.describe("Chat attachments", () => {
     });
     expect(uploadRes.status).toBe(200);
     const uploaded = (await uploadRes.json()) as UploadRow;
-    expect(uploaded.chat_session_id).toBe(createdSessionId);
+    expect(uploaded.chat_session_id).toBe(stripDashes(createdSessionId));
     expect(uploaded.chat_message_id).toBeNull();
     expect(uploaded.url).toBeTruthy();
 
@@ -161,7 +164,7 @@ test.describe("Chat attachments", () => {
       `SELECT chat_message_id::text FROM attachment WHERE id = $1`,
       [uploaded.id],
     );
-    expect(after.rows[0]?.chat_message_id).toBe(sendBody.message_id);
+    expect(stripDashes(after.rows[0]?.chat_message_id)).toBe(sendBody.message_id);
 
     // 4. Clean up the attachment we created (chat_session cascade handles the
     //    rest in afterEach via chat_session row deletion).
