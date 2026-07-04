@@ -21,7 +21,16 @@ TOKEN=""
 log()  { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$LOG_FILE"; }
 die()  { log "ERROR: $*"; exit 1; }
 
-psql_at() { psql "$DATABASE_URL" -At -F $'\t' --no-psqlrc -c "$1"; }
+psql_at() {
+  # Run a SQL query; retry once on failure (the remote dev DB occasionally drops idle connections).
+  local out rc
+  out="$(psql "$DATABASE_URL" -At -F $'\t' --no-psqlrc -c "$1" 2>/dev/null)"; rc=$?
+  if [[ $rc -ne 0 ]]; then
+    sleep 2
+    out="$(psql "$DATABASE_URL" -At -F $'\t' --no-psqlrc -c "$1" 2>/dev/null)" || true
+  fi
+  printf '%s' "$out"
+}
 
 assert_count_ge() {
   # $1 = label, $2 = expected min, $3 = sql
@@ -184,6 +193,30 @@ phase_ceo() {
   log "  CEO agent: $CEO_AGENT_ID ($agent_name)"
   assert_exists "agent row" \
     "SELECT name FROM agent WHERE id='$CEO_AGENT_ID' AND runtime_id='$CLAUDE_RUNTIME_ID' AND archived_at IS NULL"
+}
+
+phase_trigger() {
+  log "=== Phase 6: trigger issue (assign to CEO) ==="
+  local desc
+  desc=$(cat <<'DESC'
+请用 multica-squads 组建一个小队,并用 multica-creating-agents 创建一个 worker 子 agent 加入小队。把"读 wiki 约定并产出 API 设计文档"的子任务派给该 worker。worker 先用 multica wiki search/read 读 wiki 约定,再用 multica oss upload 把 API 设计文档存到 projects/{project_id}/tasks/{task_id}/docs/api-design.md。
+DESC
+)
+  local body
+  body=$(jq -n --arg t "根据 wiki 约定为 e2e 测试模块写 API 设计文档,产出存 OSS" --arg d "$desc" \
+    '{title:$t, description:$d, assignee_type:"agent", assignee_id:"'"$CEO_AGENT_ID"'", status:"todo", priority:"medium", allow_duplicate:true}')
+  local resp
+  resp="$(api_post /api/issues "$body")"
+  ISSUE_ID="$(printf '%s' "$resp" | jq -r '.id // .issue.id // empty')"
+  [[ -n "$ISSUE_ID" ]] || die "no issue id in response: $resp"
+  log "  issue: $ISSUE_ID"
+  # Give the scheduler a beat to enqueue the task.
+  sleep 2
+  # A regular task is enqueued for the assigned agent (is_leader_task=false,
+  # squad_id=NULL). The squad + sub-agent form DURING CEO execution, not here.
+  CEO_TASK_ID="$(psql_at "SELECT id FROM agent_task_queue WHERE issue_id='$ISSUE_ID' ORDER BY created_at DESC LIMIT 1")"
+  [[ -n "$CEO_TASK_ID" ]] || die "no task enqueued for issue $ISSUE_ID"
+  log "  task: $CEO_TASK_ID (squad/sub-agent form during CEO execution)"
 }
 
 # ---------- Dispatcher ----------
