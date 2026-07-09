@@ -38,6 +38,7 @@ import {
   Cloud,
   Cpu,
   Library,
+  MessageSquare,
 } from "lucide-react";
 import { WorkspaceAvatar } from "../workspace/workspace-avatar";
 import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
@@ -111,6 +112,7 @@ const EMPTY_INBOX_SUMMARY: Awaited<ReturnType<typeof api.getInboxUnreadSummary>>
 // Only parameterless paths are valid nav destinations.
 type NavKey =
   | "inbox"
+  | "chat"
   | "myIssues"
   | "issues"
   | "projects"
@@ -130,6 +132,7 @@ type NavKey =
 // Static schema (key + icon) — labels resolved at render via useT("layout").
 type NavLabelKey =
   | "inbox"
+  | "chat"
   | "my_issues"
   | "issues"
   | "projects"
@@ -148,6 +151,7 @@ type NavLabelKey =
 
 const personalNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[] = [
   { key: "inbox", labelKey: "inbox", icon: Inbox },
+  { key: "chat", labelKey: "chat", icon: MessageSquare },
   { key: "myIssues", labelKey: "my_issues", icon: CircleUser },
 ];
 

@@ -13,7 +13,7 @@ import {
 import { ModalRegistry } from "@multica/views/modals/registry";
 import { AppSidebar } from "@multica/views/layout";
 import { SearchCommand, SearchTrigger } from "@multica/views/search";
-import { ChatFab, ChatWindow } from "@multica/views/chat";
+import { FloatingChat } from "@multica/views/chat";
 import { WorkspaceSlugProvider, paths, useCurrentWorkspace } from "@multica/core/paths";
 import { useNavigation } from "@multica/views/navigation";
 import { getCurrentSlug, subscribeToCurrentSlug } from "@multica/core/platform";
@@ -221,8 +221,7 @@ export function DesktopShell() {
               {/* Content area with inset styling — relative so ChatWindow/ChatFab are constrained here */}
               <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden mr-2 mb-2 ml-0.5 rounded-xl shadow-sm bg-background">
                 <TabContent />
-                {slug && <ChatWindow />}
-                {slug && <ChatFab />}
+                {slug && <FloatingChat />}
               </div>
             </motion.div>
           </SidebarProvider>

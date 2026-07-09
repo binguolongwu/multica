@@ -101,5 +101,6 @@
       "description": "Chat with the team and other builders.",
       "dismiss": "Dismiss"
     }
-  }
+  },
+  "chat": "Chat"
 }
