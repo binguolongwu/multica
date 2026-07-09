@@ -1,0 +1,1 @@
+DROP TABLE chat_pinned_agent;
