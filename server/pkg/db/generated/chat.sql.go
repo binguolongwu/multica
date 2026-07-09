@@ -52,7 +52,7 @@ func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessagePa
 const createChatSession = `-- name: CreateChatSession :one
 INSERT INTO chat_session (workspace_id, agent_id, creator_id, title, runtime_id)
 VALUES ($1, $2, $3, $4, (SELECT runtime_id FROM agent WHERE id = $2))
-RETURNING id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id
+RETURNING id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id, is_pinned
 `
 
 type CreateChatSessionParams struct {
@@ -83,6 +83,7 @@ func (q *Queries) CreateChatSession(ctx context.Context, arg CreateChatSessionPa
 		&i.UpdatedAt,
 		&i.UnreadSince,
 		&i.RuntimeID,
+		&i.IsPinned,
 	)
 	return i, err
 }
@@ -219,7 +220,7 @@ func (q *Queries) GetChatMessage(ctx context.Context, id pgtype.UUID) (ChatMessa
 }
 
 const getChatSession = `-- name: GetChatSession :one
-SELECT id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id FROM chat_session
+SELECT id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id, is_pinned FROM chat_session
 WHERE id = $1
 `
 
@@ -239,12 +240,13 @@ func (q *Queries) GetChatSession(ctx context.Context, id pgtype.UUID) (ChatSessi
 		&i.UpdatedAt,
 		&i.UnreadSince,
 		&i.RuntimeID,
+		&i.IsPinned,
 	)
 	return i, err
 }
 
 const getChatSessionInWorkspace = `-- name: GetChatSessionInWorkspace :one
-SELECT id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id FROM chat_session
+SELECT id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id, is_pinned FROM chat_session
 WHERE id = $1 AND workspace_id = $2
 `
 
@@ -269,6 +271,7 @@ func (q *Queries) GetChatSessionInWorkspace(ctx context.Context, arg GetChatSess
 		&i.UpdatedAt,
 		&i.UnreadSince,
 		&i.RuntimeID,
+		&i.IsPinned,
 	)
 	return i, err
 }
@@ -379,7 +382,7 @@ func (q *Queries) LinkChatMessageToTask(ctx context.Context, arg LinkChatMessage
 }
 
 const listAllChatSessionsByCreator = `-- name: ListAllChatSessionsByCreator :many
-SELECT cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id,
+SELECT cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id, cs.is_pinned,
        (cs.unread_since IS NOT NULL)::bool AS has_unread
 FROM chat_session cs
 WHERE cs.workspace_id = $1 AND cs.creator_id = $2
@@ -404,6 +407,7 @@ type ListAllChatSessionsByCreatorRow struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	UnreadSince pgtype.Timestamptz `json:"unread_since"`
 	RuntimeID   pgtype.UUID        `json:"runtime_id"`
+	IsPinned    bool               `json:"is_pinned"`
 	HasUnread   bool               `json:"has_unread"`
 }
 
@@ -429,6 +433,7 @@ func (q *Queries) ListAllChatSessionsByCreator(ctx context.Context, arg ListAllC
 			&i.UpdatedAt,
 			&i.UnreadSince,
 			&i.RuntimeID,
+			&i.IsPinned,
 			&i.HasUnread,
 		); err != nil {
 			return nil, err
@@ -529,7 +534,7 @@ func (q *Queries) ListChatMessagesPage(ctx context.Context, arg ListChatMessages
 }
 
 const listChatSessionsByCreator = `-- name: ListChatSessionsByCreator :many
-SELECT cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id,
+SELECT cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id, cs.is_pinned,
        (cs.unread_since IS NOT NULL)::bool AS has_unread
 FROM chat_session cs
 WHERE cs.workspace_id = $1 AND cs.creator_id = $2 AND cs.status = 'active'
@@ -554,6 +559,7 @@ type ListChatSessionsByCreatorRow struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	UnreadSince pgtype.Timestamptz `json:"unread_since"`
 	RuntimeID   pgtype.UUID        `json:"runtime_id"`
+	IsPinned    bool               `json:"is_pinned"`
 	HasUnread   bool               `json:"has_unread"`
 }
 
@@ -582,7 +588,84 @@ func (q *Queries) ListChatSessionsByCreator(ctx context.Context, arg ListChatSes
 			&i.UpdatedAt,
 			&i.UnreadSince,
 			&i.RuntimeID,
+			&i.IsPinned,
 			&i.HasUnread,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChatSessionsByCreatorWithUnread = `-- name: ListChatSessionsByCreatorWithUnread :many
+SELECT
+    cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id, cs.is_pinned,
+    (SELECT agent.name FROM agent WHERE agent.id = cs.agent_id) AS agent_name,
+    (SELECT agent.avatar_url FROM agent WHERE agent.id = cs.agent_id) AS agent_avatar_url,
+    (SELECT agent.status FROM agent WHERE agent.id = cs.agent_id) AS agent_status,
+    CAST(COALESCE((
+        SELECT COUNT(*)
+        FROM chat_message cm
+        WHERE cm.chat_session_id = cs.id
+          AND cm.role = 'assistant'
+          AND cm.created_at > COALESCE(cs.last_read_at, '1970-01-01'::TIMESTAMPTZ)
+    ), 0) AS INTEGER) AS unread_count
+FROM chat_session cs
+WHERE cs.creator_id = $1
+ORDER BY cs.is_pinned DESC, cs.updated_at DESC
+`
+
+type ListChatSessionsByCreatorWithUnreadRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	WorkspaceID    pgtype.UUID        `json:"workspace_id"`
+	AgentID        pgtype.UUID        `json:"agent_id"`
+	CreatorID      pgtype.UUID        `json:"creator_id"`
+	Title          string             `json:"title"`
+	SessionID      pgtype.Text        `json:"session_id"`
+	WorkDir        pgtype.Text        `json:"work_dir"`
+	Status         string             `json:"status"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	UnreadSince    pgtype.Timestamptz `json:"unread_since"`
+	RuntimeID      pgtype.UUID        `json:"runtime_id"`
+	IsPinned       bool               `json:"is_pinned"`
+	AgentName      string             `json:"agent_name"`
+	AgentAvatarUrl pgtype.Text        `json:"agent_avatar_url"`
+	AgentStatus    string             `json:"agent_status"`
+	UnreadCount    int32              `json:"unread_count"`
+}
+
+func (q *Queries) ListChatSessionsByCreatorWithUnread(ctx context.Context, creatorID pgtype.UUID) ([]ListChatSessionsByCreatorWithUnreadRow, error) {
+	rows, err := q.db.Query(ctx, listChatSessionsByCreatorWithUnread, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChatSessionsByCreatorWithUnreadRow{}
+	for rows.Next() {
+		var i ListChatSessionsByCreatorWithUnreadRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.AgentID,
+			&i.CreatorID,
+			&i.Title,
+			&i.SessionID,
+			&i.WorkDir,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UnreadSince,
+			&i.RuntimeID,
+			&i.IsPinned,
+			&i.AgentName,
+			&i.AgentAvatarUrl,
+			&i.AgentStatus,
+			&i.UnreadCount,
 		); err != nil {
 			return nil, err
 		}
@@ -659,11 +742,9 @@ func (q *Queries) LockChatSessionForDelete(ctx context.Context, id pgtype.UUID) 
 }
 
 const markChatSessionRead = `-- name: MarkChatSessionRead :exec
-UPDATE chat_session SET unread_since = NULL
-WHERE id = $1
+UPDATE chat_session SET last_read_at = NOW() WHERE id = $1
 `
 
-// Clears unread_since, dropping the session's unread count to 0.
 func (q *Queries) MarkChatSessionRead(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markChatSessionRead, id)
 	return err
@@ -679,6 +760,15 @@ WHERE id = $1 AND unread_since IS NULL
 // unread boundary stable across multiple incoming replies.
 func (q *Queries) SetUnreadSinceIfNull(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, setUnreadSinceIfNull, id)
+	return err
+}
+
+const toggleSessionPin = `-- name: ToggleSessionPin :exec
+UPDATE chat_session SET is_pinned = NOT is_pinned WHERE id = $1
+`
+
+func (q *Queries) ToggleSessionPin(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, toggleSessionPin, id)
 	return err
 }
 
@@ -726,7 +816,7 @@ func (q *Queries) UpdateChatSessionSession(ctx context.Context, arg UpdateChatSe
 const updateChatSessionTitle = `-- name: UpdateChatSessionTitle :one
 UPDATE chat_session SET title = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id
+RETURNING id, workspace_id, agent_id, creator_id, title, session_id, work_dir, status, created_at, updated_at, unread_since, runtime_id, is_pinned
 `
 
 type UpdateChatSessionTitleParams struct {
@@ -750,6 +840,7 @@ func (q *Queries) UpdateChatSessionTitle(ctx context.Context, arg UpdateChatSess
 		&i.UpdatedAt,
 		&i.UnreadSince,
 		&i.RuntimeID,
+		&i.IsPinned,
 	)
 	return i, err
 }

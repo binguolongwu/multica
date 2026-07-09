@@ -28,6 +28,29 @@ FROM chat_session cs
 WHERE cs.workspace_id = $1 AND cs.creator_id = $2
 ORDER BY cs.updated_at DESC;
 
+-- name: ListChatSessionsByCreatorWithUnread :many
+SELECT
+    cs.*,
+    (SELECT agent.name FROM agent WHERE agent.id = cs.agent_id) AS agent_name,
+    (SELECT agent.avatar_url FROM agent WHERE agent.id = cs.agent_id) AS agent_avatar_url,
+    (SELECT agent.status FROM agent WHERE agent.id = cs.agent_id) AS agent_status,
+    CAST(COALESCE((
+        SELECT COUNT(*)
+        FROM chat_message cm
+        WHERE cm.chat_session_id = cs.id
+          AND cm.role = 'assistant'
+          AND cm.created_at > COALESCE(cs.last_read_at, '1970-01-01'::TIMESTAMPTZ)
+    ), 0) AS INTEGER) AS unread_count
+FROM chat_session cs
+WHERE cs.creator_id = $1
+ORDER BY cs.is_pinned DESC, cs.updated_at DESC;
+
+-- name: MarkChatSessionRead :exec
+UPDATE chat_session SET last_read_at = NOW() WHERE id = $1;
+
+-- name: ToggleSessionPin :exec
+UPDATE chat_session SET is_pinned = NOT is_pinned WHERE id = $1;
+
 -- name: UpdateChatSessionTitle :one
 UPDATE chat_session SET title = $2, updated_at = now()
 WHERE id = $1
@@ -163,10 +186,6 @@ WHERE cs.workspace_id = $1
   AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
 ORDER BY atq.created_at DESC;
 
--- name: MarkChatSessionRead :exec
--- Clears unread_since, dropping the session's unread count to 0.
-UPDATE chat_session SET unread_since = NULL
-WHERE id = $1;
 
 -- name: SetUnreadSinceIfNull :exec
 -- Atomically stamps the first unread assistant message's arrival time.
