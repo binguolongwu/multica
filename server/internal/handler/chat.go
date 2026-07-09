@@ -697,35 +697,28 @@ type PendingChatTaskResponse struct {
 }
 
 // MarkChatSessionRead sets last_read_at = NOW() on the session so the
-// unread badge / count goes away.  Uses a simple workspace-member gate
-// instead of the full session-ownership + private-agent check because
-// updating a timestamp is non-destructive; the caller just needs to be
-// a workspace member.  Broadcasts chat:session_read so other devices of
-// the same user drop their badges.
+// unread badge / count goes away. Broadcasts chat:session_read so other
+// devices of the same user drop their badges.
 func (h *Handler) MarkChatSessionRead(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
 		return
 	}
 	workspaceID := ctxWorkspaceID(r.Context())
+	sessionIDStr := chi.URLParam(r, "sessionId")
 
-	_, ok = h.workspaceMember(w, r, workspaceID)
+	session, ok := h.gateChatSessionForUser(w, r, userID, workspaceID, sessionIDStr)
 	if !ok {
 		return
 	}
 
-	sessionID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "sessionId"), "session_id")
-	if !ok {
-		return
-	}
-
-	if err := h.Queries.MarkChatSessionRead(r.Context(), sessionID); err != nil {
+	if err := h.Queries.MarkChatSessionRead(r.Context(), session.ID); err != nil {
 		slog.Warn("chat: failed to mark session read", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to mark session read")
 		return
 	}
 
-	resolvedSessionID := uuidToString(sessionID)
+	resolvedSessionID := uuidToString(session.ID)
 	h.publishChat(protocol.EventChatSessionRead, workspaceID, "member", userID, resolvedSessionID, protocol.ChatSessionReadPayload{
 		ChatSessionID: resolvedSessionID,
 	})
@@ -734,18 +727,19 @@ func (h *Handler) MarkChatSessionRead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ToggleSessionPin(w http.ResponseWriter, r *http.Request) {
-	workspaceID := h.resolveWorkspaceID(r)
-	_, ok := h.workspaceMember(w, r, workspaceID)
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	sessionIDStr := chi.URLParam(r, "sessionId")
+
+	session, ok := h.gateChatSessionForUser(w, r, userID, workspaceID, sessionIDStr)
 	if !ok {
 		return
 	}
 
-	sessionID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "sessionId"), "session_id")
-	if !ok {
-		return
-	}
-
-	err := h.Queries.ToggleSessionPin(r.Context(), sessionID)
+	err := h.Queries.ToggleSessionPin(r.Context(), session.ID)
 	if err != nil {
 		slog.Warn("chat: failed to toggle session pin", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to toggle session pin")
