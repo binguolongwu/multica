@@ -698,6 +698,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// LLM providers and models (workspace-scoped).
 					r.Get("/llm-providers", h.ListLLMProviders)
 					r.Get("/llm-providers/{providerId}/models", h.ListLLMModels)
+					// Chat pinned agents (member-level).
+					r.Get("/chat/pinned-agents", h.ListPinnedAgents)
+					r.Post("/chat/pinned-agents", h.PinAgent)
+					r.Delete("/chat/pinned-agents/{agentId}", h.UnpinAgent)
 				})
 				// Admin-level access
 				r.Group(func(r chi.Router) {
@@ -1156,6 +1160,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/messages/page", h.ListChatMessagesPage)
 					r.Get("/pending-task", h.GetPendingChatTask)
 					r.Post("/read", h.MarkChatSessionRead)
+					r.Patch("/pin", h.ToggleSessionPin)
 				})
 			})
 			r.Get("/api/chat/pending-tasks", h.ListPendingChatTasks)

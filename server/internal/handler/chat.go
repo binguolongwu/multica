@@ -733,6 +733,27 @@ func (h *Handler) MarkChatSessionRead(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) ToggleSessionPin(w http.ResponseWriter, r *http.Request) {
+	workspaceID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, workspaceID)
+	if !ok {
+		return
+	}
+
+	sessionID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "sessionId"), "session_id")
+	if !ok {
+		return
+	}
+
+	err := h.Queries.ToggleSessionPin(r.Context(), sessionID)
+	if err != nil {
+		slog.Warn("chat: failed to toggle session pin", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to toggle session pin")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // PendingChatTasksResponse is the aggregate view consumed by the FAB.
 type PendingChatTasksResponse struct {
 	Tasks []PendingChatTaskItem `json:"tasks"`
