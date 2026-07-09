@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -118,63 +119,39 @@ func (h *Handler) ListChatSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := r.URL.Query().Get("status")
+	// ListChatSessionsByCreatorWithUnread returns sessions across all
+	// workspaces keyed by creator_id.  Filter by workspace in Go so the
+	// SQL query stays simple and reusable.
+	rows, err := h.Queries.ListChatSessionsByCreatorWithUnread(r.Context(), parseUUID(userID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list chat sessions")
+		return
+	}
 
-	// Two call sites → two row types with identical shape. Collect into a
-	// common response slice via small per-branch loops.
-	var resp []ChatSessionResponse
-	if status == "all" {
-		rows, err := h.Queries.ListAllChatSessionsByCreator(r.Context(), db.ListAllChatSessionsByCreatorParams{
-			WorkspaceID: parseUUID(workspaceID),
-			CreatorID:   parseUUID(userID),
+	resp := make([]ChatSessionResponse, 0, len(rows))
+	for _, s := range rows {
+		if uuidToString(s.WorkspaceID) != workspaceID {
+			continue
+		}
+		if _, ok := allowed[uuidToString(s.AgentID)]; !ok {
+			continue
+		}
+		resp = append(resp, ChatSessionResponse{
+			ID:             uuidToString(s.ID),
+			WorkspaceID:    uuidToString(s.WorkspaceID),
+			AgentID:        uuidToString(s.AgentID),
+			CreatorID:      uuidToString(s.CreatorID),
+			Title:          s.Title,
+			Status:         s.Status,
+			HasUnread:      s.UnreadSince.Valid,
+			UnreadCount:    int(s.UnreadCount),
+			AgentName:      s.AgentName,
+			AgentAvatarURL: textToPtr(s.AgentAvatarUrl),
+			AgentStatus:    s.AgentStatus,
+			IsPinned:       s.IsPinned,
+			CreatedAt:      timestampToString(s.CreatedAt),
+			UpdatedAt:      timestampToString(s.UpdatedAt),
 		})
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list chat sessions")
-			return
-		}
-		resp = make([]ChatSessionResponse, 0, len(rows))
-		for _, s := range rows {
-			if _, ok := allowed[uuidToString(s.AgentID)]; !ok {
-				continue
-			}
-			resp = append(resp, ChatSessionResponse{
-				ID:          uuidToString(s.ID),
-				WorkspaceID: uuidToString(s.WorkspaceID),
-				AgentID:     uuidToString(s.AgentID),
-				CreatorID:   uuidToString(s.CreatorID),
-				Title:       s.Title,
-				Status:      s.Status,
-				HasUnread:   s.HasUnread,
-				CreatedAt:   timestampToString(s.CreatedAt),
-				UpdatedAt:   timestampToString(s.UpdatedAt),
-			})
-		}
-	} else {
-		rows, err := h.Queries.ListChatSessionsByCreator(r.Context(), db.ListChatSessionsByCreatorParams{
-			WorkspaceID: parseUUID(workspaceID),
-			CreatorID:   parseUUID(userID),
-		})
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list chat sessions")
-			return
-		}
-		resp = make([]ChatSessionResponse, 0, len(rows))
-		for _, s := range rows {
-			if _, ok := allowed[uuidToString(s.AgentID)]; !ok {
-				continue
-			}
-			resp = append(resp, ChatSessionResponse{
-				ID:          uuidToString(s.ID),
-				WorkspaceID: uuidToString(s.WorkspaceID),
-				AgentID:     uuidToString(s.AgentID),
-				CreatorID:   uuidToString(s.CreatorID),
-				Title:       s.Title,
-				Status:      s.Status,
-				HasUnread:   s.HasUnread,
-				CreatedAt:   timestampToString(s.CreatedAt),
-				UpdatedAt:   timestampToString(s.UpdatedAt),
-			})
-		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -494,6 +471,22 @@ func (h *Handler) SendChatMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Derive a human-readable title from the first user message when the
+	// session was created without one.  Best-effort: a failed agent lookup
+	// or title update should never block the send.
+	if session.Title == "" {
+		agentName := "Agent"
+		agent, gerr := h.Queries.GetAgent(r.Context(), session.AgentID)
+		if gerr == nil {
+			agentName = agent.Name
+		}
+		title := deriveChatTitle(req.Content, agentName)
+		_, _ = h.Queries.UpdateChatSessionTitle(r.Context(), db.UpdateChatSessionTitleParams{
+			ID:    session.ID,
+			Title: title,
+		})
+	}
+
 	// Enqueue a chat task after the message exists. For web chat the sender is
 	// the authenticated request user (sessions are creator-only), so they are
 	// the task initiator — surfaced to the agent under `## Task Initiator`.
@@ -703,28 +696,36 @@ type PendingChatTaskResponse struct {
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
-// MarkChatSessionRead clears the session's unread_since (→ has_unread=false)
-// and broadcasts chat:session_read so other devices of the same user drop
-// their badges.
+// MarkChatSessionRead sets last_read_at = NOW() on the session so the
+// unread badge / count goes away.  Uses a simple workspace-member gate
+// instead of the full session-ownership + private-agent check because
+// updating a timestamp is non-destructive; the caller just needs to be
+// a workspace member.  Broadcasts chat:session_read so other devices of
+// the same user drop their badges.
 func (h *Handler) MarkChatSessionRead(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
 		return
 	}
 	workspaceID := ctxWorkspaceID(r.Context())
-	sessionID := chi.URLParam(r, "sessionId")
 
-	session, ok := h.gateChatSessionForUser(w, r, userID, workspaceID, sessionID)
+	_, ok = h.workspaceMember(w, r, workspaceID)
 	if !ok {
 		return
 	}
 
-	if err := h.Queries.MarkChatSessionRead(r.Context(), session.ID); err != nil {
+	sessionID, ok := parseUUIDOrBadRequest(w, chi.URLParam(r, "sessionId"), "session_id")
+	if !ok {
+		return
+	}
+
+	if err := h.Queries.MarkChatSessionRead(r.Context(), sessionID); err != nil {
+		slog.Warn("chat: failed to mark session read", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to mark session read")
 		return
 	}
 
-	resolvedSessionID := uuidToString(session.ID)
+	resolvedSessionID := uuidToString(sessionID)
 	h.publishChat(protocol.EventChatSessionRead, workspaceID, "member", userID, resolvedSessionID, protocol.ChatSessionReadPayload{
 		ChatSessionID: resolvedSessionID,
 	})
@@ -973,9 +974,15 @@ type ChatSessionResponse struct {
 	Title       string `json:"title"`
 	Status      string `json:"status"`
 	// Only populated by list endpoints — single-session fetches return false.
-	HasUnread bool   `json:"has_unread"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	HasUnread    bool    `json:"has_unread"`
+	LastReadAt   *string `json:"last_read_at"`
+	UnreadCount  int     `json:"unread_count"`
+	AgentName    string  `json:"agent_name"`
+	AgentAvatarURL *string `json:"agent_avatar_url"`
+	AgentStatus  string  `json:"agent_status"`
+	IsPinned     bool    `json:"is_pinned"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
 type ChatMessageResponse struct {
@@ -1007,6 +1014,7 @@ func chatSessionToResponse(s db.ChatSession) ChatSessionResponse {
 		CreatorID:   uuidToString(s.CreatorID),
 		Title:       s.Title,
 		Status:      s.Status,
+		IsPinned:    s.IsPinned,
 		CreatedAt:   timestampToString(s.CreatedAt),
 		UpdatedAt:   timestampToString(s.UpdatedAt),
 	}
@@ -1024,4 +1032,23 @@ func chatMessageToResponse(m db.ChatMessage, attachments []AttachmentResponse) C
 		ElapsedMs:     int8ToPtr(m.ElapsedMs),
 		Attachments:   attachments,
 	}
+}
+
+// deriveChatTitle strips markdown from the first user message and truncates
+// to ~30 chars for a human-readable chat session title.  Falls back to a
+// generic "Chat with <agent>" when the cleaned content is empty.
+func deriveChatTitle(content string, agentName string) string {
+	re := regexp.MustCompile(`[#*>` + "`" + `]|!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)`)
+	cleaned := re.ReplaceAllString(content, "")
+	cleaned = strings.TrimSpace(cleaned)
+	spaceRE := regexp.MustCompile(`\s+`)
+	cleaned = spaceRE.ReplaceAllString(cleaned, " ")
+	runes := []rune(cleaned)
+	if len(runes) > 30 {
+		cleaned = string(runes[:30])
+	}
+	if cleaned == "" {
+		return "Chat with " + agentName
+	}
+	return cleaned
 }
