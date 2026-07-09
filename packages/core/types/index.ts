@@ -84,6 +84,8 @@ export type {
   SendChatMessageResponse,
   CancelledChatMessage,
   CancelTaskResponse,
+  PinnedAgent,
+  ChatMode,
 } from "./chat";
 export type { StorageAdapter } from "./storage";
 export type {

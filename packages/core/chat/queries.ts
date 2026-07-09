@@ -1,4 +1,5 @@
-import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { api } from "../api";
 import type { TaskMessagePayload } from "../types/events";
 
@@ -19,6 +20,8 @@ export const chatKeys = {
   pendingTask: (sessionId: string) => ["chat", "pending-task", sessionId] as const,
   /** Aggregate of in-flight chat tasks for the current user — FAB reads this. */
   pendingTasks: (wsId: string) => [...chatKeys.all(wsId), "pending-tasks"] as const,
+  /** Per-user pinned agents for quick chat access. */
+  pinnedAgents: (wsId: string) => [...chatKeys.all(wsId), "pinned-agents"] as const,
   /** Per-task execution messages — shared with issue agent cards. */
   taskMessages: (taskId: string) => ["task-messages", taskId] as const,
 };
@@ -130,4 +133,25 @@ export function pendingChatTasksOptions(wsId: string) {
     queryFn: () => api.listPendingChatTasks(),
     staleTime: Infinity,
   });
+}
+
+export function pinnedAgentsOptions(wsId: string) {
+  return queryOptions({
+    queryKey: chatKeys.pinnedAgents(wsId),
+    queryFn: () => api.listPinnedAgents(),
+    staleTime: Infinity,
+  });
+}
+
+export function usePinnedAgents(wsId: string) {
+  return useQuery(pinnedAgentsOptions(wsId));
+}
+
+/** Total unread count across all chat sessions for sidebar badge. */
+export function useUnreadCountTotal(wsId: string) {
+  const { data: sessions } = useQuery(chatSessionsOptions(wsId));
+  return useMemo(() => {
+    if (!sessions) return 0;
+    return sessions.reduce((sum, s) => sum + (s.unread_count ?? 0), 0);
+  }, [sessions]);
 }

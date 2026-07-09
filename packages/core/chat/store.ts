@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { StorageAdapter } from "../types";
 import type { Attachment } from "../types/attachment";
+import type { ChatMode } from "../types/chat";
 import { getCurrentSlug, registerForWorkspaceRehydration } from "../platform/workspace-storage";
 import { createLogger } from "../logger";
 
@@ -35,6 +36,7 @@ const CHAT_EXPANDED_KEY = "multica:chat:expanded";
  * every subsequent reload.
  */
 const OPEN_KEY = "multica:chat:isOpen";
+const CHAT_MODE_KEY = "multica:chat:mode";
 
 function readDrafts(storage: StorageAdapter, key: string): Record<string, string> {
   const raw = storage.getItem(key);
@@ -135,7 +137,10 @@ export interface ChatState {
   chatWidth: number;
   chatHeight: number;
   isExpanded: boolean;
+  /** Chat display mode: tab (sidebar) or floating (popup). Persisted. */
+  chatMode: ChatMode;
   setOpen: (open: boolean) => void;
+  setChatMode: (mode: ChatMode) => void;
   toggle: () => void;
   setActiveSession: (id: string | null) => void;
   setSelectedAgentId: (id: string) => void;
@@ -176,6 +181,7 @@ export function createChatStore(options: ChatStoreOptions) {
     chatWidth: Number(storage.getItem(CHAT_WIDTH_KEY)) || CHAT_DEFAULT_W,
     chatHeight: Number(storage.getItem(CHAT_HEIGHT_KEY)) || CHAT_DEFAULT_H,
     isExpanded: storage.getItem(wsKey(CHAT_EXPANDED_KEY)) === "true",
+    chatMode: (storage.getItem(CHAT_MODE_KEY) as ChatMode) || "tab",
     setOpen: (open) => {
       logger.debug("setOpen", { from: get().isOpen, to: open });
       storage.setItem(OPEN_KEY, String(open));
@@ -259,6 +265,11 @@ export function createChatStore(options: ChatStoreOptions) {
         storage.removeItem(wsKey(CHAT_EXPANDED_KEY));
       }
       set({ isExpanded: expanded });
+    },
+    setChatMode: (mode) => {
+      logger.info("setChatMode", { from: get().chatMode, to: mode });
+      storage.setItem(CHAT_MODE_KEY, mode);
+      set({ chatMode: mode });
     },
   }));
 

@@ -7,11 +7,35 @@ export interface ChatSession {
   creator_id: string;
   title: string;
   status: "active" | "archived";
-  /** True when the session has any unread assistant replies. List-only. */
+  /** @deprecated use last_read_at for unread computation */
   has_unread: boolean;
+  /** Timestamp when user last read this session. NULL = never read (all messages unread). */
+  last_read_at: string | null;
+  /** Count of assistant messages created after last_read_at. Computed server-side. */
+  unread_count: number;
+  /** Agent status from joined agent table. */
+  agent_status: "active" | "archived" | "deleted";
+  /** Agent display name from joined agent table. */
+  agent_name?: string;
+  /** Agent avatar URL from joined agent table. */
+  agent_avatar_url?: string | null;
+  /** Whether this session is pinned to top of thread list. */
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/** Agent pinned by current user for quick chat access. Max 5. */
+export interface PinnedAgent {
+  user_id: string;
+  agent_id: string;
+  workspace_id: string;
+  sort_order: number;
+  created_at: string;
+}
+
+/** Chat display mode preference. */
+export type ChatMode = "tab" | "floating";
 
 export interface PendingChatTaskItem {
   task_id: string;

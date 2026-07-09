@@ -139,3 +139,56 @@ export function useDeleteChatSession() {
     },
   });
 }
+
+export function usePinAgent() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+
+  return useMutation({
+    mutationFn: (data: { agent_id: string; sort_order?: number }) =>
+      api.pinAgent(data),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: chatKeys.pinnedAgents(wsId) });
+    },
+  });
+}
+
+export function useUnpinAgent() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+
+  return useMutation({
+    mutationFn: (agentId: string) => api.unpinAgent(agentId),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: chatKeys.pinnedAgents(wsId) });
+    },
+  });
+}
+
+export function useToggleSessionPin() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => api.toggleSessionPin(sessionId),
+    onMutate: async (sessionId) => {
+      await qc.cancelQueries({ queryKey: chatKeys.sessions(wsId) });
+      const prev = qc.getQueryData<ChatSession[]>(chatKeys.sessions(wsId));
+      if (prev) {
+        qc.setQueryData<ChatSession[]>(
+          chatKeys.sessions(wsId),
+          prev.map((s) => (s.id === sessionId ? { ...s, is_pinned: !s.is_pinned } : s)),
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(chatKeys.sessions(wsId), ctx.prev);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: chatKeys.sessions(wsId) });
+    },
+  });
+}

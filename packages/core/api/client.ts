@@ -68,6 +68,7 @@ import type {
   TaskMessagePayload,
   Attachment,
   ChatSession,
+  PinnedAgent,
   ChatMessage,
   ChatMessagesPage,
   ChatPendingTask,
@@ -1912,6 +1913,25 @@ export class ApiClient {
 
   async markChatSessionRead(sessionId: string): Promise<void> {
     await this.fetch(`/api/chat/sessions/${sessionId}/read`, { method: "POST" });
+  }
+
+  async listPinnedAgents(): Promise<PinnedAgent[]> {
+    return this.fetch(`/api/chat/pinned-agents`);
+  }
+
+  async pinAgent(data: { agent_id: string; sort_order?: number }): Promise<void> {
+    await this.fetch(`/api/chat/pinned-agents`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async unpinAgent(agentId: string): Promise<void> {
+    await this.fetch(`/api/chat/pinned-agents/${agentId}`, { method: "DELETE" });
+  }
+
+  async toggleSessionPin(sessionId: string): Promise<void> {
+    await this.fetch(`/api/chat/sessions/${sessionId}/pin`, { method: "PATCH" });
   }
 
   async cancelTaskById(taskId: string): Promise<CancelTaskResponse> {
