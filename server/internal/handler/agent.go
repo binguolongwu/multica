@@ -281,6 +281,7 @@ type AgentTaskResponse struct {
 	ChatSessionID            string               `json:"chat_session_id,omitempty"`             // non-empty for chat tasks
 	ChatMessage              string               `json:"chat_message,omitempty"`                // user message for chat tasks
 	ChatMessageAttachments   []ChatAttachmentMeta `json:"chat_message_attachments,omitempty"`    // attachments on the user message — agent calls `multica attachment download <id>` per entry
+	SystemPrompt             string               `json:"system_prompt,omitempty"`               // non-empty for special task types (e.g. welcome intro)
 	AutopilotRunID           string               `json:"autopilot_run_id,omitempty"`            // non-empty for autopilot-spawned tasks
 	AutopilotID              string               `json:"autopilot_id,omitempty"`                // autopilot that spawned this task
 	AutopilotTitle           string               `json:"autopilot_title,omitempty"`             // autopilot title used as task context
@@ -901,6 +902,41 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 
 	redactAgentResponseForActor(&resp, actorType)
 	writeJSON(w, http.StatusCreated, resp)
+
+	// Best-effort welcome chat — never blocks agent creation
+	go func() {
+		ctx := context.Background()
+
+		session, err := h.Queries.CreateChatSession(ctx, db.CreateChatSessionParams{
+			WorkspaceID: wsUUID,
+			AgentID:     created.ID,
+			CreatorID:   parseUUID(ownerID),
+			Title:       "Welcome",
+		})
+		if err != nil {
+			slog.Warn("welcome chat: failed to create session", "agent_id", uuidToString(created.ID), "error", err)
+			return
+		}
+
+		contextJSON, _ := json.Marshal(map[string]string{
+			"task_type":    "chat_intro",
+			"system_prompt": "Introduce yourself briefly to the user. Say who you are, what you can help with, and how to get started. Keep it under 3 sentences.",
+		})
+
+		task, err := h.Queries.CreateChatTask(ctx, db.CreateChatTaskParams{
+			AgentID:         created.ID,
+			RuntimeID:       created.RuntimeID,
+			Priority:        2,
+			ChatSessionID:   session.ID,
+			InitiatorUserID: parseUUID(ownerID),
+			Context:         contextJSON,
+		})
+		if err != nil {
+			slog.Warn("welcome chat: failed to enqueue intro task", "session_id", uuidToString(session.ID), "error", err)
+			return
+		}
+		_ = task
+	}()
 }
 
 type UpdateAgentRequest struct {

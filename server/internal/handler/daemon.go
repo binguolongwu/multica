@@ -1671,6 +1671,20 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Chat intro task: when the context carries task_type=chat_intro,
+	// populate system_prompt so the daemon uses the intro template
+	// instead of the default chat prompt. Best-effort parse; silent
+	// skip on any error means this is a normal chat task.
+	if task.ChatSessionID.Valid && task.Context != nil {
+		var introCtx struct {
+			TaskType     string `json:"task_type"`
+			SystemPrompt string `json:"system_prompt"`
+		}
+		if json.Unmarshal(task.Context, &introCtx) == nil && introCtx.TaskType == "chat_intro" {
+			resp.SystemPrompt = introCtx.SystemPrompt
+		}
+	}
+
 	// Autopilot run_only task: resolve workspace from autopilot_run →
 	// autopilot, and include the autopilot instructions because there is no
 	// issue for the agent to fetch.
