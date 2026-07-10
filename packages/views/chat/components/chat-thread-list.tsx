@@ -100,7 +100,7 @@ function ChatThreadRow({
               session.unread_count > 0 ? "font-semibold" : "font-normal",
             )}
           >
-            {session.title || `Chat with ${session.agent_name || "Agent"}`}
+            {session.title || session.agent_name || "Agent"}
           </span>
           {hovered ? (
             <div className="flex items-center gap-1 shrink-0">
@@ -164,6 +164,12 @@ function ChatThreadRow({
             </span>
           )}
         </div>
+        {/* Agent name subtitle */}
+        {session.agent_name && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {session.agent_name}
+          </p>
+        )}
       </div>
     </button>
   );
