@@ -279,6 +279,19 @@ WHERE leader_id IN (
 )
   AND archived_at IS NOT NULL;
 
+-- name: ArchiveSquadsByArchivedAgentsOnRuntime :exec
+-- Archives active squads whose leader_id references an archived agent on the
+-- given runtime. This is needed when deleting a runtime that has active squads
+-- led by archived agents - we need to archive them first before deleting.
+UPDATE squad
+SET archived_at = now(), archived_by = (
+    SELECT archived_by FROM agent WHERE id = squad.leader_id
+)
+WHERE leader_id IN (
+    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+)
+  AND archived_at IS NULL;
+
 -- name: FindLegacyRuntimesByDaemonID :many
 -- Looks up runtime rows keyed on a prior (hostname-derived) daemon_id. Used
 -- at register-time to find rows owned by the same machine under its old

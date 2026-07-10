@@ -1218,6 +1218,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// Inbox
 			r.Route("/api/inbox", func(r chi.Router) {
 				r.Get("/", h.ListInbox)
+				r.Get("/{id}", h.GetInboxItem)
 				r.Get("/unread-count", h.CountUnreadInbox)
 				// Cross-workspace unread summary: account-level, keyed on the
 				// user. Backs the workspace-switcher dot for OTHER workspaces.

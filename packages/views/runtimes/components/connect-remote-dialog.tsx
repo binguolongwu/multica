@@ -221,7 +221,7 @@ function InstructionsStep({ onClose }: { onClose: () => void }) {
           <CommandStep
             n={1}
             label={t(($) => $.connect.step1_label)}
-            cmd={INSTALL_CMD}
+            cmd={installCmd}
             copyAria={t(($) => $.connect.copy_aria)}
           />
 

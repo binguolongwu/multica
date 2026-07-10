@@ -38,10 +38,13 @@ fi
 # ==================== STEP 2: Build Go backend ====================
 log "=== Building Go backend ==="
 cd "$SOURCE_DIR/server"
-$GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/server" ./cmd/server
-$GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/migrate" ./cmd/migrate
-$GO_BIN build -ldflags "-s -w -X main.version=$(date -u '+%Y.%m.%d%H%M')" -o "$TARGET_DIR/multica" ./cmd/multica
-log "Backend + CLI built"
+
+# Build with static linking (CGO_ENABLED=0) to avoid glibc version issues
+# This ensures the binary runs on older systems without requiring specific glibc versions
+CGO_ENABLED=0 $GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/server" ./cmd/server
+CGO_ENABLED=0 $GO_BIN build -ldflags "-s -w" -o "$TARGET_DIR/migrate" ./cmd/migrate
+CGO_ENABLED=0 $GO_BIN build -ldflags "-s -w -X main.version=$(date -u '+%Y.%m.%d%H%M')" -o "$TARGET_DIR/multica" ./cmd/multica
+log "Backend + CLI built (static linking)"
 
 # ==================== STEP 3: Database migrations ====================
 log "=== Running migrations ==="
@@ -71,8 +74,11 @@ cp -r "$SOURCE_DIR/apps/web/.next/standalone"/* "$TARGET_DIR/frontend/"
 cp -r "$SOURCE_DIR/apps/web/.next/static" "$TARGET_DIR/frontend/apps/web/.next/"
 cp -r "$SOURCE_DIR/apps/web/public" "$TARGET_DIR/frontend/apps/web/"
 # Make CLI + update script available for download
-cp "$TARGET_DIR/multica" "$TARGET_DIR/frontend/apps/web/public/multica"
-cp "$SOURCE_DIR/update-daemon.sh" "$TARGET_DIR/frontend/apps/web/public/update-daemon.sh" 2>/dev/null || true
+mkdir -p "$TARGET_DIR/frontend/apps/web/public/downloads"
+cp "$TARGET_DIR/multica" "$TARGET_DIR/frontend/apps/web/public/downloads/multica"
+chmod +x "$TARGET_DIR/frontend/apps/web/public/downloads/multica"
+cp "$SOURCE_DIR/update-daemon.sh" "$TARGET_DIR/frontend/apps/web/public/downloads/update-daemon.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/frontend/apps/web/public/downloads/update-daemon.sh" 2>/dev/null || true
 
 # ==================== STEP 5: Copy configs ====================
 cp -r "$SOURCE_DIR/server/migrations" "$TARGET_DIR/"

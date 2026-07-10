@@ -19,6 +19,20 @@ New tables must use **business-meaningful primary key names**, not a generic `id
 - This makes FK references self-documenting — a reader seeing `provider_id` in a JOIN or foreign key immediately knows which table it references, without cross-checking.
 - Existing tables with `id` PKs are grandfathered; do not rename them. Only new tables follow this rule.
 
+### Database Foreign Key Constraints
+
+**Do not use database-level foreign key constraints.** All referential integrity logic must be implemented in the application code layer, not in the database.
+
+- New tables must not define `FOREIGN KEY` constraints in their schema.
+- Existing FK constraints should be removed when encountered during refactoring.
+- All referential integrity checks (e.g., verifying a referenced row exists before insert/update) must be performed in Go code before executing database operations.
+- Use `ON DELETE RESTRICT` or `ON DELETE CASCADE` semantics in application code, not in DDL.
+- This approach provides:
+  - More flexible error handling (custom error messages, retry logic)
+  - Easier schema migrations (no FK dependency ordering)
+  - Better performance for bulk operations (no FK validation overhead)
+  - Simpler testing (no need to satisfy FK constraints in test fixtures)
+
 ## Project Shape
 
 Multica is an AI-native task management platform for small teams, with agents as first-class assignees that can own issues, comment, and change status.

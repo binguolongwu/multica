@@ -152,6 +152,25 @@ func (q *Queries) DeleteSquadsByArchivedAgentsOnRuntime(ctx context.Context, run
 	return err
 }
 
+const archiveSquadsByArchivedAgentsOnRuntime = `-- name: ArchiveSquadsByArchivedAgentsOnRuntime :exec
+UPDATE squad
+SET archived_at = now(), archived_by = (
+    SELECT archived_by FROM agent WHERE id = squad.leader_id
+)
+WHERE leader_id IN (
+    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+)
+  AND archived_at IS NULL
+`
+
+// Archives active squads whose leader_id references an archived agent on the
+// given runtime. This is needed when deleting a runtime that has active squads
+// led by archived agents - we need to archive them first before deleting.
+func (q *Queries) ArchiveSquadsByArchivedAgentsOnRuntime(ctx context.Context, runtimeID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, archiveSquadsByArchivedAgentsOnRuntime, runtimeID)
+	return err
+}
+
 const deleteStaleOfflineRuntimes = `-- name: DeleteStaleOfflineRuntimes :many
 DELETE FROM agent_runtime
 WHERE status = 'offline'

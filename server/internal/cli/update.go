@@ -328,8 +328,25 @@ func FetchLatestRelease() (*GitHubRelease, error) {
 }
 
 // getUpdateBaseURL returns the configured update server base URL, or "" for GitHub.
+// Checks (in order):
+//  1. MULTICA_UPDATE_BASE_URL environment variable
+//  2. AppURL from CLI config (for self-hosted deployments)
+//
+// For self-hosted servers, the update endpoint is at the same host as the app,
+// so we use AppURL as the base URL for fetching CLI updates.
 func getUpdateBaseURL() string {
-	return strings.TrimRight(os.Getenv("MULTICA_UPDATE_BASE_URL"), "/")
+	// 1. Explicit env var takes precedence
+	if envURL := strings.TrimRight(os.Getenv("MULTICA_UPDATE_BASE_URL"), "/"); envURL != "" {
+		return envURL
+	}
+
+	// 2. Fall back to AppURL from CLI config (self-hosted deployments)
+	cfg, err := LoadCLIConfig()
+	if err == nil && cfg.AppURL != "" {
+		return strings.TrimRight(cfg.AppURL, "/")
+	}
+
+	return ""
 }
 
 // fetchReleaseFromServer fetches release metadata from a self-hosted Multica server.

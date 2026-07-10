@@ -866,7 +866,27 @@ func (h *Handler) ArchiveAgentsAndDeleteRuntime(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// 4. Hard-delete the archived agents so the agent.runtime_id FK
+	// 4. Remove archived squads whose leader is an archived agent on this runtime
+	//    so the RESTRICT FK on squad.leader_id won't block the subsequent agent
+	//    deletion. Active squads are handled by the 409 guard above instead.
+	if err := qtx.DeleteSquadsByArchivedAgentsOnRuntime(r.Context(), rt.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to clean up squads referencing archived agents")
+		return
+	}
+
+	// 5. Archive active squads whose leader is an archived agent on this runtime,
+	//    then delete them. This handles the case where active squads still reference
+	//    archived agents that need to be deleted.
+	if err := qtx.ArchiveSquadsByArchivedAgentsOnRuntime(r.Context(), rt.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to archive squads referencing archived agents")
+		return
+	}
+	if err := qtx.DeleteSquadsByArchivedAgentsOnRuntime(r.Context(), rt.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete archived squads")
+		return
+	}
+
+	// 6. Hard-delete the archived agents so the agent.runtime_id FK
 	//    (ON DELETE RESTRICT) no longer keeps the runtime alive.
 	if err := qtx.DeleteArchivedAgentsByRuntime(r.Context(), rt.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to clean up archived agents")

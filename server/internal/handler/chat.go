@@ -173,7 +173,20 @@ func (h *Handler) loadChatSessionForUser(w http.ResponseWriter, r *http.Request,
 		writeError(w, http.StatusNotFound, "chat session not found")
 		return db.ChatSession{}, false
 	}
-	if uuidToString(session.CreatorID) != userID {
+	// Normalize both UUIDs to the same format for comparison.
+	// X-User-ID header may use dashes (2d6a1d7c-bea5-4e8f-98fb-b350b16b3eef)
+	// while uuidToString returns without dashes (2d6a1d7cbea54e8f98fbb350b16b3eef).
+	sessionCreatorID, err := util.ParseUUID(uuidToString(session.CreatorID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "invalid session creator id")
+		return db.ChatSession{}, false
+	}
+	requestUserID, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return db.ChatSession{}, false
+	}
+	if sessionCreatorID != requestUserID {
 		writeError(w, http.StatusForbidden, "not your chat session")
 		return db.ChatSession{}, false
 	}

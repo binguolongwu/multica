@@ -85,6 +85,18 @@ func (h *Handler) enrichInboxResponse(ctx context.Context, resp InboxItemRespons
 	return resp
 }
 
+// GetInboxItem returns a single inbox item by ID.
+// GET /api/inbox/{id}
+func (h *Handler) GetInboxItem(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	item, ok := h.loadInboxItemForUser(w, r, id)
+	if !ok {
+		return
+	}
+	resp := h.enrichInboxResponse(r.Context(), inboxToResponse(item), item.IssueID)
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (h *Handler) ListInbox(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
