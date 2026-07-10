@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"log/slog"
 	"net/http"
 	"net/netip"
@@ -22,9 +23,11 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/featureflagdispatch"
+	"github.com/multica-ai/multica/server/internal/featureflags"
 	"github.com/multica-ai/multica/server/internal/handler"
 	"github.com/multica-ai/multica/server/internal/integrations/channel"
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
+	composiointeg "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/oss"
 "github.com/multica-ai/multica/server/internal/integrations/wiki"
@@ -37,6 +40,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/util/secretbox"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/featureflag"
+	composiosdk "github.com/multica-ai/multica/server/pkg/composio"
 )
 
 var defaultOrigins = []string{
@@ -410,6 +414,56 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	} else {
 		slog.Info("lark integration disabled (MULTICA_LARK_SECRET_KEY not set)")
 	}
+
+	// Composio integration (MUL-3720). Gated by COMPOSIO_API_KEY plus the
+	// composio_mcp_apps feature flag. The env var is the project-scoped key the
+	// standalone SDK authenticates Composio with (sent as x-api-key; the project
+	// is resolved server-side). When either env var is unset or the feature
+	// flag-disabled the whole block is skipped and the composio HTTP handlers
+	// return 503 with a clear message.
+	{
+		if composioAPIKey := strings.TrimSpace(os.Getenv("COMPOSIO_API_KEY")); composioAPIKey != "" {
+			if !featureflags.ComposioMCPAppsEnabled(context.Background(), opts.FeatureFlags) {
+				slog.Info("composio integration disabled (feature flag off)")
+			} else {
+				sdkClient, err := composiosdk.NewClient(composiosdk.Options{APIKey: composioAPIKey})
+				if err != nil {
+					slog.Error("composio: SDK client init failed; composio integration disabled", "error", err)
+				} else {
+					stateSecret := composioStateSecret()
+					callbackBase := composioCallbackBaseURL(signupConfig.PublicURL)
+					if len(stateSecret) == 0 {
+						slog.Error("composio: no state secret (set COMPOSIO_STATE_SECRET or JWT_SECRET); composio integration disabled")
+					} else if callbackBase == "" {
+						slog.Error("composio: no callback base url (set COMPOSIO_CALLBACK_BASE_URL or MULTICA_PUBLIC_URL); composio integration disabled")
+					} else {
+						svc, serr := composiointeg.NewService(sdkClient, queries, composiointeg.Config{
+							StateSecret:      stateSecret,
+							CallbackBaseURL:  callbackBase,
+							FrontendBaseURL:  strings.TrimSpace(os.Getenv("MULTICA_FRONTEND_URL")),
+						})
+						if serr != nil {
+							slog.Error("composio: service init failed; composio integration disabled", "error", serr)
+						} else {
+							h.Composio = svc
+							// TaskService.Composio wires the overlay builder so every task enqueue
+							// path attaches the initiator user's Composio session
+							// MCP overlay for this agent run. The TaskService owns the
+							// Composio field for exactly this kind of late wiring,
+							// letting the core service stay composio-free.
+							if h.TaskService != nil {
+								h.TaskService.Composio = svc
+							}
+							slog.Info("composio integration enabled")
+						}
+					}
+				}
+			}
+		} else {
+			slog.Info("composio integration disabled (COMPOSIO_API_KEY not set)")
+		}
+	}
+
 	// Wiki integration. Always enabled — no secret key required.
 	// Wiki is a core feature gated by workspace settings.
 	{
@@ -580,6 +634,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// HMAC-SHA256 signature in the handler) and post-install setup callback.
 	r.Post("/api/webhooks/github", h.HandleGitHubWebhook)
 	r.Get("/api/github/setup", h.GitHubSetupCallback)
+
+	// Composio OAuth callback (MUL-3843). NOT under the Auth group on purpose:
+	// Composio 302-redirects the user's browser here at the end of the OAuth
+	// flow; the signed state in the query validates the request so there's no
+	// session to check. Rate-limiter applies to stop blind replay without
+	// doing anything. h.Composio == nil still returns 503. Keeping it inside the
+	// Auth group would redirect to /login before the handler could run, which
+	// breaks the Composio OAuth callback entirely — the redirect erases the query
+	// params so the signed state is lost and the user sees "connect failed" even
+	// though the OAuth grant succeeded upstream.
+	r.Get("/api/integrations/composio/callback", h.ComposioCallback)
+
 	// Stripe webhook (no Multica auth — Stripe signs the raw body
 	// with a shared secret, the multica-cloud upstream verifies. We
 	// only forward the bytes + the Stripe-Signature header; see
@@ -855,6 +921,16 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Post("/checkout-sessions", h.CreateCloudBillingCheckoutSession)
 			r.Get("/checkout-sessions/{sessionId}", h.GetCloudBillingCheckoutSession)
 			r.Post("/portal-sessions", h.CreateCloudBillingPortalSession)
+		})
+
+		// Composio integration (MUL-3720). User-scoped (no workspace context):
+		// connections belong to the authenticated user, not a workspace.
+		// All handlers return 503 when h.Composio is nil (not configured).
+		r.Route("/api/integrations/composio", func(r chi.Router) {
+			r.Post("/connect/init", h.ComposioConnectInit)
+			r.Get("/toolkits", h.ListComposioToolkits)
+			r.Get("/connections", h.ListComposioConnections)
+			r.Delete("/connections/{id}", h.DeleteComposioConnection)
 		})
 
 		// --- Workspace-scoped routes (all require workspace membership) ---
@@ -1400,4 +1476,30 @@ func cloudRuntimeFleetURLFromEnv() string {
 		return url
 	}
 	return strings.TrimSpace(os.Getenv("MULTICA_FLEET_URL"))
+}
+
+// composioStateSecret resolves the HMAC key for the connect-state. Prefers an
+// explicit COMPOSIO_STATE_SECRET; otherwise derives a composio-specific key
+// from JWT_SECRET so self-host deployments that set JWT_SECRET automatically
+// work without an extra env var. Derivation uses SHA-256 so both sides get an
+// identical key. Returns nil when neither is set (composio stays disabled).
+func composioStateSecret() []byte {
+	if v := strings.TrimSpace(os.Getenv("COMPOSIO_STATE_SECRET")); v != "" {
+		return []byte(v)
+	}
+	if v := strings.TrimSpace(os.Getenv("JWT_SECRET")); v != "" {
+		sum := sha256.Sum256([]byte("composio-state:" + v))
+		return sum[:]
+	}
+	return nil
+}
+
+// composioCallbackBaseURL resolves the public API base used to build the
+// Composio callback URL. Prefers COMPOSIO_CALLBACK_BASE_URL, then the
+// MULTICA_PUBLIC_URL already loaded in signupConfig.
+func composioCallbackBaseURL(publicURL string) string {
+	if v := strings.TrimSpace(os.Getenv("COMPOSIO_CALLBACK_BASE_URL")); v != "" {
+		return v
+	}
+	return publicURL
 }

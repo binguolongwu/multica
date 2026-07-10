@@ -486,7 +486,7 @@ func (h *Handler) triggerChildDoneSquad(ctx context.Context, parent, child db.Is
 	}
 
 	// Private-leader gate: deny if the actor cannot access the leader.
-	if !h.canEnqueueSquadLeader(ctx, squad.LeaderID, actorType, actorID, uuidToString(parent.WorkspaceID)) {
+	if !h.canEnqueueSquadLeader(ctx, squad.LeaderID, actorType, actorID, uuidToString(parent.WorkspaceID), "") {
 		return
 	}
 

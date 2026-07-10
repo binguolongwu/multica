@@ -21,6 +21,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/featureflagdispatch"
+	composio "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/oss"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
@@ -30,6 +31,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/storage"
 	"github.com/multica-ai/multica/server/internal/util"
+	"github.com/multica-ai/multica/server/pkg/featureflag"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -119,6 +121,7 @@ type Handler struct {
 	ModelListStore        ModelListStore
 	LocalSkillListStore   LocalSkillListStore
 	LocalSkillImportStore LocalSkillImportStore
+	FeatureFlags           *featureflag.Service
 	DaemonFeatureFlags    *featureflagdispatch.Evaluator
 	OssService            *oss.Service
 	LivenessStore         LivenessStore
@@ -174,7 +177,11 @@ type Handler struct {
 	// WikiService is the wiki knowledge base service. Nil when wiki is not
 	// configured; handlers return 503 in that case.
 	WikiService *wiki.Service
-	cfg        Config
+	// Composio integration (MUL-3720). Nil when COMPOSIO_API_KEY is unset;
+	// the composio HTTP handlers return 503 in that case. Wired in
+	// cmd/server/router.go.
+	Composio *composio.Service
+	cfg      Config
 }
 
 func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *events.Bus, emailService *service.EmailService, store storage.Storage, cfSigner *auth.CloudFrontSigner, analyticsClient analytics.Client, cfg Config, daemonHubs ...*daemonws.Hub) *Handler {
@@ -753,4 +760,32 @@ func (h *Handler) loadInboxItemForUser(w http.ResponseWriter, r *http.Request, i
 		return db.InboxItem{}, false
 	}
 	return item, true
+}
+
+// uuidsToStrings converts a slice of pgtype.UUID to a string slice, omitting
+// invalid UUIDs. Returns nil when the input is empty or contains only invalid UUIDs.
+func uuidsToStrings(us []pgtype.UUID) []string {
+	if len(us) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(us))
+	for _, u := range us {
+		if u.Valid {
+			out = append(out, uuidToString(u))
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// uuidStringsOrEmpty preserves the distinction between a modern, authoritative
+// empty UUID-array value ([]) and a field omitted by a legacy server.
+func uuidStringsOrEmpty(us []pgtype.UUID) []string {
+	out := uuidsToStrings(us)
+	if out == nil {
+		return []string{}
+	}
+	return out
 }
