@@ -158,7 +158,13 @@ function replaceOptimisticChatMessageId(
   );
 }
 
-export function ChatWindow() {
+/**
+ * Shared chat conversation surface used by both the floating FAB overlay and
+ * the first-class Chat tab. When `inline` is set the component drops all
+ * floating-window chrome (absolute positioning, resize handles, header with
+ * session picker) so the parent — e.g. `ChatPage` — can supply its own layout.
+ */
+export function ChatWindow({ inline }: { inline?: boolean }) {
   const { t } = useT("chat");
   const wsId = useWorkspaceId();
   const isOpen = useChatStore((s) => s.isOpen);
@@ -657,13 +663,17 @@ export function ChatWindow() {
   // a real message, or a pending task whose timeline will stream in.
   const hasMessages = messages.length > 0 || !!pendingTaskId;
 
-  const isVisible = isOpen && (isExpanded || boundsReady);
+  const isVisible = inline || (isOpen && (isExpanded || boundsReady));
 
-  const containerClass = "absolute bottom-2 right-2 z-50 flex flex-col rounded-xl ring-1 ring-foreground/10 bg-sidebar shadow-2xl overflow-hidden";
-  const containerStyle: React.CSSProperties = {
-    transformOrigin: "bottom right",
-    pointerEvents: isOpen ? "auto" : "none",
-  };
+  const containerClass = inline
+    ? "flex flex-col h-full bg-background"
+    : "absolute bottom-2 right-2 z-50 flex flex-col rounded-xl ring-1 ring-foreground/10 bg-sidebar shadow-2xl overflow-hidden";
+  const containerStyle: React.CSSProperties = inline
+    ? {}
+    : {
+        transformOrigin: "bottom right",
+        pointerEvents: isOpen ? "auto" : "none",
+      };
 
   const contextItems = useChatContextItems(wsId);
 
@@ -672,13 +682,16 @@ export function ChatWindow() {
       ref={windowRef}
       className={containerClass}
       style={containerStyle}
-      initial={{ opacity: 0, scale: 0.95, width: renderWidth, height: renderHeight }}
-      animate={{
-        opacity: isVisible ? 1 : 0,
-        scale: isVisible ? 1 : 0.95,
-        width: renderWidth,
-        height: renderHeight,
-      }}
+      initial={inline ? { opacity: 0 } : { opacity: 0, scale: 0.95, width: renderWidth, height: renderHeight }}
+      animate={inline
+        ? { opacity: 1 }
+        : {
+            opacity: isVisible ? 1 : 0,
+            scale: isVisible ? 1 : 0.95,
+            width: renderWidth,
+            height: renderHeight,
+          }
+      }
       transition={{
         width: isDragging ? { duration: 0 } : { type: "spring", duration: 0.3, bounce: 0 },
         height: isDragging ? { duration: 0 } : { type: "spring", duration: 0.3, bounce: 0 },
@@ -686,9 +699,10 @@ export function ChatWindow() {
         scale: { type: "spring", duration: 0.2, bounce: 0 },
       }}
     >
-      <ChatResizeHandles onDragStart={startDrag} />
-      {/* Header — ⊕ new + session dropdown | window tools */}
-      <div className="flex items-center justify-between border-b px-4 py-2.5 gap-2">
+      {!inline && <ChatResizeHandles onDragStart={startDrag} />}
+      {/* Header — ⊕ new + session dropdown | window tools. Hidden in inline (tab) mode:
+          ChatPage supplies its own ChatSessionHeader above. */}
+      {!inline && <div className="flex items-center justify-between border-b px-4 py-2.5 gap-2">
         <div className="flex items-center gap-1 min-w-0">
           <Tooltip>
             <TooltipTrigger
@@ -748,7 +762,7 @@ export function ChatWindow() {
             <TooltipContent side="top">{t(($) => $.window.minimize_tooltip)}</TooltipContent>
           </Tooltip>
         </div>
-      </div>
+      </div>}
 
       {/* Messages / skeleton / empty state */}
       {showSkeleton ? (

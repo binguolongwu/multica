@@ -26,6 +26,7 @@ export function ChatPage({ initialSessionId }: ChatPageProps) {
   const wsId = useWorkspaceId();
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
+  const setOpen = useChatStore((s) => s.setOpen);
 
   const { data: sessions = [] } = useQuery(chatSessionsOptions(wsId));
   const deleteSession = useDeleteChatSession();
@@ -34,6 +35,11 @@ export function ChatPage({ initialSessionId }: ChatPageProps) {
   const markRead = useMarkChatSessionRead();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+
+  // In tab mode, ChatWindow must always be visible (isOpen controls floating FAB visibility)
+  useEffect(() => {
+    setOpen(true);
+  }, [setOpen]);
 
   // Handle initial session from URL param
   useEffect(() => {
@@ -85,9 +91,8 @@ export function ChatPage({ initialSessionId }: ChatPageProps) {
             {activeSession.agent_status === "archived" && (
               <ArchivedAgentBanner agentName={activeSession.agent_name} />
             )}
-            <div className="flex-1 relative">
-              {/* Reuse ChatWindow for message list + input — it's self-contained and handles all chat logic */}
-              <ChatWindow key={activeSession.id} />
+            <div className="flex-1 relative overflow-hidden">
+              <ChatWindow key={activeSession.id} inline />
             </div>
           </>
         ) : (
