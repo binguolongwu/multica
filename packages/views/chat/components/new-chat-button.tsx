@@ -10,6 +10,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { useChatStore } from "@multica/core/chat";
 import { useCreateChatSession } from "@multica/core/chat/mutations";
 import { agentListOptions } from "@multica/core/workspace/queries";
+import { useT } from "../../i18n";
 import type { Agent } from "@multica/core/types";
 
 interface NewChatButtonProps {
@@ -17,6 +18,7 @@ interface NewChatButtonProps {
 }
 
 export function NewChatButton({ className }: NewChatButtonProps) {
+  const { t } = useT("chat");
   const wsId = useWorkspaceId();
   const [open, setOpen] = useState(false);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
@@ -48,13 +50,13 @@ export function NewChatButton({ className }: NewChatButtonProps) {
         )}
       >
         <Plus className="size-4" />
-        <span className="flex-1 text-left">New Chat</span>
+        <span className="flex-1 text-left">{t(($) => $.window.new_chat_tooltip)}</span>
         <ChevronDown className="size-3 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-64 p-1" align="start">
         <div className="max-h-72 overflow-y-auto">
           {chatAgents.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">No agents available</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">{t(($) => $.window.no_agents)}</div>
           ) : (
             chatAgents.map((agent: Agent) => (
               <button
