@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@multica/ui/lib/utils";
 import { ActorAvatar } from "../../common/actor-avatar";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@multica/ui/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@multica/ui/components/ui/collapsible";
 import { useChatStore } from "@multica/core/chat";
 import type { ChatSession } from "@multica/core/types/chat";
-import { X, Square } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 interface ChatThreadListProps {
   sessions: ChatSession[];
@@ -15,31 +19,139 @@ interface ChatThreadListProps {
   className?: string;
 }
 
+interface AgentGroup {
+  agentId: string;
+  agentName: string;
+  agentAvatarUrl: string | null | undefined;
+  sessions: ChatSession[];
+  totalUnread: number;
+}
+
 export function ChatThreadList({ sessions, onDelete, onStop, className }: ChatThreadListProps) {
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
 
+  // Group sessions by agent
+  const groups = useMemo<AgentGroup[]>(() => {
+    const map = new Map<string, AgentGroup>();
+    for (const s of sessions) {
+      const existing = map.get(s.agent_id);
+      if (existing) {
+        existing.sessions.push(s);
+        existing.totalUnread += s.unread_count;
+      } else {
+        map.set(s.agent_id, {
+          agentId: s.agent_id,
+          agentName: s.agent_name || "Agent",
+          agentAvatarUrl: s.agent_avatar_url,
+          sessions: [s],
+          totalUnread: s.unread_count,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [sessions]);
+
+  // Default open: the group containing the active session
+  const defaultOpenIds = useMemo(() => {
+    if (!activeSessionId) return new Set<string>();
+    const g = groups.find((g) => g.sessions.some((s) => s.id === activeSessionId));
+    return g ? new Set([g.agentId]) : new Set<string>();
+  }, [activeSessionId, groups]);
+
   return (
     <div className={cn("flex flex-col h-full", className)}>
       <div className="flex-1 overflow-y-auto">
-        {sessions.length === 0 ? (
+        {groups.length === 0 ? (
           <div className="p-4 text-sm text-muted-foreground text-center">
             No conversations yet
           </div>
         ) : (
-          sessions.map((session) => (
-            <ChatThreadRow
-              key={session.id}
-              session={session}
-              isActive={session.id === activeSessionId}
-              onClick={() => setActiveSession(session.id)}
-              onDelete={() => onDelete(session.id)}
-              onStop={() => onStop(session.id)}
+          groups.map((group) => (
+            <AgentGroupPanel
+              key={group.agentId}
+              group={group}
+              defaultOpen={defaultOpenIds.has(group.agentId)}
+              activeSessionId={activeSessionId}
+              onSelectSession={(id) => setActiveSession(id)}
+              onDelete={onDelete}
+              onStop={onStop}
             />
           ))
         )}
       </div>
     </div>
+  );
+}
+
+function AgentGroupPanel({
+  group,
+  defaultOpen,
+  activeSessionId,
+  onSelectSession,
+}: {
+  group: AgentGroup;
+  defaultOpen: boolean;
+  activeSessionId: string | null;
+  onSelectSession: (id: string) => void;
+  onDelete?: (sessionId: string) => void;
+  onStop?: (sessionId: string) => void;
+}) {
+  const hasActiveSession = group.sessions.some((s) => s.id === activeSessionId);
+
+  return (
+    <Collapsible defaultOpen={defaultOpen || hasActiveSession}>
+      <CollapsibleTrigger
+        className={cn(
+          "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium",
+          "hover:bg-accent/50 transition-colors",
+          "group",
+        )}
+      >
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-aria-expanded:rotate-90" />
+        <ActorAvatar
+          actorType="agent"
+          actorId={group.agentId}
+          size={18}
+          className="shrink-0"
+        />
+        <span className="flex-1 text-left truncate">{group.agentName}</span>
+        <span className="text-xs text-muted-foreground shrink-0">
+          {group.sessions.length}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {group.sessions.map((session) => (
+          <button
+            key={session.id}
+            type="button"
+            onClick={() => onSelectSession(session.id)}
+            className={cn(
+              "w-full flex items-center justify-between gap-2 pl-11 pr-3 py-2 text-left text-sm transition-colors",
+              "hover:bg-accent/50",
+              session.id === activeSessionId && "bg-accent",
+            )}
+          >
+            <span
+              className={cn(
+                "truncate flex-1",
+                session.unread_count > 0 ? "font-semibold" : "font-normal",
+              )}
+            >
+              {session.title || "Untitled"}
+            </span>
+            <span className="text-xs text-muted-foreground shrink-0">
+              {session.unread_count > 0 && (
+                <span className="inline-flex items-center justify-center size-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold mr-1">
+                  {session.unread_count > 99 ? "99+" : session.unread_count}
+                </span>
+              )}
+              {formatRelativeTime(session.updated_at)}
+            </span>
+          </button>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -56,121 +168,4 @@ function formatRelativeTime(dateStr: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
-}
-
-function ChatThreadRow({
-  session,
-  isActive,
-  onClick,
-  onDelete,
-  onStop,
-}: {
-  session: ChatSession;
-  isActive: boolean;
-  onClick: () => void;
-  onDelete: () => void;
-  onStop: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const time = formatRelativeTime(session.updated_at);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={cn(
-        "w-full flex items-start gap-3 px-3 py-3 text-left transition-colors",
-        "hover:bg-accent/50",
-        isActive && "bg-accent",
-      )}
-    >
-      <ActorAvatar
-        actorType="agent"
-        actorId={session.agent_id}
-        size={20}
-        className="shrink-0 mt-0.5"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className={cn(
-              "text-sm truncate",
-              session.unread_count > 0 ? "font-semibold" : "font-normal",
-            )}
-          >
-            {session.title || session.agent_name || "Agent"}
-          </span>
-          {hovered ? (
-            <div className="flex items-center gap-1 shrink-0">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className="p-0.5 rounded hover:bg-muted cursor-pointer"
-                    >
-                      <Square className="size-3.5" />
-                    </span>
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStop();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      onStop();
-                    }
-                  }}
-                />
-                <TooltipContent>Stop</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className="p-0.5 rounded hover:bg-destructive/20 cursor-pointer"
-                    >
-                      <X className="size-3.5" />
-                    </span>
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      onDelete();
-                    }
-                  }}
-                />
-                <TooltipContent>Delete</TooltipContent>
-              </Tooltip>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground shrink-0">
-              {session.unread_count > 0 && (
-                <span className="inline-flex items-center justify-center size-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold mr-1">
-                  {session.unread_count > 99 ? "99+" : session.unread_count}
-                </span>
-              )}
-              {time}
-            </span>
-          )}
-        </div>
-        {/* Agent name subtitle */}
-        {session.agent_name && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {session.agent_name}
-          </p>
-        )}
-      </div>
-    </button>
-  );
 }
