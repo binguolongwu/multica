@@ -15,7 +15,8 @@
     "settings": "设置",
     "llm": "大模型",
     "templates": "智能体模板",
-    "sharedSkills": "共享Skills"
+    "sharedSkills": "共享Skills",
+    "chat": "聊天"
   },
   "help": {
     "trigger": "帮助",
@@ -101,6 +102,5 @@
       "description": "和团队及其他用户一起交流。",
       "dismiss": "关闭"
     }
-  },
-  "chat": "聊天"
+  }
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
-import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
+import { ActorAvatar } from "../../common/actor-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,13 +33,9 @@ export function ChatSessionHeader({ session, onRename, onPin, onDelete }: ChatSe
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
       <ActorAvatar
-        actor={{
-          type: "agent",
-          id: session.agent_id,
-          name: session.agent_name,
-          avatar_url: session.agent_avatar_url ?? null,
-        }}
-        size="sm"
+        actorType="agent"
+        actorId={session.agent_id}
+        size={20}
       />
       <div className="flex-1 min-w-0">
         {editing ? (
@@ -75,11 +71,13 @@ export function ChatSessionHeader({ session, onRename, onPin, onDelete }: ChatSe
         )}
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className="p-1 rounded hover:bg-muted shrink-0">
-            <MoreHorizontal className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger
+          render={
+            <button type="button" className="p-1 rounded hover:bg-muted shrink-0">
+              <MoreHorizontal className="size-4" />
+            </button>
+          }
+        />
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => setEditing(true)}>Rename</DropdownMenuItem>
           <DropdownMenuItem onClick={onPin}>

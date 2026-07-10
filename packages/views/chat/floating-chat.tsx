@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useChatStore } from "@multica/core/chat";
 import { ChatFab } from "./components/chat-fab";
 import { ChatWindow } from "./components/chat-window";

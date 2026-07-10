@@ -1,12 +1,10 @@
 "use client";
 
-import React from "react";
-import { Bot, Lightbulb, ListChecks, Search } from "lucide-react";
-import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
+import { Lightbulb, ListChecks, Search } from "lucide-react";
+import { ActorAvatar } from "../../common/actor-avatar";
 
 interface ChatEmptyStateProps {
   agentName?: string;
-  agentAvatarUrl?: string | null;
   agentDescription?: string | null;
   onStarterClick?: (prompt: string) => void;
 }
@@ -19,7 +17,6 @@ const DEFAULT_STARTERS = [
 
 export function ChatEmptyState({
   agentName,
-  agentAvatarUrl,
   agentDescription,
   onStarterClick,
 }: ChatEmptyStateProps) {
@@ -28,8 +25,9 @@ export function ChatEmptyState({
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-12">
       <ActorAvatar
-        actor={{ type: "agent", id: "", name: agentName, avatar_url: agentAvatarUrl }}
-        size="lg"
+        actorType="agent"
+        actorId=""
+        size={40}
         className="mb-4"
       />
       <h2 className="text-lg font-semibold mb-1">

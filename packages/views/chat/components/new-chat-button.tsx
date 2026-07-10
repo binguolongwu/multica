@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Plus, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@multica/ui/lib/utils";
-import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
+import { ActorAvatar } from "../../common/actor-avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@multica/ui/components/ui/popover";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useChatStore } from "@multica/core/chat";
@@ -36,23 +36,20 @@ export function NewChatButton({ className }: NewChatButtonProps) {
     [createSession, setActiveSession, setSelectedAgentId],
   );
 
-  const chatAgents = agents.filter((a: Agent) => a.status !== "deleted");
+  const chatAgents = agents.filter((a: Agent) => !a.archived_at);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg",
-            "hover:bg-accent transition-colors",
-            className,
-          )}
-        >
-          <Plus className="size-4" />
-          <span className="flex-1 text-left">New Chat</span>
-          <ChevronDown className="size-3 text-muted-foreground" />
-        </button>
+      <PopoverTrigger
+        className={cn(
+          "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg",
+          "hover:bg-accent transition-colors",
+          className,
+        )}
+      >
+        <Plus className="size-4" />
+        <span className="flex-1 text-left">New Chat</span>
+        <ChevronDown className="size-3 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-64 p-1" align="start">
         <div className="max-h-72 overflow-y-auto">
@@ -67,13 +64,9 @@ export function NewChatButton({ className }: NewChatButtonProps) {
                 className="flex items-center gap-3 w-full px-3 py-2 text-sm rounded hover:bg-accent transition-colors"
               >
                 <ActorAvatar
-                  actor={{
-                    type: "agent",
-                    id: agent.id,
-                    name: agent.name,
-                    avatar_url: agent.avatar_url,
-                  }}
-                  size="sm"
+                  actorType="agent"
+                  actorId={agent.id}
+                  size={20}
                 />
                 <span className="truncate">{agent.name}</span>
               </button>

@@ -15,7 +15,8 @@
     "settings": "Settings",
     "llm": "LLM Models",
     "templates": "Templates",
-    "sharedSkills": "Shared Skills"
+    "sharedSkills": "Shared Skills",
+    "chat": "Chat"
   },
   "help": {
     "trigger": "Help",
@@ -101,6 +102,5 @@
       "description": "Chat with the team and other builders.",
       "dismiss": "Dismiss"
     }
-  },
-  "chat": "Chat"
+  }
 }

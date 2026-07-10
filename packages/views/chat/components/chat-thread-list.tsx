@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import { useState } from "react";
 import { cn } from "@multica/ui/lib/utils";
-import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
+import { ActorAvatar } from "../../common/actor-avatar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@multica/ui/components/ui/tooltip";
 import { useChatStore } from "@multica/core/chat";
 import type { ChatSession } from "@multica/core/types/chat";
@@ -71,7 +71,7 @@ function ChatThreadRow({
   onDelete: () => void;
   onStop: () => void;
 }) {
-  const [hovered, setHovered] = React.useState(false);
+  const [hovered, setHovered] = useState(false);
   const time = formatRelativeTime(session.updated_at);
 
   return (
@@ -87,13 +87,9 @@ function ChatThreadRow({
       )}
     >
       <ActorAvatar
-        actor={{
-          type: "agent",
-          id: session.agent_id,
-          name: session.agent_name,
-          avatar_url: session.agent_avatar_url ?? null,
-        }}
-        size="sm"
+        actorType="agent"
+        actorId={session.agent_id}
+        size={20}
         className="shrink-0 mt-0.5"
       />
       <div className="flex-1 min-w-0">
@@ -109,47 +105,51 @@ function ChatThreadRow({
           {hovered ? (
             <div className="flex items-center gap-1 shrink-0">
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
+                <TooltipTrigger
+                  render={
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="p-0.5 rounded hover:bg-muted cursor-pointer"
+                    >
+                      <Square className="size-3.5" />
+                    </span>
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStop();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.stopPropagation();
                       onStop();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        onStop();
-                      }
-                    }}
-                    className="p-0.5 rounded hover:bg-muted cursor-pointer"
-                  >
-                    <Square className="size-3.5" />
-                  </span>
-                </TooltipTrigger>
+                    }
+                  }}
+                />
                 <TooltipContent>Stop</TooltipContent>
               </Tooltip>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
+                <TooltipTrigger
+                  render={
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="p-0.5 rounded hover:bg-destructive/20 cursor-pointer"
+                    >
+                      <X className="size-3.5" />
+                    </span>
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.stopPropagation();
                       onDelete();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        onDelete();
-                      }
-                    }}
-                    className="p-0.5 rounded hover:bg-destructive/20 cursor-pointer"
-                  >
-                    <X className="size-3.5" />
-                  </span>
-                </TooltipTrigger>
+                    }
+                  }}
+                />
                 <TooltipContent>Delete</TooltipContent>
               </Tooltip>
             </div>
