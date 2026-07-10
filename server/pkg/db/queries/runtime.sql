@@ -274,10 +274,10 @@ SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL;
 -- handled separately by CountActiveSquadsWithArchivedLeadersByRuntime, which
 -- returns a 409 until the caller archives them or assigns a new leader.
 DELETE FROM squad
-WHERE leader_id IN (
-    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+WHERE squad.leader_id IN (
+    SELECT agent.id FROM agent WHERE agent.runtime_id = $1 AND agent.archived_at IS NOT NULL
 )
-  AND archived_at IS NOT NULL;
+  AND squad.archived_at IS NOT NULL;
 
 -- name: ArchiveSquadsByArchivedAgentsOnRuntime :exec
 -- Archives active squads whose leader_id references an archived agent on the
@@ -285,12 +285,12 @@ WHERE leader_id IN (
 -- led by archived agents - we need to archive them first before deleting.
 UPDATE squad
 SET archived_at = now(), archived_by = (
-    SELECT archived_by FROM agent WHERE id = squad.leader_id
+    SELECT archived_by FROM agent WHERE agent.id = squad.leader_id
 )
-WHERE leader_id IN (
-    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+WHERE squad.leader_id IN (
+    SELECT agent.id FROM agent WHERE agent.runtime_id = $1 AND agent.archived_at IS NOT NULL
 )
-  AND archived_at IS NULL;
+  AND squad.archived_at IS NULL;
 
 -- name: FindLegacyRuntimesByDaemonID :many
 -- Looks up runtime rows keyed on a prior (hostname-derived) daemon_id. Used

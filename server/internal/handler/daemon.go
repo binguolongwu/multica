@@ -22,6 +22,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
+	"github.com/multica-ai/multica/server/internal/runtimeapps"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
@@ -259,6 +260,22 @@ func workspaceReposResponse(workspaceID string, raw []byte, settingsRaw []byte) 
 	}
 	return resp
 }
+func parseRuntimeConnectedAppsForClaim(raw []byte, taskID pgtype.UUID) []runtimeapps.ConnectedApp {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return nil
+	}
+	var apps []runtimeapps.ConnectedApp
+	if err := json.Unmarshal(raw, &apps); err != nil {
+		slog.Warn("daemon claim: unmarshal runtime_connected_apps failed",
+			"task_id", uuidToString(taskID),
+			"error", err,
+		)
+		return nil
+	}
+	return apps
+}
+
 
 // normalizeProvider canonicalizes a provider string for storage: trimmed and
 // lowercased so client-side pricing lookups tolerate case drift. Returns "" for
@@ -1286,6 +1303,10 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 
 	// Build response with fresh agent data (name + skills + custom_env + custom_args).
 	resp := taskToResponse(*task, runtimeWorkspaceID)
+	composioMCPEnabled := h.composioMCPAppsEnabled(r.Context())
+	if composioMCPEnabled {
+		resp.ConnectedApps = parseRuntimeConnectedAppsForClaim(task.RuntimeConnectedApps, task.ID)
+	}
 	if agent, err := h.Queries.GetAgent(r.Context(), task.AgentID); err == nil {
 		useSkillRefs := requestHasDaemonCapability(r, protocol.DaemonCapabilitySkillBundlesV1)
 		var customEnv map[string]string
@@ -1310,6 +1331,19 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		if agent.McpConfig != nil {
 			mcpConfig = json.RawMessage(agent.McpConfig)
 		}
+			// Layer the per-task overlay (set at enqueue from the initiator
+			// user's active integrations — currently Composio) on top of the
+			// agent's saved mcp_config. Overlay wins on server-name collisions
+			// because it carries the live user-scoped session URL. Errors are
+			// logged but never fail the claim: a broken overlay must not prevent
+			// the agent from running with its base config.
+			if composioMCPEnabled && len(task.RuntimeMcpOverlay) > 0 {
+				if merged, err := mergeMCPOverlay(mcpConfig, json.RawMessage(task.RuntimeMcpOverlay)); err != nil {
+					slog.Warn("daemon claim: merge runtime_mcp_overlay failed; falling back to agent mcp_config", "task_id", uuidToString(task.ID), "error", err)
+				} else {
+					mcpConfig = merged
+				}
+			}
 		// runtime_config is stored as JSONB and may legitimately be the
 		// empty object `{}` for agents that haven't opted into any
 		// provider-specific tuning. Forward only non-empty payloads so the
@@ -1671,19 +1705,6 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Chat intro task: when the context carries task_type=chat_intro,
-	// populate system_prompt so the daemon uses the intro template
-	// instead of the default chat prompt. Best-effort parse; silent
-	// skip on any error means this is a normal chat task.
-	if task.ChatSessionID.Valid && task.Context != nil {
-		var introCtx struct {
-			TaskType     string `json:"task_type"`
-			SystemPrompt string `json:"system_prompt"`
-		}
-		if json.Unmarshal(task.Context, &introCtx) == nil && introCtx.TaskType == "chat_intro" {
-			resp.SystemPrompt = introCtx.SystemPrompt
-		}
-	}
 
 	// Autopilot run_only task: resolve workspace from autopilot_run →
 	// autopilot, and include the autopilot instructions because there is no

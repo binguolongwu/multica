@@ -312,8 +312,6 @@ type AgentTaskResponse struct {
 	// WorkDir directly; newer UIs should prefer RelativeWorkDir.
 	RelativeWorkDir          string               `json:"relative_work_dir,omitempty"`
 	TriggerCommentID         *string              `json:"trigger_comment_id,omitempty"`          // comment that triggered this task
-	CoalescedCommentIDs      []string             `json:"coalesced_comment_ids,omitempty"`       // MUL-4195: earlier comments folded into this run when it had not yet started, so a single run still covers every deliberate comment; trigger_comment_id is the newest. Surfaced so the UI can show which comments a run covered. omitempty so old clients ignore it
-	CoalescedComments        []CoalescedCommentData `json:"coalesced_comments,omitempty"`        // MUL-4195: full detail (thread_id/author/created_at/content) of the folded comments, so the daemon prompt can address each without assuming they share the triggering thread. omitempty so old clients ignore it
 	DeliveredCommentIDs      []string             `json:"delivered_comment_ids"`                 // always present: [] is an authoritative empty receipt, while field absence identifies responses from legacy servers
 	TriggerThreadID          string               `json:"trigger_thread_id,omitempty"`           // root comment ID for the triggering thread
 	TriggerCommentContent    string               `json:"trigger_comment_content,omitempty"`     // content of the triggering comment
@@ -323,11 +321,8 @@ type AgentTaskResponse struct {
 	NewCommentCount          int                  `json:"new_comment_count,omitempty"`           // trigger-thread comments since last run; excludes injected trigger + own comments; omitempty so old daemons ignore it
 	NewCommentsSince         string               `json:"new_comments_since,omitempty"`          // RFC3339 anchor (last run's started_at) the count is measured from; omitempty so old daemons ignore it
 	ChatSessionID            string               `json:"chat_session_id,omitempty"`             // non-empty for chat tasks
-	ChatChannelType          string               `json:"chat_channel_type,omitempty"`           // "slack" when the chat session is backed by an IM channel; empty for a web-only chat. Makes the agent channel-aware (read history from the channel, not Multica)
-	ChatInThread             bool                 `json:"chat_in_thread,omitempty"`              // true when the latest @mention was a thread reply; tells the agent to start with `multica chat thread` vs `multica chat history`
 	ChatMessage              string               `json:"chat_message,omitempty"`                // user message for chat tasks
 	ChatMessageAttachments   []ChatAttachmentMeta `json:"chat_message_attachments,omitempty"`    // attachments on the user message — agent calls `multica attachment download <id>` per entry
-	ChatIntro                bool                 `json:"chat_intro,omitempty"`                  // true for the agent's proactive self-introduction chat (is_agent_intro session, no user message); the daemon builds an intro prompt instead of a reply prompt
 	AutopilotRunID           string               `json:"autopilot_run_id,omitempty"`            // non-empty for autopilot-spawned tasks
 	AutopilotID              string               `json:"autopilot_id,omitempty"`                // autopilot that spawned this task
 	AutopilotTitle           string               `json:"autopilot_title,omitempty"`             // autopilot title used as task context
@@ -390,24 +385,6 @@ type ChatAttachmentMeta struct {
 	ContentType string `json:"content_type,omitempty"`
 }
 
-// CoalescedCommentData carries the full detail of a comment that was folded
-// into a not-yet-started run (MUL-4195) so the daemon can embed it directly in
-// the prompt. The earlier merge path only shipped comment IDs plus a
-// "they are in the triggering thread" hint, which is WRONG when the folded
-// comments span multiple threads (an issue's assignee can be triggered from
-// different threads). Shipping thread_id / author / created_at / content lets
-// the prompt address each folded comment without assuming a single thread or
-// relying on a `--recent N` window that may not cover them all. The mirror
-// struct on the daemon side lives in internal/daemon/types.go with the same
-// JSON field names.
-type CoalescedCommentData struct {
-	ID         string `json:"id"`
-	ThreadID   string `json:"thread_id,omitempty"`
-	AuthorType string `json:"author_type,omitempty"`
-	AuthorName string `json:"author_name,omitempty"`
-	Content    string `json:"content"`
-	CreatedAt  string `json:"created_at,omitempty"`
-}
 
 // TaskAgentData holds agent info included in claim responses so the daemon
 // can set up the execution environment (branch naming, skill files, instructions).
@@ -473,8 +450,6 @@ func taskToResponse(t db.AgentTaskQueue, workspaceID string) AgentTaskResponse {
 		IsLeaderTask:        t.IsLeaderTask,
 		CreatedAt:           timestampToString(t.CreatedAt),
 		TriggerCommentID:    uuidToPtr(t.TriggerCommentID),
-		CoalescedCommentIDs: uuidsToStrings(t.CoalescedCommentIds),
-		DeliveredCommentIDs: uuidStringsOrEmpty(t.DeliveredCommentIds),
 		TriggerSummary:      textToPtr(t.TriggerSummary),
 		HandoffNote:         handoffNote,
 		WorkDir:             workDir,
@@ -1071,20 +1046,18 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 // creation.
 func (h *Handler) sendAgentWelcomeChat(ctx context.Context, agent db.Agent, creatorID, workspaceID string) {
 	if !agent.RuntimeID.Valid {
-		return // no runtime → the agent can't run; skip the welcome
+		return
 	}
 	session, err := h.Queries.CreateChatSession(ctx, db.CreateChatSessionParams{
 		WorkspaceID:  parseUUID(workspaceID),
 		AgentID:      agent.ID,
 		CreatorID:    parseUUID(creatorID),
 		Title:        "👋 " + agent.Name,
-		IsAgentIntro: true,
 	})
 	if err != nil {
 		slog.Warn("agent welcome: create session failed", "agent_id", uuidToString(agent.ID), "error", err)
 		return
 	}
-
 	if _, err := h.TaskService.EnqueueChatTask(ctx, session, parseUUID(creatorID), false); err != nil {
 		slog.Warn("agent welcome: enqueue task failed", "chat_session_id", uuidToString(session.ID), "error", err)
 	}

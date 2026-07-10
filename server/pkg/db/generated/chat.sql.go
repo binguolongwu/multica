@@ -98,7 +98,7 @@ VALUES (
     COALESCE($6::boolean, FALSE),
     $7
 )
-RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id
+RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id, runtime_mcp_overlay, originator_user_id, runtime_connected_apps
 `
 
 type CreateChatTaskParams struct {
@@ -153,6 +153,9 @@ func (q *Queries) CreateChatTask(ctx context.Context, arg CreateChatTaskParams) 
 		&i.HandoffNote,
 		&i.PrepareLeaseExpiresAt,
 		&i.SquadID,
+		&i.RuntimeMcpOverlay,
+		&i.OriginatorUserID,
+		&i.RuntimeConnectedApps,
 	)
 	return i, err
 }

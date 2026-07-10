@@ -11,12 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveSquadsByArchivedAgentsOnRuntime = `-- name: ArchiveSquadsByArchivedAgentsOnRuntime :exec
+UPDATE squad
+SET archived_at = now(), archived_by = (
+    SELECT archived_by FROM agent WHERE agent.id = squad.leader_id
+)
+WHERE squad.leader_id IN (
+    SELECT agent.id FROM agent WHERE agent.runtime_id = $1 AND agent.archived_at IS NOT NULL
+)
+  AND squad.archived_at IS NULL
+`
+
+// Archives active squads whose leader_id references an archived agent on the
+// given runtime. This is needed when deleting a runtime that has active squads
+// led by archived agents - we need to archive them first before deleting.
+func (q *Queries) ArchiveSquadsByArchivedAgentsOnRuntime(ctx context.Context, runtimeID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, archiveSquadsByArchivedAgentsOnRuntime, runtimeID)
+	return err
+}
+
 const cancelAgentTasksByRuntimeOrAgent = `-- name: CancelAgentTasksByRuntimeOrAgent :many
 UPDATE agent_task_queue
 SET status = 'cancelled', completed_at = now()
 WHERE (runtime_id = ANY($1::uuid[]) OR agent_id = ANY($2::uuid[]))
   AND status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
-RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id
+RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id, runtime_mcp_overlay, originator_user_id, runtime_connected_apps
 `
 
 type CancelAgentTasksByRuntimeOrAgentParams struct {
@@ -78,6 +97,9 @@ func (q *Queries) CancelAgentTasksByRuntimeOrAgent(ctx context.Context, arg Canc
 			&i.HandoffNote,
 			&i.PrepareLeaseExpiresAt,
 			&i.SquadID,
+			&i.RuntimeMcpOverlay,
+			&i.OriginatorUserID,
+			&i.RuntimeConnectedApps,
 		); err != nil {
 			return nil, err
 		}
@@ -136,10 +158,10 @@ func (q *Queries) DeleteArchivedAgentsByRuntime(ctx context.Context, runtimeID p
 
 const deleteSquadsByArchivedAgentsOnRuntime = `-- name: DeleteSquadsByArchivedAgentsOnRuntime :exec
 DELETE FROM squad
-WHERE leader_id IN (
-    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+WHERE squad.leader_id IN (
+    SELECT agent.id FROM agent WHERE agent.runtime_id = $1 AND agent.archived_at IS NOT NULL
 )
-  AND archived_at IS NOT NULL
+  AND squad.archived_at IS NOT NULL
 `
 
 // Removes archived squads whose leader_id references an archived agent on the
@@ -149,25 +171,6 @@ WHERE leader_id IN (
 // returns a 409 until the caller archives them or assigns a new leader.
 func (q *Queries) DeleteSquadsByArchivedAgentsOnRuntime(ctx context.Context, runtimeID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteSquadsByArchivedAgentsOnRuntime, runtimeID)
-	return err
-}
-
-const archiveSquadsByArchivedAgentsOnRuntime = `-- name: ArchiveSquadsByArchivedAgentsOnRuntime :exec
-UPDATE squad
-SET archived_at = now(), archived_by = (
-    SELECT archived_by FROM agent WHERE id = squad.leader_id
-)
-WHERE leader_id IN (
-    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
-)
-  AND archived_at IS NULL
-`
-
-// Archives active squads whose leader_id references an archived agent on the
-// given runtime. This is needed when deleting a runtime that has active squads
-// led by archived agents - we need to archive them first before deleting.
-func (q *Queries) ArchiveSquadsByArchivedAgentsOnRuntime(ctx context.Context, runtimeID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, archiveSquadsByArchivedAgentsOnRuntime, runtimeID)
 	return err
 }
 
@@ -216,7 +219,7 @@ WHERE status IN ('dispatched', 'running', 'waiting_local_directory')
   AND runtime_id IN (
     SELECT id FROM agent_runtime WHERE status = 'offline'
   )
-RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id
+RETURNING id, agent_id, issue_id, status, priority, dispatched_at, started_at, completed_at, result, error, created_at, context, runtime_id, session_id, work_dir, trigger_comment_id, chat_session_id, autopilot_run_id, attempt, max_attempts, parent_task_id, failure_reason, trigger_summary, force_fresh_session, is_leader_task, wait_reason, initiator_user_id, handoff_note, prepare_lease_expires_at, squad_id, runtime_mcp_overlay, originator_user_id, runtime_connected_apps
 `
 
 // Marks dispatched/running/waiting_local_directory tasks as failed when
@@ -262,6 +265,9 @@ func (q *Queries) FailTasksForOfflineRuntimes(ctx context.Context) ([]AgentTaskQ
 			&i.HandoffNote,
 			&i.PrepareLeaseExpiresAt,
 			&i.SquadID,
+			&i.RuntimeMcpOverlay,
+			&i.OriginatorUserID,
+			&i.RuntimeConnectedApps,
 		); err != nil {
 			return nil, err
 		}
