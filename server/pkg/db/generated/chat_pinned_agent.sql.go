@@ -11,36 +11,111 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countPinnedAgents = `-- name: CountPinnedAgents :one
-SELECT COUNT(*) FROM chat_pinned_agent
-WHERE user_id = $1 AND workspace_id = $2
+const createChatPinnedAgent = `-- name: CreateChatPinnedAgent :one
+INSERT INTO chat_pinned_agent (workspace_id, user_id, agent_id, position)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (workspace_id, user_id, agent_id)
+DO UPDATE SET position = chat_pinned_agent.position
+RETURNING id, workspace_id, user_id, agent_id, position, created_at
 `
 
-type CountPinnedAgentsParams struct {
-	UserID      pgtype.UUID `json:"user_id"`
+type CreateChatPinnedAgentParams struct {
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	AgentID     pgtype.UUID `json:"agent_id"`
+	Position    float64     `json:"position"`
 }
 
-func (q *Queries) CountPinnedAgents(ctx context.Context, arg CountPinnedAgentsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPinnedAgents, arg.UserID, arg.WorkspaceID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
+// Idempotent: pinning an already-pinned agent is a no-op that returns the
+// existing row (DO UPDATE keeps `:one` from hitting a no-rows error).
+func (q *Queries) CreateChatPinnedAgent(ctx context.Context, arg CreateChatPinnedAgentParams) (ChatPinnedAgent, error) {
+	row := q.db.QueryRow(ctx, createChatPinnedAgent,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.AgentID,
+		arg.Position,
+	)
+	var i ChatPinnedAgent
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.UserID,
+		&i.AgentID,
+		&i.Position,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
-const listPinnedAgents = `-- name: ListPinnedAgents :many
-SELECT user_id, agent_id, workspace_id, sort_order, created_at FROM chat_pinned_agent
-WHERE user_id = $1 AND workspace_id = $2
-ORDER BY sort_order ASC
+const deleteChatPinnedAgent = `-- name: DeleteChatPinnedAgent :exec
+DELETE FROM chat_pinned_agent
+WHERE workspace_id = $1 AND user_id = $2 AND agent_id = $3
 `
 
-type ListPinnedAgentsParams struct {
-	UserID      pgtype.UUID `json:"user_id"`
+type DeleteChatPinnedAgentParams struct {
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	AgentID     pgtype.UUID `json:"agent_id"`
 }
 
-func (q *Queries) ListPinnedAgents(ctx context.Context, arg ListPinnedAgentsParams) ([]ChatPinnedAgent, error) {
-	rows, err := q.db.Query(ctx, listPinnedAgents, arg.UserID, arg.WorkspaceID)
+func (q *Queries) DeleteChatPinnedAgent(ctx context.Context, arg DeleteChatPinnedAgentParams) error {
+	_, err := q.db.Exec(ctx, deleteChatPinnedAgent, arg.WorkspaceID, arg.UserID, arg.AgentID)
+	return err
+}
+
+const deleteChatPinnedAgentsByArchivedRuntimeAgents = `-- name: DeleteChatPinnedAgentsByArchivedRuntimeAgents :exec
+DELETE FROM chat_pinned_agent
+WHERE agent_id IN (
+    SELECT id FROM agent WHERE runtime_id = $1 AND archived_at IS NOT NULL
+)
+`
+
+func (q *Queries) DeleteChatPinnedAgentsByArchivedRuntimeAgents(ctx context.Context, runtimeID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChatPinnedAgentsByArchivedRuntimeAgents, runtimeID)
+	return err
+}
+
+const deleteChatPinnedAgentsByWorkspace = `-- name: DeleteChatPinnedAgentsByWorkspace :exec
+DELETE FROM chat_pinned_agent
+WHERE workspace_id = $1
+`
+
+func (q *Queries) DeleteChatPinnedAgentsByWorkspace(ctx context.Context, workspaceID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChatPinnedAgentsByWorkspace, workspaceID)
+	return err
+}
+
+const getMaxChatPinnedAgentPosition = `-- name: GetMaxChatPinnedAgentPosition :one
+SELECT COALESCE(MAX(position), 0)::float8 AS max_position
+FROM chat_pinned_agent
+WHERE workspace_id = $1 AND user_id = $2
+`
+
+type GetMaxChatPinnedAgentPositionParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetMaxChatPinnedAgentPosition(ctx context.Context, arg GetMaxChatPinnedAgentPositionParams) (float64, error) {
+	row := q.db.QueryRow(ctx, getMaxChatPinnedAgentPosition, arg.WorkspaceID, arg.UserID)
+	var max_position float64
+	err := row.Scan(&max_position)
+	return max_position, err
+}
+
+const listChatPinnedAgents = `-- name: ListChatPinnedAgents :many
+SELECT id, workspace_id, user_id, agent_id, position, created_at FROM chat_pinned_agent
+WHERE workspace_id = $1 AND user_id = $2
+ORDER BY position ASC, created_at ASC
+`
+
+type ListChatPinnedAgentsParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) ListChatPinnedAgents(ctx context.Context, arg ListChatPinnedAgentsParams) ([]ChatPinnedAgent, error) {
+	rows, err := q.db.Query(ctx, listChatPinnedAgents, arg.WorkspaceID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,10 +124,11 @@ func (q *Queries) ListPinnedAgents(ctx context.Context, arg ListPinnedAgentsPara
 	for rows.Next() {
 		var i ChatPinnedAgent
 		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
 			&i.UserID,
 			&i.AgentID,
-			&i.WorkspaceID,
-			&i.SortOrder,
+			&i.Position,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -63,41 +139,4 @@ func (q *Queries) ListPinnedAgents(ctx context.Context, arg ListPinnedAgentsPara
 		return nil, err
 	}
 	return items, nil
-}
-
-const pinAgent = `-- name: PinAgent :exec
-INSERT INTO chat_pinned_agent (user_id, agent_id, workspace_id, sort_order)
-VALUES ($1, $2, $3, $4)
-`
-
-type PinAgentParams struct {
-	UserID      pgtype.UUID `json:"user_id"`
-	AgentID     pgtype.UUID `json:"agent_id"`
-	WorkspaceID pgtype.UUID `json:"workspace_id"`
-	SortOrder   int16       `json:"sort_order"`
-}
-
-func (q *Queries) PinAgent(ctx context.Context, arg PinAgentParams) error {
-	_, err := q.db.Exec(ctx, pinAgent,
-		arg.UserID,
-		arg.AgentID,
-		arg.WorkspaceID,
-		arg.SortOrder,
-	)
-	return err
-}
-
-const unpinAgent = `-- name: UnpinAgent :exec
-DELETE FROM chat_pinned_agent WHERE user_id = $1 AND agent_id = $2 AND workspace_id = $3
-`
-
-type UnpinAgentParams struct {
-	UserID      pgtype.UUID `json:"user_id"`
-	AgentID     pgtype.UUID `json:"agent_id"`
-	WorkspaceID pgtype.UUID `json:"workspace_id"`
-}
-
-func (q *Queries) UnpinAgent(ctx context.Context, arg UnpinAgentParams) error {
-	_, err := q.db.Exec(ctx, unpinAgent, arg.UserID, arg.AgentID, arg.WorkspaceID)
-	return err
 }

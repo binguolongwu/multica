@@ -22,7 +22,6 @@ function mk(id: string, status: Issue["status"], position: number): Issue {
     parent_issue_id: null,
     project_id: null,
     position,
-    stage: null,
     start_date: null,
     due_date: null,
     metadata: {},

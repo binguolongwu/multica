@@ -132,6 +132,10 @@ func ListModels(ctx context.Context, providerType, executablePath string) ([]Mod
 		return cachedDiscovery(providerType, func() ([]Model, error) {
 			return discoverQoderModels(ctx, executablePath)
 		})
+	case "traecli":
+		return cachedDiscovery(providerType, func() ([]Model, error) {
+			return discoverTraecliModels(ctx, executablePath)
+		})
 	case "opencode":
 		return cachedDiscovery(discoveryCacheKey(providerType, executablePath), func() ([]Model, error) {
 			return discoverOpenCodeModels(ctx, executablePath)
@@ -809,6 +813,16 @@ func discoverQoderModels(ctx context.Context, executablePath string) ([]Model, e
 		clientName:   "multica-model-discovery",
 		acpArgs:      []string{"--yolo", "--acp"},
 		tmpdirPrefix: "multica-qoder-discovery-",
+	})
+}
+
+// discoverTraecliModels spins up `traecli acp serve --yolo` and parses models from session/new.
+func discoverTraecliModels(ctx context.Context, executablePath string) ([]Model, error) {
+	return discoverACPModels(ctx, executablePath, acpDiscoveryProvider{
+		defaultBin:   "traecli",
+		clientName:   "multica-model-discovery",
+		acpArgs:      []string{"acp", "serve", "--yolo"},
+		tmpdirPrefix: "multica-traecli-discovery-",
 	})
 }
 

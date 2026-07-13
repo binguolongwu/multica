@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@multica/core/api";
-import type { LLMProviderEndpoint, APIType, CreateEndpointRequest } from "@multica/core/types";
+import type { LLMProviderEndpoint, APIType } from "@multica/core/types";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";

@@ -6,7 +6,7 @@ import { Edit, Plus, Trash2, Loader2, ChevronRight, RefreshCw, Search } from "lu
 import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { LLM_CAPABILITIES, CAPABILITY_LABELS } from "@multica/core/types";
-import type { LLMProvider, LLMModel, LLMModelCandidate, LLMProviderEndpoint } from "@multica/core/types";
+import type { LLMProvider, LLMModel, LLMModelCandidate } from "@multica/core/types";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Card, CardContent } from "@multica/ui/components/ui/card";

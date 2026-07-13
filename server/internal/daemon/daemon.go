@@ -2091,11 +2091,19 @@ func (d *Daemon) handleLocalSkillList(ctx context.Context, rt Runtime, requestID
 		})
 		return
 	}
+	mcpServers, mcpSupported, err := listRuntimeLocalMcpServers(rt.Provider)
+	if err != nil {
+		d.logger.Warn("runtime local MCP discovery failed", "runtime_id", rt.ID, "provider", rt.Provider, "error", err)
+		mcpServers = []runtimeLocalMcpServerSummary{}
+		mcpSupported = false
+	}
 
 	d.reportLocalSkillListResult(ctx, rt, requestID, map[string]any{
-		"status":    "completed",
-		"skills":    skills,
-		"supported": supported,
+		"status":        "completed",
+		"skills":        skills,
+		"supported":     supported,
+		"mcp_servers":   mcpServers,
+		"mcp_supported": mcpSupported,
 	})
 }
 
@@ -3157,9 +3165,27 @@ func gcMetaForTask(task Task) (execenv.GCMeta, bool) {
 	return meta, true
 }
 
+// runtimeDisplayNameOverrides maps a provider key to the human-facing runtime
+// name when simple title-casing would read awkwardly. Providers not listed
+// here fall back to capitalizing the key (claude → "Claude", codex → "Codex").
+var runtimeDisplayNameOverrides = map[string]string{
+	"traecli": "Trae",
+}
+
+// providerDisplayName returns the human-facing runtime name for a provider key.
+func providerDisplayName(name string) string {
+	if name == "" {
+		return name
+	}
+	if friendly, ok := runtimeDisplayNameOverrides[name]; ok {
+		return friendly
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
+}
+
 func providerNeedsInlineSystemPrompt(provider string) bool {
 	switch provider {
-	case "openclaw", "kiro", "kimi":
+	case "openclaw", "kiro", "kimi", "traecli":
 		return true
 	default:
 		return false
@@ -3497,8 +3523,18 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 	// loses the envRoot association the GC loop needs, and re-running
 	// Prepare against a stable user path is cheap (no clone, no copy).
 	var agentMcpConfig json.RawMessage
+	var effectiveMcpConfig json.RawMessage
 	if task.Agent != nil {
 		agentMcpConfig = task.Agent.McpConfig
+		effectiveMcpConfig = agentMcpConfig
+		if merged, mergeErr := mergeRuntimeAndAgentMcpConfig(provider, agentMcpConfig); mergeErr != nil {
+			taskLog.Warn("mcp_config: runtime merge failed; using agent configuration only",
+				"error", mergeErr,
+				"provider", provider,
+			)
+		} else {
+			effectiveMcpConfig = merged
+		}
 	}
 	// Decode openclaw-specific runtime_config knobs once so reuse / prepare /
 	// ExecOptions all see the same mode + gateway pin (issue #3260). Parse
@@ -3515,7 +3551,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 			Provider:        provider,
 			CodexVersion:    codexVersion,
 			OpenclawBin:     openclawBin,
-			McpConfig:       agentMcpConfig,
+			McpConfig:       effectiveMcpConfig,
 			OpenclawGateway: openclawGateway,
 			Task:            taskCtx,
 		}, d.logger)
@@ -3530,7 +3566,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 			Provider:        provider,
 			CodexVersion:    codexVersion,
 			OpenclawBin:     openclawBin,
-			McpConfig:       agentMcpConfig,
+			McpConfig:       effectiveMcpConfig,
 			OpenclawGateway: openclawGateway,
 			Task:            taskCtx,
 		}
@@ -3729,7 +3765,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 	var mcpConfig json.RawMessage
 	if task.Agent != nil {
 		customArgs = task.Agent.CustomArgs
-		mcpConfig = task.Agent.McpConfig
+		mcpConfig = effectiveMcpConfig
 	}
 	// Two-tier model resolution: an explicit agent.model wins,
 	// then the daemon-wide MULTICA_<PROVIDER>_MODEL env var. If

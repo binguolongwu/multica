@@ -75,7 +75,7 @@ func TestRedisLocalSkillListStore_CreateGetComplete(t *testing.T) {
 			FileCount:   2,
 		},
 	}
-	if err := store.Complete(ctx, req.ID, skills, true); err != nil {
+	if err := store.Complete(ctx, req.ID, skills, true, nil, false); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
 

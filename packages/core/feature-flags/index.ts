@@ -14,6 +14,7 @@ export type {
   Rule,
 } from "./types";
 
+export { COMPOSIO_MCP_APPS_FLAG } from "./keys";
 export { FeatureFlagService } from "./service";
 export { StaticProvider } from "./static-provider";
 export { ChainProvider } from "./chain-provider";

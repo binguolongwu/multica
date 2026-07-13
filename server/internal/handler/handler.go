@@ -24,7 +24,9 @@ import (
 	composio "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/oss"
+	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	"github.com/multica-ai/multica/server/internal/integrations/wiki"
+	"github.com/multica-ai/multica/server/pkg/llm"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
 	"github.com/multica-ai/multica/server/internal/realtime"
@@ -181,7 +183,23 @@ type Handler struct {
 	// the composio HTTP handlers return 503 in that case. Wired in
 	// cmd/server/router.go.
 	Composio *composio.Service
-	cfg      Config
+	// LLM* configure the basic LLM API layer (MUL-4238). They back the
+	// server-internal LLM helpers in pkg/llm (e.g. chat title generation).
+	// When both LLMAPIKey and LLMBaseURL are empty the layer is disabled
+	// and callers fall back silently.
+	LLMAPIKey       string
+	LLMBaseURL      string
+	LLMDefaultModel string
+	LLM             *llm.Client
+	// SlackHistory backs the agent-facing `multica chat history` command.
+	// Nil unless Slack is configured; GetChatChannelHistory then reports
+	// "no channel integration".
+	SlackHistory ChatChannelHistoryReader
+	// SlackInstall manages Slack BYO installations (register, list, revoke).
+	SlackInstall *slack.InstallService
+	// SlackBindingTokens mints and redeems Slack user-identity binding tokens.
+	SlackBindingTokens *slack.BindingTokenService
+	cfg                Config
 }
 
 func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *events.Bus, emailService *service.EmailService, store storage.Storage, cfSigner *auth.CloudFrontSigner, analyticsClient analytics.Client, cfg Config, daemonHubs ...*daemonws.Hub) *Handler {

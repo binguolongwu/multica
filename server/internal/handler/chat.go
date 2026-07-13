@@ -119,10 +119,11 @@ func (h *Handler) ListChatSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ListChatSessionsByCreatorWithUnread returns sessions across all
-	// workspaces keyed by creator_id.  Filter by workspace in Go so the
-	// SQL query stays simple and reusable.
-	rows, err := h.Queries.ListChatSessionsByCreatorWithUnread(r.Context(), parseUUID(userID))
+	wsUUID := parseUUID(workspaceID)
+	rows, err := h.Queries.ListChatSessionsByCreator(r.Context(), db.ListChatSessionsByCreatorParams{
+		WorkspaceID: wsUUID,
+		CreatorID:   parseUUID(userID),
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list chat sessions")
 		return
@@ -130,27 +131,22 @@ func (h *Handler) ListChatSessions(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]ChatSessionResponse, 0, len(rows))
 	for _, s := range rows {
-		if uuidToString(s.WorkspaceID) != workspaceID {
-			continue
-		}
 		if _, ok := allowed[uuidToString(s.AgentID)]; !ok {
 			continue
 		}
 		resp = append(resp, ChatSessionResponse{
-			ID:             uuidToString(s.ID),
-			WorkspaceID:    uuidToString(s.WorkspaceID),
-			AgentID:        uuidToString(s.AgentID),
-			CreatorID:      uuidToString(s.CreatorID),
-			Title:          s.Title,
-			Status:         s.Status,
-			HasUnread:      s.UnreadSince.Valid,
-			UnreadCount:    int(s.UnreadCount),
-			AgentName:      s.AgentName,
-			AgentAvatarURL: textToPtr(s.AgentAvatarUrl),
-			AgentStatus:    s.AgentStatus,
-			IsPinned:       s.IsPinned,
-			CreatedAt:      timestampToString(s.CreatedAt),
-			UpdatedAt:      timestampToString(s.UpdatedAt),
+			ID:          uuidToString(s.ID),
+			WorkspaceID: uuidToString(s.WorkspaceID),
+			AgentID:     uuidToString(s.AgentID),
+			CreatorID:   uuidToString(s.CreatorID),
+			Title:       s.Title,
+			Status:      s.Status,
+			HasUnread:   s.UnreadCount > 0,
+			UnreadCount: int(s.UnreadCount),
+			LastMessage: buildChatLastMessage(s.LastMessageAt, s.LastMessageContent, s.LastMessageRole, s.LastMessageFailureReason, s.LastMessageKind),
+			Pinned:      s.PinnedAt.Valid,
+			CreatedAt:   timestampToString(s.CreatedAt),
+			UpdatedAt:   timestampToString(s.UpdatedAt),
 		})
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -739,7 +735,7 @@ func (h *Handler) MarkChatSessionRead(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) ToggleSessionPin(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SetChatSessionPinned(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
 		return
@@ -747,18 +743,119 @@ func (h *Handler) ToggleSessionPin(w http.ResponseWriter, r *http.Request) {
 	workspaceID := ctxWorkspaceID(r.Context())
 	sessionIDStr := chi.URLParam(r, "sessionId")
 
+	var req struct {
+		Pinned bool `json:"pinned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
 	session, ok := h.gateChatSessionForUser(w, r, userID, workspaceID, sessionIDStr)
 	if !ok {
 		return
 	}
 
-	err := h.Queries.ToggleSessionPin(r.Context(), session.ID)
+	updated, err := h.Queries.SetChatSessionPinned(r.Context(), db.SetChatSessionPinnedParams{
+		ID:     session.ID,
+		Pinned: req.Pinned,
+	})
 	if err != nil {
-		slog.Warn("chat: failed to toggle session pin", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to toggle session pin")
+		slog.Warn("chat: failed to set session pin", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to set session pin")
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+
+	// Broadcast so other tabs update the pinned state in their caches.
+	pinned := req.Pinned
+	h.publishChat(protocol.EventChatSessionUpdated, workspaceID, "member", userID, uuidToString(session.ID), protocol.ChatSessionUpdatedPayload{
+		ChatSessionID: uuidToString(session.ID),
+		Pinned:        &pinned,
+		UpdatedAt:     timestampToString(updated.UpdatedAt),
+	})
+
+	writeJSON(w, http.StatusOK, chatSessionToResponse(updated))
+}
+
+func (h *Handler) SetChatSessionArchived(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	sessionIDStr := chi.URLParam(r, "sessionId")
+
+	var req struct {
+		Archived bool `json:"archived"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	session, ok := h.gateChatSessionForUser(w, r, userID, workspaceID, sessionIDStr)
+	if !ok {
+		return
+	}
+
+	updated, err := h.Queries.SetChatSessionArchived(r.Context(), db.SetChatSessionArchivedParams{
+		ID:       session.ID,
+		Archived: req.Archived,
+	})
+	if err != nil {
+		slog.Warn("chat: failed to set session archived", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to set session archived")
+		return
+	}
+
+	status := updated.Status
+	h.publishChat(protocol.EventChatSessionUpdated, workspaceID, "member", userID, uuidToString(session.ID), protocol.ChatSessionUpdatedPayload{
+		ChatSessionID: uuidToString(session.ID),
+		Status:        &status,
+		UpdatedAt:     timestampToString(updated.UpdatedAt),
+	})
+
+	writeJSON(w, http.StatusOK, chatSessionToResponse(updated))
+}
+
+func (h *Handler) HasPendingChatTasks(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+
+	member, ok := h.workspaceMember(w, r, workspaceID)
+	if !ok {
+		return
+	}
+	actorType, actorID := h.resolveActor(r, userID, workspaceID)
+	allowed, ok := h.accessibleAgentIDs(r.Context(), workspaceID, actorType, actorID, member.Role)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "failed to resolve agent access")
+		return
+	}
+	if len(allowed) == 0 {
+		writeJSON(w, http.StatusOK, map[string]bool{"has_pending": false})
+		return
+	}
+
+	agentUUIDs := make([]pgtype.UUID, 0, len(allowed))
+	for id := range allowed {
+		agentUUIDs = append(agentUUIDs, parseUUID(id))
+	}
+	has, err := h.Queries.HasPendingChatTasksByCreator(r.Context(), db.HasPendingChatTasksByCreatorParams{
+		WorkspaceID: parseUUID(workspaceID),
+		CreatorID:   parseUUID(userID),
+		AgentIds:    agentUUIDs,
+	})
+	if err != nil {
+		slog.Warn("chat: failed to check pending tasks", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to check pending tasks")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"has_pending": has})
 }
 
 // PendingChatTasksResponse is the aggregate view consumed by the FAB.
@@ -1001,16 +1098,22 @@ type ChatSessionResponse struct {
 	CreatorID   string `json:"creator_id"`
 	Title       string `json:"title"`
 	Status      string `json:"status"`
-	// Only populated by list endpoints — single-session fetches return false.
-	HasUnread    bool    `json:"has_unread"`
-	LastReadAt   *string `json:"last_read_at"`
-	UnreadCount  int     `json:"unread_count"`
-	AgentName    string  `json:"agent_name"`
-	AgentAvatarURL *string `json:"agent_avatar_url"`
-	AgentStatus  string  `json:"agent_status"`
-	IsPinned     bool    `json:"is_pinned"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	// Only populated by list endpoints — single-session fetches return 0/false/nil.
+	HasUnread   bool             `json:"has_unread"`
+	UnreadCount int              `json:"unread_count"`
+	LastMessage *ChatLastMessage `json:"last_message"`
+	Pinned      bool             `json:"pinned"`
+	CreatedAt   string           `json:"created_at"`
+	UpdatedAt   string           `json:"updated_at"`
+}
+
+// ChatLastMessage is a preview of a session's most recent message.
+type ChatLastMessage struct {
+	Content       string  `json:"content"`
+	Role          string  `json:"role"`
+	CreatedAt     string  `json:"created_at"`
+	FailureReason *string `json:"failure_reason"`
+	MessageKind   string  `json:"message_kind"`
 }
 
 type ChatMessageResponse struct {
@@ -1026,6 +1129,8 @@ type ChatMessageResponse struct {
 	// ElapsedMs is the wall-clock duration from task creation to terminal
 	// state. Drives "Replied in 38s" / "Failed after 12s" captions.
 	ElapsedMs *int64 `json:"elapsed_ms"`
+	// MessageKind is 'message' (default) or 'no_response'.
+	MessageKind string `json:"message_kind"`
 	// Attachments linked to this message via chat_message_id. The chat
 	// bubble renders file cards from these, and the daemon claim path
 	// (daemon.go) pulls structured metadata from the same source so the
@@ -1042,9 +1147,33 @@ func chatSessionToResponse(s db.ChatSession) ChatSessionResponse {
 		CreatorID:   uuidToString(s.CreatorID),
 		Title:       s.Title,
 		Status:      s.Status,
-		IsPinned:    s.IsPinned,
+		Pinned:      s.PinnedAt.Valid,
 		CreatedAt:   timestampToString(s.CreatedAt),
 		UpdatedAt:   timestampToString(s.UpdatedAt),
+	}
+}
+
+// buildChatLastMessage assembles the last-message preview from list-row columns.
+func buildChatLastMessage(at pgtype.Timestamptz, content, role string, failure pgtype.Text, kind string) *ChatLastMessage {
+	if !at.Valid {
+		return nil
+	}
+	return &ChatLastMessage{
+		Content:       content,
+		Role:          role,
+		CreatedAt:     timestampToString(at),
+		FailureReason: textToPtr(failure),
+		MessageKind:   normalizeMessageKind(kind),
+	}
+}
+
+// normalizeMessageKind maps stored message_kind to API value.
+func normalizeMessageKind(kind string) string {
+	switch kind {
+	case protocol.ChatMessageKindNoResponse:
+		return protocol.ChatMessageKindNoResponse
+	default:
+		return protocol.ChatMessageKindMessage
 	}
 }
 

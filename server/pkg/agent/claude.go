@@ -39,7 +39,7 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 	// instead of inheriting from the outer Claude Code session.
 	var mcpConfigPath string
 	var mcpFileCleanup func() // non-nil while this function owns the temp file
-	if len(opts.McpConfig) > 0 {
+	if hasManagedMcpConfig(opts.McpConfig) {
 		path, err := writeMcpConfigToTemp(opts.McpConfig)
 		if err != nil {
 			cancel()

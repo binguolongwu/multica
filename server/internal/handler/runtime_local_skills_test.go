@@ -137,7 +137,7 @@ func TestInMemoryLocalSkillListStore_PreservesSummaries(t *testing.T) {
 		t.Fatalf("unmarshal report body: %v", err)
 	}
 
-	if err := store.Complete(ctx, req.ID, parsed.Skills, true); err != nil {
+	if err := store.Complete(ctx, req.ID, parsed.Skills, true, nil, false); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
 	got, err := store.Get(ctx, req.ID)

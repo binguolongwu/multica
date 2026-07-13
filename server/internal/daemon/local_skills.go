@@ -132,6 +132,15 @@ func localSkillRootsForProvider(provider string) ([]localSkillRoot, bool, error)
 		// agy inherits Gemini CLI's global skill root; see
 		// https://antigravity.google/docs/gcli-migration ("Global skills").
 		providerRoot = filepath.Join(home, ".gemini", "antigravity-cli", "skills")
+	case "qoder":
+		// Qoder CLI global skills live in ~/.qoder/skills.
+		providerRoot = filepath.Join(home, ".qoder", "skills")
+	case "traecli":
+		// Official TRAE CLI global skills live in ~/.traecli/skills.
+		// See https://docs.trae.cn/cli_skills
+		providerRoot = filepath.Join(home, ".traecli", "skills")
+	case "zeroclaw":
+		providerRoot = filepath.Join(home, ".zeroclaw", "skills")
 	default:
 		return nil, false, nil
 	}

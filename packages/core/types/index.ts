@@ -84,7 +84,10 @@ export type {
   SendChatMessageResponse,
   CancelledChatMessage,
   CancelTaskResponse,
-  PinnedAgent,
+  ChatPinnedAgent,
+  ChatMessageKind,
+  ChatLastMessage,
+  HasPendingChatTasksResponse,
   ChatMode,
 } from "./chat";
 export type { StorageAdapter } from "./storage";
@@ -122,6 +125,12 @@ export type {
   LarkInstallStatusResponse,
   RedeemLarkBindingTokenResponse,
 } from "./lark";
+export type {
+  SlackInstallation,
+  ListSlackInstallationsResponse,
+  RegisterSlackBYORequest,
+  RedeemSlackBindingTokenResponse,
+} from "./slack";
 export type {
   WikiSpace,
   WikiPage,
@@ -209,3 +218,4 @@ export type {
 
 export type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry, LLMModelCandidate, LLMCapability } from "./llm";
 export { LLM_CAPABILITIES, CAPABILITY_LABELS } from "./llm";
+export type { ComposioToolkit, ComposioConnection, ComposioConnectInitResponse } from "./composio";

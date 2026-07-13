@@ -134,4 +134,8 @@ const (
 	// deleting the row; the audit trail is preserved.
 	EventLarkInstallationCreated = "lark_installation:created"
 	EventLarkInstallationRevoked = "lark_installation:revoked"
+
+	// Slack installation lifecycle events
+	EventSlackInstallationCreated = "slack_installation:created"
+	EventSlackInstallationRevoked = "slack_installation:revoked"
 )

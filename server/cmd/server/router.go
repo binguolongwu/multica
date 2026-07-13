@@ -29,6 +29,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	composiointeg "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
+	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	"github.com/multica-ai/multica/server/internal/integrations/oss"
 "github.com/multica-ai/multica/server/internal/integrations/wiki"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
@@ -181,6 +182,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	h := handler.New(queries, pool, hub, bus, emailSvc, store, cfSigner, analyticsClient, signupConfig, daemonHub)
 	h.Metrics = opts.BusinessMetrics
 	if opts.FeatureFlags != nil {
+		h.FeatureFlags = opts.FeatureFlags
 		h.DaemonFeatureFlags = featureflagdispatch.NewEvaluator(opts.FeatureFlags)
 	}
 	h.TaskService.Metrics = opts.BusinessMetrics
@@ -413,6 +415,61 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		}
 	} else {
 		slog.Info("lark integration disabled (MULTICA_LARK_SECRET_KEY not set)")
+	}
+
+	// Slack integration. BYO model: each Multica agent gets its own Slack app
+	// with its own bot token (xoxb-) and app-level token (xapp-). Per-installation
+	// Socket Mode connection is driven by the channel engine Supervisor.
+	//
+	// Gated by MULTICA_SLACK_SECRET_KEY which decrypts the per-installation bot
+	// token stored on the channel_installation row. Without it there is no Slack
+	// at all — list, install, inbound, and outbound are all gracefully disabled.
+	if slackKey, err := secretbox.LoadKey("MULTICA_SLACK_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(slackKey)
+		if err != nil {
+			slog.Error("slack: secretbox.New failed; slack integration disabled", "error", err)
+		} else {
+			slackBindingSvc := slack.NewBindingTokenService(queries, pool)
+			h.SlackBindingTokens = slackBindingSvc
+			slackReplier := slack.NewOutboundReplier(slack.OutboundReplierConfig{
+				Binding: slackBindingSvc,
+				Decrypt: box.Open,
+				AppURL:  appURLFromEnv(),
+				Logger:  slog.Default(),
+			})
+
+			// Typing indicator: eyes reaction lifecycle
+			slackTyping := slack.NewTypingIndicatorManager(queries, box.Open, slog.Default())
+			slackTyping.Register(bus)
+			channelRouter.Register(slack.TypeSlack, slack.NewSlackResolverSet(queries, pool, slackReplier, slackTyping))
+			slack.NewOutbound(queries, box.Open, slog.Default()).Register(bus)
+
+			// On-demand history for `multica chat history` command
+			h.SlackHistory = slack.NewHistory(queries, box.Open, slog.Default())
+
+			// `/issue` slash command
+			slackSlash := slack.NewSlashCommandProcessor(slack.SlashCommandConfig{
+				Queries: queries,
+				Tasks:   h.TaskService,
+				Binding: slackBindingSvc,
+				AppURL:  appURLFromEnv(),
+				Logger:  slog.Default(),
+			})
+
+			// Per-installation Socket Mode factory
+			slack.RegisterSlack(channelRegistry, slack.ChannelDeps{Decrypt: box.Open, Logger: slog.Default(), Slash: slackSlash})
+
+			// BYO self-serve install
+			installSvc, ierr := slack.NewInstallService(queries, pool, box, slog.Default())
+			if ierr != nil {
+				slog.Error("slack: InstallService init failed; install disabled", "error", ierr)
+			} else {
+				h.SlackInstall = installSvc
+			}
+			slog.Info("slack integration enabled (BYO per-installation socket mode)")
+		}
+	} else {
+		slog.Info("slack integration disabled (MULTICA_SLACK_SECRET_KEY not set)")
 	}
 
 	// Composio integration (MUL-3720). Gated by COMPOSIO_API_KEY plus the
@@ -764,10 +821,6 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// LLM providers and models (workspace-scoped).
 					r.Get("/llm-providers", h.ListLLMProviders)
 					r.Get("/llm-providers/{providerId}/models", h.ListLLMModels)
-					// Chat pinned agents (member-level).
-					r.Get("/chat/pinned-agents", h.ListPinnedAgents)
-					r.Post("/chat/pinned-agents", h.PinAgent)
-					r.Delete("/chat/pinned-agents/{agentId}", h.UnpinAgent)
 				})
 				// Admin-level access
 				r.Group(func(r chi.Router) {
@@ -837,6 +890,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/lark/install/begin", h.BeginLarkInstall)
 					r.Get("/lark/install/{sessionId}/status", h.GetLarkInstallStatus)
 
+				// Slack integration. Same admin/member split as Lark:
+				// listing is member-visible; BYO register + revoke are admin-only.
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceMemberFromURL(queries, "id"))
+					r.Get("/slack/installations", h.ListSlackInstallations)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner", "admin"))
+					r.Delete("/slack/installations/{installationId}", h.RevokeSlackInstallation)
+					r.Post("/slack/install/byo", h.RegisterSlackBYO)
+				})
+
 				// Wiki knowledge base
 				r.Route("/wiki", func(r chi.Router) {
 					r.Get("/spaces", h.ListWikiSpaces)
@@ -872,6 +937,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		// the token only proves "this open_id requested binding," and
 		// is combined with the logged-in user to create the mapping.
 		r.Post("/api/lark/binding/redeem", h.RedeemLarkBindingToken)
+		// Slack binding-token redemption. Same rationale as Lark: NOT
+		// workspace-scoped because the redeemer hits this before they have any
+		// workspace context.
+		r.Post("/api/slack/binding/redeem", h.RedeemSlackBindingToken)
 
 		// User-scoped invitation routes (no workspace context required)
 		r.Get("/api/invitations", h.ListMyInvitations)
@@ -1230,16 +1299,29 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Route("/{sessionId}", func(r chi.Router) {
 					r.Get("/", h.GetChatSession)
 					r.Patch("/", h.UpdateChatSession)
+					r.Patch("/pin", h.SetChatSessionPinned)
+					r.Patch("/archive", h.SetChatSessionArchived)
 					r.Delete("/", h.DeleteChatSession)
 					r.Post("/messages", h.SendChatMessage)
 					r.Get("/messages", h.ListChatMessages)
 					r.Get("/messages/page", h.ListChatMessagesPage)
 					r.Get("/pending-task", h.GetPendingChatTask)
 					r.Post("/read", h.MarkChatSessionRead)
-					r.Patch("/pin", h.ToggleSessionPin)
 				})
 			})
 			r.Get("/api/chat/pending-tasks", h.ListPendingChatTasks)
+			r.Get("/api/chat/pending-tasks/has-any", h.HasPendingChatTasks)
+
+			// Quick-agent bar: per-user pinned agents for one-tap new chats.
+			r.Get("/api/chat/pinned-agents", h.ListChatPinnedAgents)
+			r.Post("/api/chat/pinned-agents", h.PinChatAgent)
+			r.Delete("/api/chat/pinned-agents/{agentId}", h.UnpinChatAgent)
+
+			// Agent-facing channel reads (MUL-3871). The caller's task-scoped token
+			// resolves to its own chat session; no session/channel id is passed, so
+			// an agent can only read its own conversation.
+			r.Get("/api/chat/history", h.GetChatChannelHistory)
+			r.Get("/api/chat/thread", h.GetChatThread)
 
 			// Wiki knowledge base — header-based workspace resolution
 			// so CLI (multica wiki read-page/write-page/list-pages/search)

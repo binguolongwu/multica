@@ -1,10 +1,2 @@
-export { ChatFab } from "./components/chat-fab";
-export { ChatWindow } from "./components/chat-window";
-export { FloatingChat } from "./floating-chat";
 export { ChatPage } from "./chat-page";
-export { ChatThreadList } from "./components/chat-thread-list";
-export { ChatSessionHeader } from "./components/chat-session-header";
-export { ChatEmptyState } from "./components/chat-empty-state";
-export { NewChatButton } from "./components/new-chat-button";
-export { ArchivedAgentBanner } from "./components/archived-agent-banner";
-export { QuickAgentBar } from "./components/quick-agent-bar";
+export { FloatingChat } from "./floating-chat";

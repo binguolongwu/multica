@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/multica-ai/multica/server/internal/analytics"
+	"github.com/multica-ai/multica/server/internal/featureflags"
 )
 
 type AppConfig struct {
@@ -44,6 +46,11 @@ type AppConfig struct {
 	PosthogKey           string `json:"posthog_key"`
 	PosthogHost          string `json:"posthog_host"`
 	AnalyticsEnvironment string `json:"analytics_environment"`
+
+	// FeatureFlags are the current server-side feature flag decisions for
+	// flags the frontend is allowed to see. Omitted when the server has no
+	// feature flag service configured.
+	FeatureFlags map[string]bool `json:"feature_flags,omitempty"`
 }
 
 // GetConfig is mounted on the public (unauthenticated) route group because
@@ -71,6 +78,10 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		if config.PosthogHost == "" && config.PosthogKey != "" {
 			config.PosthogHost = "https://us.i.posthog.com"
 		}
+	}
+
+	if h.FeatureFlags != nil {
+		config.FeatureFlags = featureflags.EvaluateFrontendPublicFlags(context.Background(), h.FeatureFlags)
 	}
 
 	writeJSON(w, http.StatusOK, config)

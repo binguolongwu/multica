@@ -139,7 +139,7 @@ type Config struct {
 }
 
 // New creates a Backend for the given agent type.
-// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder".
+// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder", "traecli".
 //
 // SupportedTypes is the canonical whitelist of agent types eligible to back a
 // custom runtime profile. It MUST stay in lockstep with the
@@ -160,6 +160,8 @@ var SupportedTypes = []string{
 	"kimi",
 	"kiro",
 	"antigravity",
+	"qoder",
+	"traecli",
 	"zeroclaw",
 }
 
@@ -207,10 +209,12 @@ func New(agentType string, cfg Config) (Backend, error) {
 		return &antigravityBackend{cfg: cfg}, nil
 	case "zeroclaw":
 		return &zeroclawBackend{cfg: cfg}, nil
+	case "traecli":
+		return &traecliBackend{cfg: cfg}, nil
 	case "qoder":
 		return &qoderBackend{cfg: cfg}, nil
 	default:
-		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder)", agentType)
+		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder, traecli)", agentType)
 	}
 }
 
@@ -239,6 +243,7 @@ var launchHeaders = map[string]string{
 	"opencode":    "opencode run (json)",
 	"pi":          "pi (json mode)",
 	"qoder":       "qodercli --acp",
+	"traecli":     "traecli acp serve",
 	"zeroclaw":    "zeroclaw acp",
 }
 

@@ -131,6 +131,7 @@ func (f *fakeTyping) OnIngested(_ context.Context, _ ResolvedInstallation, _ cha
 	defer f.mu.Unlock()
 	f.count++
 }
+func (f *fakeTyping) OnSettled(_ context.Context, _ pgtype.UUID) {}
 func (f *fakeTyping) calls() int { f.mu.Lock(); defer f.mu.Unlock(); return f.count }
 
 type fakeIssues struct {

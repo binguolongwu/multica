@@ -354,8 +354,10 @@ func (r *Router) flushChatRun(set ResolverSet, inst ResolvedInstallation, msg ch
 		switch {
 		case errors.Is(err, service.ErrChatTaskAgentNoRuntime):
 			r.emitFlushReply(ctx, set, inst, msg, sessionID, OutcomeAgentOffline)
+			r.clearTyping(ctx, set, sessionID)
 		case errors.Is(err, service.ErrChatTaskAgentArchived):
 			r.emitFlushReply(ctx, set, inst, msg, sessionID, OutcomeAgentArchived)
+			r.clearTyping(ctx, set, sessionID)
 		default:
 			r.logger.Error("channel router: flush enqueue chat task failed",
 				"chat_session_id", uuidString(sessionID), "err", err.Error())
@@ -375,6 +377,16 @@ func (r *Router) takePendingFresh(key string, fallback bool) bool {
 	fresh := fallback || r.pendingFresh[key]
 	delete(r.pendingFresh, key)
 	return fresh
+}
+
+// clearTyping asks the platform to drop the "processing" indicator for a session
+// whose debounced run trigger produced no task. The platform's own bus-driven clear
+// (on chat-done / task-failed) would never fire, so without this the indicator
+// would stick forever. Idempotent — nil Typing is a no-op.
+func (r *Router) clearTyping(ctx context.Context, set ResolverSet, sessionID pgtype.UUID) {
+	if set.Typing != nil {
+		set.Typing.OnSettled(ctx, sessionID)
+	}
 }
 
 // emitFlushReply delivers an offline/archived notice for a flushed run.

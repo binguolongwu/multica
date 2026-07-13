@@ -467,6 +467,18 @@ func (s *Supervisor) supervise(ctx context.Context, inst Installation, id string
 			continue
 		}
 
+		// Skip installations whose channel type has no registered factory
+		// (e.g. Slack rows when Slack is not enabled). Without this guard
+		// the Supervisor would churn the lease and log forever.
+		if _, ok := s.registry.Lookup(inst.ChannelType); !ok {
+			s.releaseLease(inst.ID, leaseTok)
+			if sleep(ctx, backoff) {
+				return
+			}
+			backoff = nextBackoff(backoff, s.cfg.MaxBackoff)
+			continue
+		}
+
 		// Lease acquired. Build the platform channel via the registry,
 		// run it under a child context, and renew the lease in parallel.
 		ch, err := s.registry.Build(channel.Config{

@@ -41,6 +41,7 @@ export interface AppConfigResponse {
   daemon_server_url?: string;
   daemon_app_url?: string;
   workspace_creation_disabled?: boolean;
+  feature_flags?: Record<string, boolean>;
 }
 
 // ---------------------------------------------------------------------------

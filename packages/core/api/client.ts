@@ -68,7 +68,8 @@ import type {
   TaskMessagePayload,
   Attachment,
   ChatSession,
-  PinnedAgent,
+  ChatPinnedAgent,
+  HasPendingChatTasksResponse,
   ChatMessage,
   ChatMessagesPage,
   ChatPendingTask,
@@ -114,6 +115,10 @@ import type {
   BeginLarkInstallResponse,
   LarkInstallStatusResponse,
   RedeemLarkBindingTokenResponse,
+  SlackInstallation,
+  ListSlackInstallationsResponse,
+  RegisterSlackBYORequest,
+  RedeemSlackBindingTokenResponse,
   WikiSpace,
   WikiPage,
   WikiPageDetail,
@@ -143,6 +148,7 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
+import type { ComposioToolkit, ComposioConnection, ComposioConnectInitResponse } from "../types/composio";
 import type { LLMProvider, LLMProviderTemplate, LLMModel, LLMModelCatalogEntry, LLMModelCandidate, LLMProviderEndpoint, RuntimeProtocolMapEntry, CreateEndpointRequest } from "../types/llm";
 import type { OssProviderConfig, OssObject, OssObjectWithUrl, CreateOssConfigRequest, UpdateOssConfigRequest } from "../types/oss";
 import type { OnboardingCompletionPath } from "../onboarding/types";
@@ -1915,23 +1921,37 @@ export class ApiClient {
     await this.fetch(`/api/chat/sessions/${sessionId}/read`, { method: "POST" });
   }
 
-  async listPinnedAgents(): Promise<PinnedAgent[]> {
-    return this.fetch(`/api/chat/pinned-agents`);
+  async listChatPinnedAgents(): Promise<ChatPinnedAgent[]> {
+    return this.fetch("/api/chat/pinned-agents");
   }
 
-  async pinAgent(data: { agent_id: string; sort_order?: number }): Promise<void> {
-    await this.fetch(`/api/chat/pinned-agents`, {
+  async pinChatAgent(agentId: string): Promise<ChatPinnedAgent> {
+    return this.fetch("/api/chat/pinned-agents", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ agent_id: agentId }),
     });
   }
 
-  async unpinAgent(agentId: string): Promise<void> {
+  async unpinChatAgent(agentId: string): Promise<void> {
     await this.fetch(`/api/chat/pinned-agents/${agentId}`, { method: "DELETE" });
   }
 
-  async toggleSessionPin(sessionId: string): Promise<void> {
-    await this.fetch(`/api/chat/sessions/${sessionId}/pin`, { method: "PATCH" });
+  async setChatSessionPinned(id: string, pinned: boolean): Promise<ChatSession> {
+    return this.fetch(`/api/chat/sessions/${id}/pin`, {
+      method: "PATCH",
+      body: JSON.stringify({ pinned }),
+    });
+  }
+
+  async setChatSessionArchived(id: string, archived: boolean): Promise<ChatSession> {
+    return this.fetch(`/api/chat/sessions/${id}/archive`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+    });
+  }
+
+  async hasAnyPendingChatTasks(): Promise<HasPendingChatTasksResponse> {
+    return this.fetch("/api/chat/pending-tasks/has-any");
   }
 
   async cancelTaskById(taskId: string): Promise<CancelTaskResponse> {
@@ -2381,6 +2401,68 @@ export class ApiClient {
     return this.fetch(`/api/lark/binding/redeem`, {
       method: "POST",
       body: JSON.stringify({ token }),
+    });
+  }
+
+  // Slack integration
+  async listSlackInstallations(workspaceId: string): Promise<ListSlackInstallationsResponse> {
+    return this.fetch(`/api/workspaces/${workspaceId}/slack/installations`);
+  }
+
+  async registerSlackBYO(
+    workspaceId: string,
+    agentId: string,
+    body: RegisterSlackBYORequest,
+  ): Promise<SlackInstallation> {
+    const search = new URLSearchParams({ agent_id: agentId });
+    return this.fetch(`/api/workspaces/${workspaceId}/slack/install/byo?${search.toString()}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteSlackInstallation(workspaceId: string, installationId: string): Promise<void> {
+    await this.fetch(`/api/workspaces/${workspaceId}/slack/installations/${installationId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async redeemSlackBindingToken(token: string): Promise<RedeemSlackBindingTokenResponse> {
+    return this.fetch(`/api/slack/binding/redeem`, {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  // Composio integration (MUL-3720). All routes are user-scoped (a connection
+  // belongs to a user, not a workspace), so none take a workspaceId.
+
+  /** The project's connectable Composio toolkits (those with an enabled auth
+   * config). Since MUL-4009 the backend filters out non-connectable toolkits,
+   * so every entry has `connectable: true`. A resolver/upstream failure is a
+   * 502 rather than an empty list. */
+  async listComposioToolkits(): Promise<ComposioToolkit[]> {
+    return this.fetch(`/api/integrations/composio/toolkits`);
+  }
+
+  /** The caller's active Composio connections. */
+  async listComposioConnections(): Promise<ComposioConnection[]> {
+    return this.fetch(`/api/integrations/composio/connections`);
+  }
+
+  /** Starts a hosted Composio connect flow for a toolkit and returns the
+   * redirect URL the browser should be sent to. */
+  async beginComposioConnect(toolkitSlug: string): Promise<ComposioConnectInitResponse> {
+    return this.fetch(`/api/integrations/composio/connect/init`, {
+      method: "POST",
+      body: JSON.stringify({ toolkit_slug: toolkitSlug }),
+    });
+  }
+
+  /** Disconnects a Composio connection the caller owns. */
+  async deleteComposioConnection(connectionId: string): Promise<void> {
+    await this.fetch(`/api/integrations/composio/connections/${connectionId}`, {
+      method: "DELETE",
     });
   }
 

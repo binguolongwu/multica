@@ -1,0 +1,2 @@
+-- No-op: leaving pg_trgm installed is harmless and avoids breaking other
+-- consumers that may have come to depend on it.

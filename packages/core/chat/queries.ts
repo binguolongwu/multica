@@ -1,7 +1,7 @@
-import { infiniteQueryOptions, queryOptions, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { api } from "../api";
 import type { TaskMessagePayload } from "../types/events";
+import type { ChatSession } from "../types/chat";
 
 // NOTE on workspace scoping:
 // `wsId` is used only as part of queryKey for cache isolation per workspace.
@@ -15,15 +15,26 @@ export const chatKeys = {
   /** Full sessions list (active + archived); the dropdown splits locally. */
   sessions: (wsId: string) => [...chatKeys.all(wsId), "sessions"] as const,
   session: (wsId: string, id: string) => [...chatKeys.all(wsId), "session", id] as const,
-  messages: (sessionId: string) => ["chat", "messages", sessionId] as const,
-  messagesPage: (sessionId: string) => ["chat", "messages-page", sessionId] as const,
-  pendingTask: (sessionId: string) => ["chat", "pending-task", sessionId] as const,
+  messagesAll: () => ["chat", "messages"] as const,
+  messages: (sessionId: string) => [...chatKeys.messagesAll(), sessionId] as const,
+  messagesPageAll: () => ["chat", "messages-page"] as const,
+  messagesPage: (sessionId: string) => [...chatKeys.messagesPageAll(), sessionId] as const,
+  pendingTaskAll: () => ["chat", "pending-task"] as const,
+  pendingTask: (sessionId: string) => [...chatKeys.pendingTaskAll(), sessionId] as const,
   /** Aggregate of in-flight chat tasks for the current user — FAB reads this. */
   pendingTasks: (wsId: string) => [...chatKeys.all(wsId), "pending-tasks"] as const,
-  /** Per-user pinned agents for quick chat access. */
+  /** Per-user pinned agents for the quick-agent bar. */
   pinnedAgents: (wsId: string) => [...chatKeys.all(wsId), "pinned-agents"] as const,
+  /**
+   * Boolean "does the user have any in-flight chat task" — the FAB's cheap
+   * running indicator. Separate cache from the detailed `pendingTasks` list so
+   * the FAB (closed-window) and ChatWindow (open) can subscribe independently.
+   */
+  pendingTasksHasAny: (wsId: string) =>
+    [...chatKeys.all(wsId), "pending-tasks", "has-any"] as const,
   /** Per-task execution messages — shared with issue agent cards. */
-  taskMessages: (taskId: string) => ["task-messages", taskId] as const,
+  taskMessagesAll: () => ["task-messages"] as const,
+  taskMessages: (taskId: string) => [...chatKeys.taskMessagesAll(), taskId] as const,
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,6 +47,36 @@ export function chatSessionsOptions(wsId: string) {
   return queryOptions({
     queryKey: chatKeys.sessions(wsId),
     queryFn: () => api.listChatSessions({ status: "all" }),
+    staleTime: Infinity,
+  });
+}
+
+/** Last-activity timestamp used to rank the IM list (newest first). */
+function sessionActivityTime(s: ChatSession): number {
+  return new Date(s.last_message?.created_at ?? s.updated_at).getTime();
+}
+
+/**
+ * Orders the chat list the same way the server does: pinned chats first, then
+ * everyone else by most-recent activity. Used both to render the list and to
+ * re-sort the cache after an optimistic pin/unpin or a WS patch, so a mutated
+ * flat cache never renders out of order. Returns a new array; stable for equal
+ * keys (Array.prototype.sort is stable), so pinned rows keep their server
+ * order when pin timestamps aren't carried in the list payload.
+ */
+export function sortChatSessions(sessions: ChatSession[]): ChatSession[] {
+  return [...sessions].sort((a, b) => {
+    const ap = a.pinned ? 1 : 0;
+    const bp = b.pinned ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    return sessionActivityTime(b) - sessionActivityTime(a);
+  });
+}
+
+export function chatPinnedAgentsOptions(wsId: string) {
+  return queryOptions({
+    queryKey: chatKeys.pinnedAgents(wsId),
+    queryFn: () => api.listChatPinnedAgents(),
     staleTime: Infinity,
   });
 }
@@ -135,23 +176,17 @@ export function pendingChatTasksOptions(wsId: string) {
   });
 }
 
-export function pinnedAgentsOptions(wsId: string) {
+/**
+ * Boolean "is any chat task running for me right now" — the cheap sibling of
+ * pendingChatTasksOptions. The FAB uses this (with `enabled: !isOpen`) so the
+ * minimised chat button never fetches or holds the full task list; the
+ * detailed list is reserved for the open ChatWindow (history + stop flows).
+ * Both caches are kept in sync by the task-lifecycle WS handlers.
+ */
+export function hasPendingChatTasksOptions(wsId: string) {
   return queryOptions({
-    queryKey: chatKeys.pinnedAgents(wsId),
-    queryFn: () => api.listPinnedAgents(),
+    queryKey: chatKeys.pendingTasksHasAny(wsId),
+    queryFn: () => api.hasAnyPendingChatTasks(),
     staleTime: Infinity,
   });
-}
-
-export function usePinnedAgents(wsId: string) {
-  return useQuery(pinnedAgentsOptions(wsId));
-}
-
-/** Total unread count across all chat sessions for sidebar badge. */
-export function useUnreadCountTotal(wsId: string) {
-  const { data: sessions } = useQuery(chatSessionsOptions(wsId));
-  return useMemo(() => {
-    if (!sessions) return 0;
-    return sessions.reduce((sum, s) => sum + (s.unread_count ?? 0), 0);
-  }, [sessions]);
 }

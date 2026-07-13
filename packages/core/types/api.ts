@@ -84,6 +84,11 @@ export interface ListIssuesParams {
   creator_id?: string;
   project_id?: string;
   /**
+   * Narrow to issues assigned to the given actor kinds (member / agent /
+   * squad). Powers the workspace Members/Agents tabs server-side.
+   */
+  assignee_types?: IssueAssigneeType[];
+  /**
    * Widen the assignee filter to issues where the user is the *indirect*
    * assignee — assignee is one of the user's owned agents, or a squad that
    * involves the user (human member / leader-via-owned-agent / agent member

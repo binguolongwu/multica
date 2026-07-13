@@ -942,38 +942,41 @@ COMMENT ON COLUMN "task_usage_daily_dirty"."provider" IS '供应商';
 COMMENT ON COLUMN "task_usage_daily_dirty"."model" IS '模型';
 COMMENT ON COLUMN "task_usage_daily_dirty"."enqueued_at" IS '入队时间';
 
--- ---------- task_usage_dashboard_daily ----------
-COMMENT ON TABLE "task_usage_dashboard_daily" IS '任务用量仪表盘每日';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."bucket_date" IS '桶日期';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."workspace_id" IS '工作区ID';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."agent_id" IS '智能体ID';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."project_id" IS '项目ID';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."model" IS '模型';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."input_tokens" IS '输入令牌数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."output_tokens" IS '输出令牌数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."cache_read_tokens" IS '缓存读取令牌数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."cache_write_tokens" IS '缓存写入令牌数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."task_count" IS '任务数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."event_count" IS '事件数';
-COMMENT ON COLUMN "task_usage_dashboard_daily"."updated_at" IS '更新时间';
+---- SKIP: task_usage_dashboard_daily (table not present in this variant)
+---- ---------- task_usage_dashboard_daily ----------
+-- COMMENT ON TABLE "task_usage_dashboard_daily" IS '任务用量仪表盘每日';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."bucket_date" IS '桶日期';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."workspace_id" IS '工作区ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."agent_id" IS '智能体ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."project_id" IS '项目ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."model" IS '模型';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."input_tokens" IS '输入令牌数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."output_tokens" IS '输出令牌数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."cache_read_tokens" IS '缓存读取令牌数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."cache_write_tokens" IS '缓存写入令牌数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."task_count" IS '任务数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."event_count" IS '事件数';
+-- COMMENT ON COLUMN "task_usage_dashboard_daily"."updated_at" IS '更新时间';
 
--- ---------- task_usage_dashboard_dirty ----------
-COMMENT ON TABLE "task_usage_dashboard_dirty" IS '任务用量仪表盘脏队列';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."bucket_date" IS '桶日期';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."workspace_id" IS '工作区ID';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."agent_id" IS '智能体ID';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."project_id" IS '项目ID';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."model" IS '模型';
-COMMENT ON COLUMN "task_usage_dashboard_dirty"."enqueued_at" IS '入队时间';
+---- SKIP: task_usage_dashboard_dirty (table not present in this variant)
+---- ---------- task_usage_dashboard_dirty ----------
+-- COMMENT ON TABLE "task_usage_dashboard_dirty" IS '任务用量仪表盘脏队列';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."bucket_date" IS '桶日期';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."workspace_id" IS '工作区ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."agent_id" IS '智能体ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."project_id" IS '项目ID';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."model" IS '模型';
+-- COMMENT ON COLUMN "task_usage_dashboard_dirty"."enqueued_at" IS '入队时间';
 
--- ---------- task_usage_dashboard_rollup_state ----------
-COMMENT ON TABLE "task_usage_dashboard_rollup_state" IS '任务用量仪表盘汇总状态';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."id" IS '主键';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."watermark_at" IS '水位时间';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_started_at" IS '上次运行开始时间';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_finished_at" IS '上次运行结束时间';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_rows" IS '上次运行行数';
-COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_error" IS '上次错误';
+---- SKIP: task_usage_dashboard_rollup_state (table not present in this variant)
+---- ---------- task_usage_dashboard_rollup_state ----------
+-- COMMENT ON TABLE "task_usage_dashboard_rollup_state" IS '任务用量仪表盘汇总状态';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."id" IS '主键';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."watermark_at" IS '水位时间';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_started_at" IS '上次运行开始时间';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_finished_at" IS '上次运行结束时间';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_run_rows" IS '上次运行行数';
+-- COMMENT ON COLUMN "task_usage_dashboard_rollup_state"."last_error" IS '上次错误';
 
 -- ---------- task_usage_hourly ----------
 COMMENT ON TABLE "task_usage_hourly" IS '任务每小时用量';
@@ -1012,14 +1015,15 @@ COMMENT ON COLUMN "task_usage_hourly_rollup_state"."last_run_finished_at" IS '�
 COMMENT ON COLUMN "task_usage_hourly_rollup_state"."last_run_rows" IS '上次运行行数';
 COMMENT ON COLUMN "task_usage_hourly_rollup_state"."last_error" IS '上次错误';
 
--- ---------- task_usage_rollup_state ----------
-COMMENT ON TABLE "task_usage_rollup_state" IS '任务用量汇总状态';
-COMMENT ON COLUMN "task_usage_rollup_state"."id" IS '主键';
-COMMENT ON COLUMN "task_usage_rollup_state"."watermark_at" IS '水位时间';
-COMMENT ON COLUMN "task_usage_rollup_state"."last_run_started_at" IS '上次运行开始时间';
-COMMENT ON COLUMN "task_usage_rollup_state"."last_run_finished_at" IS '上次运行结束时间';
-COMMENT ON COLUMN "task_usage_rollup_state"."last_run_rows" IS '上次运行行数';
-COMMENT ON COLUMN "task_usage_rollup_state"."last_error" IS '上次错误';
+--- SKIP: task_usage_rollup_state (table not present in this variant)
+--- ---------- task_usage_rollup_state ----------
+-- COMMENT ON TABLE "task_usage_rollup_state" IS '任务用量汇总状态';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."id" IS '主键';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."watermark_at" IS '水位时间';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."last_run_started_at" IS '上次运行开始时间';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."last_run_finished_at" IS '上次运行结束时间';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."last_run_rows" IS '上次运行行数';
+-- COMMENT ON COLUMN "task_usage_rollup_state"."last_error" IS '上次错误';
 
 -- ---------- user ----------
 COMMENT ON TABLE "user" IS '用户';

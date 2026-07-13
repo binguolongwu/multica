@@ -34,6 +34,7 @@ export interface RuntimeDevice {
    * a missing value as `null` (built-in).
    */
   profile_id?: string | null;
+  custom_name?: string | null;
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
@@ -68,6 +69,8 @@ export const RUNTIME_PROFILE_PROTOCOL_FAMILIES = [
   "kimi",
   "kiro",
   "antigravity",
+  "qoder",
+  "traecli",
   "zeroclaw",
 ] as const;
 
@@ -473,6 +476,7 @@ export interface UpdateAgentRequest {
    *     runtime's provider enum, rejected with 400 if not recognised
    */
   thinking_level?: string;
+  composio_toolkit_allowlist?: string[];
 }
 
 /**
@@ -782,6 +786,8 @@ export interface RuntimeLocalSkillListRequest {
   status: RuntimeLocalSkillStatus;
   skills?: RuntimeLocalSkillSummary[];
   supported: boolean;
+  mcp_servers?: RuntimeLocalMcpServerSummary[];
+  mcp_supported?: boolean;
   error?: string;
   created_at: string;
   updated_at: string;
@@ -813,9 +819,18 @@ export interface RuntimeLocalSkillImportRequest {
   updated_at: string;
 }
 
+export interface RuntimeLocalMcpServerSummary {
+  name: string;
+  transport?: "stdio" | "http" | "sse" | "unknown";
+  source?: string;
+  enabled: boolean;
+}
+
 export interface RuntimeLocalSkillsResult {
   skills: RuntimeLocalSkillSummary[];
   supported: boolean;
+  mcpServers: RuntimeLocalMcpServerSummary[];
+  mcpSupported: boolean;
 }
 
 export interface RuntimeLocalSkillImportResult {
