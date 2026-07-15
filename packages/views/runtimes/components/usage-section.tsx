@@ -186,24 +186,11 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
   const totals = computeTotals(filtered, dbPricing);
   const prevTotals = computeTotals(prevFiltered, dbPricing);
 
-  // Determine the primary currency from dbPricing (most common currency)
+  // Determine the primary currency from dbPricing
+  // Use the first record's currency, default to "CNY" if not available
   const primaryCurrency = useMemo(() => {
-    if (!dbPricingData || dbPricingData.length === 0) return "USD";
-    const counts = new Map<string, number>();
-    for (const p of dbPricingData) {
-      if (p.currency) {
-        counts.set(p.currency, (counts.get(p.currency) ?? 0) + 1);
-      }
-    }
-    let maxCount = 0;
-    let maxCurrency = "USD";
-    for (const [currency, count] of counts) {
-      if (count > maxCount) {
-        maxCount = count;
-        maxCurrency = currency;
-      }
-    }
-    return maxCurrency;
+    if (!dbPricingData || dbPricingData.length === 0) return "CNY";
+    return dbPricingData[0]?.currency || "CNY";
   }, [dbPricingData]);
 
   const tokensTotal =
