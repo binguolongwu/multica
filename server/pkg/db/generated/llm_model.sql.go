@@ -309,6 +309,44 @@ func (q *Queries) ListLLMModelsForCatalog(ctx context.Context) ([]ListLLMModelsF
 	return items, nil
 }
 
+const listLLMModelsByWorkspace = `-- name: ListLLMModelsByWorkspace :many
+SELECT model_code, input_price, output_price, currency FROM llm_model
+WHERE workspace_id = $1 AND status = 1
+ORDER BY model_code
+`
+
+type ListLLMModelsByWorkspaceRow struct {
+	ModelCode   string  `json:"model_code"`
+	InputPrice  float64 `json:"input_price"`
+	OutputPrice float64 `json:"output_price"`
+	Currency    string  `json:"currency"`
+}
+
+func (q *Queries) ListLLMModelsByWorkspace(ctx context.Context, workspaceID pgtype.UUID) ([]ListLLMModelsByWorkspaceRow, error) {
+	rows, err := q.db.Query(ctx, listLLMModelsByWorkspace, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLLMModelsByWorkspaceRow{}
+	for rows.Next() {
+		var i ListLLMModelsByWorkspaceRow
+		if err := rows.Scan(
+			&i.ModelCode,
+			&i.InputPrice,
+			&i.OutputPrice,
+			&i.Currency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateLLMModel = `-- name: UpdateLLMModel :one
 UPDATE llm_model SET
     name = COALESCE($3, name),

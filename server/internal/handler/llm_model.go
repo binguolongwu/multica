@@ -18,6 +18,44 @@ import (
 
 // ── LLM Model CRUD (workspace-scoped) ────────────────────────────────────────
 
+// ModelPricing represents the pricing info for a model, used by the frontend
+// to compute costs without hardcoding prices.
+type ModelPricing struct {
+	ModelCode    string  `json:"model_code"`
+	InputPrice   float64 `json:"input_price"`
+	OutputPrice  float64 `json:"output_price"`
+	Currency     string  `json:"currency"`
+}
+
+// ListLLMModelPricing returns pricing for all active models in the workspace.
+// The frontend uses this to compute costs instead of hardcoded MODEL_PRICING.
+func (h *Handler) ListLLMModelPricing(w http.ResponseWriter, r *http.Request) {
+	wsID := h.resolveWorkspaceID(r)
+	_, ok := h.workspaceMember(w, r, wsID)
+	if !ok {
+		return
+	}
+	wsUUID := parseUUID(wsID)
+
+	models, err := h.Queries.ListLLMModelsByWorkspace(r.Context(), wsUUID)
+	if err != nil {
+		slog.Warn("llm: failed to list model pricing", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list model pricing")
+		return
+	}
+
+	result := make([]ModelPricing, 0, len(models))
+	for _, m := range models {
+		result = append(result, ModelPricing{
+			ModelCode:   m.ModelCode,
+			InputPrice:  m.InputPrice,
+			OutputPrice: m.OutputPrice,
+			Currency:    m.Currency,
+		})
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 	wsID := h.resolveWorkspaceID(r)
 	_, ok := h.workspaceMember(w, r, wsID)

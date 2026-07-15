@@ -782,6 +782,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		r.Get("/api/runtime-protocol-map", h.ListRuntimeProtocolMap)
 		// Model catalog (merged from all workspaces, used by agent picker).
 		r.Get("/api/llm-models/catalog", h.ListLLMModelCatalog)
+		r.Get("/api/llm-models/pricing", h.ListLLMModelPricing)
 		// Platform skills (global, builtin + platform, no workspace context required).
 		r.Get("/api/platform-skills", h.ListPlatformSkills)
 

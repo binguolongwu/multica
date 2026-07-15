@@ -2633,6 +2633,9 @@ export class ApiClient {
   async listLLMModelCatalog(): Promise<LLMModelCatalogEntry[]> {
     return this.fetch("/api/llm-models/catalog");
   }
+  async listLLMModelPricing(): Promise<{ model_code: string; input_price: number; output_price: number; currency: string }[]> {
+    return this.fetch("/api/llm-models/pricing");
+  }
   async createLLMModel(workspaceId: string, providerId: string, data: Partial<LLMModel>): Promise<LLMModel> {
     return this.fetch(`/api/workspaces/${workspaceId}/llm-providers/${providerId}/models`, { method: "POST", body: JSON.stringify(data) });
   }

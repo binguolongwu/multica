@@ -291,14 +291,41 @@ const MODEL_PRICING: Record<
 // every candidate is tried `${provider}/…`-qualified first, then bare, so a
 // `cursor/auto` row wins for a Cursor row while an unqualified `auto` (no
 // provider) stays unmapped instead of silently borrowing Cursor's price.
-function resolvePricing(model: string, provider?: string) {
+//
+// `dbPricing` is an optional map from model_code to {input, output} pricing
+// loaded from the database (llm_model table). When provided, it takes
+// precedence over the hardcoded MODEL_PRICING table.
+export type PricingEntry = { input: number; output: number; cacheRead: number; cacheWrite: number };
+export type DbPricingMap = Map<string, { input_price: number; output_price: number }>;
+
+function resolvePricing(model: string, provider?: string, dbPricing?: DbPricingMap): PricingEntry | undefined {
   if (!model) return undefined;
 
   const candidates = pricingCandidates(model, provider);
+
+  // 1. Check database pricing first (highest priority)
+  if (dbPricing) {
+    for (const candidate of candidates) {
+      const hit = dbPricing.get(candidate);
+      if (hit && (hit.input_price > 0 || hit.output_price > 0)) {
+        return {
+          input: hit.input_price,
+          output: hit.output_price,
+          // Database doesn't have cache pricing, use 0
+          cacheRead: 0,
+          cacheWrite: 0,
+        };
+      }
+    }
+  }
+
+  // 2. Check hardcoded MODEL_PRICING
   for (const candidate of candidates) {
     const hit = MODEL_PRICING[candidate];
     if (hit) return hit;
   }
+
+  // 3. Check user custom pricing
   for (const candidate of candidates) {
     const hit = getCustomPricing(candidate);
     if (hit) return hit;
@@ -453,8 +480,8 @@ type Priceable = Pick<
   "model" | "input_tokens" | "output_tokens" | "cache_read_tokens" | "cache_write_tokens"
 > & { provider?: string };
 
-export function estimateCost(usage: Priceable): number {
-  const pricing = resolvePricing(usage.model, usage.provider);
+export function estimateCost(usage: Priceable, dbPricing?: DbPricingMap): number {
+  const pricing = resolvePricing(usage.model, usage.provider, dbPricing);
   if (!pricing) return 0;
   return (
     (usage.input_tokens * pricing.input +
@@ -472,8 +499,8 @@ export interface CostBreakdown {
   cacheWrite: number;
 }
 
-export function estimateCostBreakdown(usage: Priceable): CostBreakdown {
-  const pricing = resolvePricing(usage.model, usage.provider);
+export function estimateCostBreakdown(usage: Priceable, dbPricing?: DbPricingMap): CostBreakdown {
+  const pricing = resolvePricing(usage.model, usage.provider, dbPricing);
   if (!pricing) {
     return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   }
@@ -488,8 +515,8 @@ export function estimateCostBreakdown(usage: Priceable): CostBreakdown {
 // Cache savings: what cache *reads* would have cost at full input pricing
 // minus what they actually cost at the discounted cache-hit rate. This is a
 // reconstruction of "money the cache saved you", not real-world spend.
-export function estimateCacheSavings(usage: Priceable): number {
-  const pricing = resolvePricing(usage.model, usage.provider);
+export function estimateCacheSavings(usage: Priceable, dbPricing?: DbPricingMap): number {
+  const pricing = resolvePricing(usage.model, usage.provider, dbPricing);
   if (!pricing) return 0;
   const wouldHaveCost = (usage.cache_read_tokens * pricing.input) / 1_000_000;
   const actualCost = (usage.cache_read_tokens * pricing.cacheRead) / 1_000_000;
@@ -564,7 +591,7 @@ export interface WeeklyCostStackData {
   total: number;
 }
 
-export function aggregateByDate(usage: RuntimeUsage[]): {
+export function aggregateByDate(usage: RuntimeUsage[], dbPricing?: DbPricingMap): {
   dailyTokens: DailyTokenData[];
   dailyCost: DailyCostData[];
   dailyCostStack: DailyCostStackData[];
@@ -592,10 +619,10 @@ export function aggregateByDate(usage: RuntimeUsage[]): {
     existing.cacheWrite += u.cache_write_tokens;
     dateMap.set(u.date, existing);
 
-    const dayCost = (costMap.get(u.date) ?? 0) + estimateCost(u);
+    const dayCost = (costMap.get(u.date) ?? 0) + estimateCost(u, dbPricing);
     costMap.set(u.date, dayCost);
 
-    const breakdown = estimateCostBreakdown(u);
+    const breakdown = estimateCostBreakdown(u, dbPricing);
     const stack = stackMap.get(u.date) ?? {
       input: 0,
       output: 0,
@@ -610,7 +637,7 @@ export function aggregateByDate(usage: RuntimeUsage[]): {
     const m = modelMap.get(modelName) ?? { tokens: 0, cost: 0 };
     m.tokens +=
       u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens;
-    m.cost += estimateCost(u);
+    m.cost += estimateCost(u, dbPricing);
     modelMap.set(modelName, m);
   }
 
@@ -686,6 +713,7 @@ export function aggregateByWeek(
   usage: readonly WeeklyAggregable[],
   tz: string,
   weekCount: number,
+  dbPricing?: DbPricingMap,
 ): {
   weeklyTokens: WeeklyTokenData[];
   weeklyCostStack: WeeklyCostStackData[];
@@ -723,7 +751,7 @@ export function aggregateByWeek(
     tokens.cacheRead += u.cache_read_tokens;
     tokens.cacheWrite += u.cache_write_tokens;
 
-    const breakdown = estimateCostBreakdown(u);
+    const breakdown = estimateCostBreakdown(u, dbPricing);
     const stack = stackMap.get(wkStart);
     if (!stack) continue;
     stack.input += breakdown.input;
@@ -878,7 +906,7 @@ export interface CostByKey {
 // Per-(agent, model) rows → per-agent totals. Cost is summed across all
 // models for that agent, then the list is sorted by cost desc so the
 // heaviest-spending agent appears first.
-export function aggregateCostByAgent(rows: RuntimeUsageByAgent[]): CostByKey[] {
+export function aggregateCostByAgent(rows: RuntimeUsageByAgent[], dbPricing?: DbPricingMap): CostByKey[] {
   const map = new Map<string, CostByKey>();
   for (const r of rows) {
     const entry = map.get(r.agent_id) ?? {
@@ -889,7 +917,7 @@ export function aggregateCostByAgent(rows: RuntimeUsageByAgent[]): CostByKey[] {
     };
     entry.tokens +=
       r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens;
-    entry.cost += estimateCost(r);
+    entry.cost += estimateCost(r, dbPricing);
     entry.taskCount += r.task_count;
     map.set(r.agent_id, entry);
   }
@@ -898,14 +926,14 @@ export function aggregateCostByAgent(rows: RuntimeUsageByAgent[]): CostByKey[] {
 
 // Per-(date, model) rows → per-model totals (the "By model" tab reuses the
 // daily-grain data we already cache, so no extra request is needed).
-export function aggregateCostByModel(rows: RuntimeUsage[]): CostByKey[] {
+export function aggregateCostByModel(rows: RuntimeUsage[], dbPricing?: DbPricingMap): CostByKey[] {
   const map = new Map<string, CostByKey>();
   for (const r of rows) {
     const key = modelGroupingKey(r.model, r.provider);
     const entry = map.get(key) ?? { key, tokens: 0, cost: 0, taskCount: 0 };
     entry.tokens +=
       r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens;
-    entry.cost += estimateCost(r);
+    entry.cost += estimateCost(r, dbPricing);
     map.set(key, entry);
   }
   return Array.from(map.values()).toSorted((a, b) => b.cost - a.cost);

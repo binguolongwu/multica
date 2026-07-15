@@ -66,3 +66,8 @@ SELECT m.*, p.name AS provider_name FROM llm_model m
 JOIN llm_provider p ON p.id = m.provider_id
 WHERE m.status = 1 AND p.status = 1
 ORDER BY m.sort, m.name;
+
+-- name: ListLLMModelsByWorkspace :many
+SELECT model_code, input_price, output_price, currency FROM llm_model
+WHERE workspace_id = $1 AND status = 1
+ORDER BY model_code;

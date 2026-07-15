@@ -13,6 +13,7 @@ import {
   runtimeUsageByAgentOptions,
 } from "@multica/core/runtimes/queries";
 import { useCustomPricingStore } from "@multica/core/runtimes/custom-pricing-store";
+import { modelPricingOptions, buildPricingMap } from "@multica/core/runtimes/model-pricing";
 import { useViewingTimezone } from "../../common/use-viewing-timezone";
 import {
   formatTokens,
@@ -26,6 +27,7 @@ import {
   pctChange,
   sliceWindow,
   type CostByKey,
+  type DbPricingMap,
 } from "../utils";
 import { KpiCard } from "./shared";
 import { ActorAvatar } from "../../common/actor-avatar";
@@ -130,6 +132,7 @@ function fmtMoney(n: number): string {
 export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
   const { t } = useT("runtimes");
   const runtimeId = runtime.id;
+  const wsId = useWorkspaceId();
   // Reports render in the viewer's timezone — the backend slices the UTC
   // hourly rollup on the same `tz` we pass here, so every frontend window
   // calculation shares one axis with the server.
@@ -137,6 +140,9 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
   const { data: usage = [], isLoading: loading } = useQuery(
     runtimeUsageOptions(runtimeId, 180, tz),
   );
+  // Fetch model pricing from database (llm_model table)
+  const { data: dbPricingData = [] } = useQuery(modelPricingOptions(wsId));
+  const dbPricing = useMemo(() => buildPricingMap(dbPricingData), [dbPricingData]);
   const [dim, setDim] = useState<Exclude<WhenTab, "heatmap">>("daily");
   const [days, setDays] = useState<TimeRange>(30);
   // Subscribe so the KPI cards (which call estimateCost at render-time, not
@@ -165,8 +171,8 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
       setDays(DEFAULT_DAYS_BY_DIM[next]);
     }
   };
-  const totals = computeTotals(filtered);
-  const prevTotals = computeTotals(prevFiltered);
+  const totals = computeTotals(filtered, dbPricing);
+  const prevTotals = computeTotals(prevFiltered, dbPricing);
 
   const tokensTotal =
     totals.input + totals.output + totals.cacheRead + totals.cacheWrite;
@@ -281,10 +287,11 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
         days={days}
         dim={dim}
         tz={tz}
+        dbPricing={dbPricing}
       />
 
       {/* Layer 3 — WHO/WHAT burned the spend. */}
-      <CostByBlock runtimeId={runtimeId} days={days} usage={filtered} tz={tz} />
+      <CostByBlock runtimeId={runtimeId} days={days} usage={filtered} tz={tz} dbPricing={dbPricing} />
 
       {/* Layer 4 — Folded raw view. The Heatmap used to live here too; it
           was promoted into the WHEN chart's toggle, leaving only the
@@ -311,12 +318,14 @@ function WhenChart({
   days,
   dim,
   tz,
+  dbPricing,
 }: {
   usage: RuntimeUsage[];
   filtered: RuntimeUsage[];
   days: TimeRange;
   dim: Dim;
   tz: string;
+  dbPricing?: DbPricingMap;
 }) {
   const { t } = useT("runtimes");
   // Heatmap is the "independent" sibling — toggled here, not part of the
@@ -330,8 +339,8 @@ function WhenChart({
   const pricings = useCustomPricingStore((s) => s.pricings);
 
   const { dailyCostStack, dailyTokens } = useMemo(
-    () => aggregateByDate(filtered),
-    [filtered, pricings],
+    () => aggregateByDate(filtered, dbPricing),
+    [filtered, pricings, dbPricing],
   );
   // Weekly aggregation builds exactly N trailing calendar weeks anchored at
   // today (in the runtime tz). Buckets are pre-zeroed inside aggregateByWeek
@@ -340,8 +349,8 @@ function WhenChart({
   // aggregate surfaced old populated weeks instead of in-range empty ones.
   const weekCount = Math.max(1, Math.ceil(days / 7));
   const { weeklyTokens, weeklyCostStack } = useMemo(
-    () => aggregateByWeek(usage, tz, weekCount),
-    [usage, tz, weekCount, pricings],
+    () => aggregateByWeek(usage, tz, weekCount, dbPricing),
+    [usage, tz, weekCount, pricings, dbPricing],
   );
 
   const metricToggleVisible = !showHeatmap;
@@ -601,11 +610,13 @@ function CostByBlock({
   days,
   usage,
   tz,
+  dbPricing,
 }: {
   runtimeId: string;
   days: number;
   usage: RuntimeUsage[];
   tz: string;
+  dbPricing?: DbPricingMap;
 }) {
   const { t } = useT("runtimes");
   const [tab, setTab] = useState<"agent" | "model">("agent");
@@ -624,12 +635,12 @@ function CostByBlock({
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
 
   const byAgent = useMemo(
-    () => aggregateCostByAgent(byAgentRows),
-    [byAgentRows, pricings],
+    () => aggregateCostByAgent(byAgentRows, dbPricing),
+    [byAgentRows, pricings, dbPricing],
   );
   const byModel = useMemo(
-    () => aggregateCostByModel(usage),
-    [usage, pricings],
+    () => aggregateCostByModel(usage, dbPricing),
+    [usage, pricings, dbPricing],
   );
 
   const caption =
@@ -857,15 +868,15 @@ interface UsageTotals {
   cacheSavings: number;
 }
 
-function computeTotals(rows: RuntimeUsage[]): UsageTotals {
+function computeTotals(rows: RuntimeUsage[], dbPricing?: DbPricingMap): UsageTotals {
   return rows.reduce<UsageTotals>(
     (acc, u) => ({
       input: acc.input + u.input_tokens,
       output: acc.output + u.output_tokens,
       cacheRead: acc.cacheRead + u.cache_read_tokens,
       cacheWrite: acc.cacheWrite + u.cache_write_tokens,
-      cost: acc.cost + estimateCost(u),
-      cacheSavings: acc.cacheSavings + estimateCacheSavings(u),
+      cost: acc.cost + estimateCost(u, dbPricing),
+      cacheSavings: acc.cacheSavings + estimateCacheSavings(u, dbPricing),
     }),
     { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, cacheSavings: 0 },
   );
