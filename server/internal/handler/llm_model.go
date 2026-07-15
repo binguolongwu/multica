@@ -232,14 +232,31 @@ func (h *Handler) FetchProviderModels(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "provider not found in this workspace")
 		return
 	}
-	if provider.ApiBaseUrl == "" || provider.ApiKey == "" {
-		writeError(w, http.StatusBadRequest, "provider is missing api_base_url or api_key")
+	if provider.ApiKey == "" {
+		writeError(w, http.StatusBadRequest, "provider is missing api_key")
+		return
+	}
+
+	// Get api_base_url from the first active endpoint (new design: provider
+	// has multiple endpoints, each with its own api_type and api_base_url).
+	endpoints, err := h.Queries.ListLLMProviderEndpoints(r.Context(), db.ListLLMProviderEndpointsParams{
+		ProviderID:  providerID,
+		WorkspaceID: wsUUID,
+	})
+	if err != nil || len(endpoints) == 0 {
+		writeError(w, http.StatusBadRequest, "provider has no endpoints configured")
+		return
+	}
+	// Use the first active endpoint's api_base_url
+	apiBaseURL := endpoints[0].ApiBaseUrl
+	if apiBaseURL == "" {
+		writeError(w, http.StatusBadRequest, "endpoint is missing api_base_url")
 		return
 	}
 
 	// Use the same fallback logic as TestLLMConnection for providers whose
 	// api_base_url includes a path suffix (e.g. /anthropic).
-	resp, tried, err := llmVerifyWithFallback(r.Context(), provider.ApiBaseUrl, provider.ApiKey)
+	resp, tried, err := llmVerifyWithFallback(r.Context(), apiBaseURL, provider.ApiKey)
 	if err != nil {
 		slog.Warn("llm: fetch models request failed", "error", err, "tried", tried)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("failed to connect: %v", err))

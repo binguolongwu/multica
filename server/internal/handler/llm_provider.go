@@ -112,10 +112,6 @@ func (h *Handler) CreateLLMProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name and code are required")
 		return
 	}
-	if err := validateAPIBaseURL(req.ApiBaseUrl); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid api_base_url: "+err.Error())
-		return
-	}
 	req.WorkspaceID = parseUUID(wsID)
 	provider, err := h.Queries.CreateLLMProvider(r.Context(), req)
 	if err != nil {
@@ -143,12 +139,6 @@ func (h *Handler) UpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ApiKey.Valid && strings.Contains(req.ApiKey.String, "****") {
 		req.ApiKey = pgtype.Text{}
-	}
-	if req.ApiBaseUrl.Valid && req.ApiBaseUrl.String != "" {
-		if err := validateAPIBaseURL(req.ApiBaseUrl.String); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid api_base_url: "+err.Error())
-			return
-		}
 	}
 	req.ID = id
 	req.WorkspaceID = parseUUID(wsID)

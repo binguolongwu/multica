@@ -694,8 +694,6 @@ type LlmProvider struct {
 	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
 	Name          string             `json:"name"`
 	Code          string             `json:"code"`
-	ApiType       string             `json:"api_type"`
-	ApiBaseUrl    string             `json:"api_base_url"`
 	ApiKey        string             `json:"api_key"`
 	EnvVarApiKey  string             `json:"env_var_api_key"`
 	EnvVarBaseUrl string             `json:"env_var_base_url"`

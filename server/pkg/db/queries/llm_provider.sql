@@ -1,6 +1,6 @@
 -- name: CreateLLMProvider :one
-INSERT INTO llm_provider (workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, sort)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
+INSERT INTO llm_provider (workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, sort)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: GetLLMProvider :one
 SELECT * FROM llm_provider WHERE id = $1 AND workspace_id = $2;
@@ -12,8 +12,6 @@ SELECT * FROM llm_provider WHERE workspace_id = $1 AND status = 1 ORDER BY sort,
 UPDATE llm_provider SET
     name = COALESCE(sqlc.narg('name'), name),
     code = COALESCE(sqlc.narg('code'), code),
-    api_type = COALESCE(sqlc.narg('api_type'), api_type),
-    api_base_url = COALESCE(sqlc.narg('api_base_url'), api_base_url),
     api_key = COALESCE(sqlc.narg('api_key'), api_key),
     env_var_api_key = COALESCE(sqlc.narg('env_var_api_key'), env_var_api_key),
     env_var_base_url = COALESCE(sqlc.narg('env_var_base_url'), env_var_base_url),

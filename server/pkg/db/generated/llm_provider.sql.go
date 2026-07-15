@@ -12,16 +12,14 @@ import (
 )
 
 const createLLMProvider = `-- name: CreateLLMProvider :one
-INSERT INTO llm_provider (workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, sort)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
+INSERT INTO llm_provider (workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, sort)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
 `
 
 type CreateLLMProviderParams struct {
 	WorkspaceID   pgtype.UUID `json:"workspace_id"`
 	Name          string      `json:"name"`
 	Code          string      `json:"code"`
-	ApiType       string      `json:"api_type"`
-	ApiBaseUrl    string      `json:"api_base_url"`
 	ApiKey        string      `json:"api_key"`
 	EnvVarApiKey  string      `json:"env_var_api_key"`
 	EnvVarBaseUrl string      `json:"env_var_base_url"`
@@ -33,8 +31,6 @@ func (q *Queries) CreateLLMProvider(ctx context.Context, arg CreateLLMProviderPa
 		arg.WorkspaceID,
 		arg.Name,
 		arg.Code,
-		arg.ApiType,
-		arg.ApiBaseUrl,
 		arg.ApiKey,
 		arg.EnvVarApiKey,
 		arg.EnvVarBaseUrl,
@@ -46,8 +42,6 @@ func (q *Queries) CreateLLMProvider(ctx context.Context, arg CreateLLMProviderPa
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Code,
-		&i.ApiType,
-		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
@@ -119,7 +113,7 @@ func (q *Queries) GetLLMEndpointForInjection(ctx context.Context, arg GetLLMEndp
 }
 
 const getLLMProvider = `-- name: GetLLMProvider :one
-SELECT id, workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE id = $1 AND workspace_id = $2
+SELECT id, workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE id = $1 AND workspace_id = $2
 `
 
 type GetLLMProviderParams struct {
@@ -135,8 +129,6 @@ func (q *Queries) GetLLMProvider(ctx context.Context, arg GetLLMProviderParams) 
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Code,
-		&i.ApiType,
-		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
@@ -149,7 +141,7 @@ func (q *Queries) GetLLMProvider(ctx context.Context, arg GetLLMProviderParams) 
 }
 
 const getLLMProviderByModelCode = `-- name: GetLLMProviderByModelCode :one
-SELECT p.id, p.workspace_id, p.name, p.code, p.api_type, p.api_base_url, p.api_key, p.env_var_api_key, p.env_var_base_url, p.status, p.sort, p.created_at, p.updated_at FROM llm_provider p
+SELECT p.id, p.workspace_id, p.name, p.code, p.api_key, p.env_var_api_key, p.env_var_base_url, p.status, p.sort, p.created_at, p.updated_at FROM llm_provider p
 JOIN llm_model m ON m.provider_id = p.id
 WHERE m.model_code = $1 AND m.workspace_id = $2 AND p.status = 1
 `
@@ -167,8 +159,6 @@ func (q *Queries) GetLLMProviderByModelCode(ctx context.Context, arg GetLLMProvi
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Code,
-		&i.ApiType,
-		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
@@ -218,7 +208,7 @@ func (q *Queries) ListLLMProviderTemplates(ctx context.Context) ([]LlmProviderTe
 }
 
 const listLLMProviders = `-- name: ListLLMProviders :many
-SELECT id, workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE workspace_id = $1 AND status = 1 ORDER BY sort, name
+SELECT id, workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at FROM llm_provider WHERE workspace_id = $1 AND status = 1 ORDER BY sort, name
 `
 
 func (q *Queries) ListLLMProviders(ctx context.Context, workspaceID pgtype.UUID) ([]LlmProvider, error) {
@@ -235,8 +225,6 @@ func (q *Queries) ListLLMProviders(ctx context.Context, workspaceID pgtype.UUID)
 			&i.WorkspaceID,
 			&i.Name,
 			&i.Code,
-			&i.ApiType,
-			&i.ApiBaseUrl,
 			&i.ApiKey,
 			&i.EnvVarApiKey,
 			&i.EnvVarBaseUrl,
@@ -259,15 +247,13 @@ const updateLLMProvider = `-- name: UpdateLLMProvider :one
 UPDATE llm_provider SET
     name = COALESCE($3, name),
     code = COALESCE($4, code),
-    api_type = COALESCE($5, api_type),
-    api_base_url = COALESCE($6, api_base_url),
-    api_key = COALESCE($7, api_key),
-    env_var_api_key = COALESCE($8, env_var_api_key),
-    env_var_base_url = COALESCE($9, env_var_base_url),
-    status = COALESCE($10, status),
-    sort = COALESCE($11, sort),
+    api_key = COALESCE($5, api_key),
+    env_var_api_key = COALESCE($6, env_var_api_key),
+    env_var_base_url = COALESCE($7, env_var_base_url),
+    status = COALESCE($8, status),
+    sort = COALESCE($9, sort),
     updated_at = now()
-WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, code, api_type, api_base_url, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
+WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, code, api_key, env_var_api_key, env_var_base_url, status, sort, created_at, updated_at
 `
 
 type UpdateLLMProviderParams struct {
@@ -275,8 +261,6 @@ type UpdateLLMProviderParams struct {
 	WorkspaceID   pgtype.UUID `json:"workspace_id"`
 	Name          pgtype.Text `json:"name"`
 	Code          pgtype.Text `json:"code"`
-	ApiType       pgtype.Text `json:"api_type"`
-	ApiBaseUrl    pgtype.Text `json:"api_base_url"`
 	ApiKey        pgtype.Text `json:"api_key"`
 	EnvVarApiKey  pgtype.Text `json:"env_var_api_key"`
 	EnvVarBaseUrl pgtype.Text `json:"env_var_base_url"`
@@ -290,8 +274,6 @@ func (q *Queries) UpdateLLMProvider(ctx context.Context, arg UpdateLLMProviderPa
 		arg.WorkspaceID,
 		arg.Name,
 		arg.Code,
-		arg.ApiType,
-		arg.ApiBaseUrl,
 		arg.ApiKey,
 		arg.EnvVarApiKey,
 		arg.EnvVarBaseUrl,
@@ -304,8 +286,6 @@ func (q *Queries) UpdateLLMProvider(ctx context.Context, arg UpdateLLMProviderPa
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Code,
-		&i.ApiType,
-		&i.ApiBaseUrl,
 		&i.ApiKey,
 		&i.EnvVarApiKey,
 		&i.EnvVarBaseUrl,
