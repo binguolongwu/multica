@@ -124,7 +124,7 @@ function currencySymbol(currency: string): string {
   }
 }
 
-function fmtMoney(n: number, currency: string = "USD"): string {
+function fmtMoney(n: number, currency: string = "CNY"): string {
   const symbol = currencySymbol(currency);
   if (n >= 100) return `${symbol}${n.toFixed(0)}`;
   return `${symbol}${n.toFixed(2)}`;
