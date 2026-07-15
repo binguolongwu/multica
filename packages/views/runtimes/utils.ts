@@ -958,13 +958,14 @@ export function computeCostInWindow(
   daysBack: number,
   tz: string,
   offsetDays: number = 0,
+  dbPricing?: DbPricingMap,
 ): number {
   const today = todayIso(tz);
   const isoEnd = addDaysIso(today, -offsetDays);
   const isoStart = addDaysIso(today, -offsetDays - daysBack);
   let total = 0;
   for (const r of rows) {
-    if (r.date >= isoStart && r.date < isoEnd) total += estimateCost(r);
+    if (r.date >= isoStart && r.date < isoEnd) total += estimateCost(r, dbPricing);
   }
   return total;
 }

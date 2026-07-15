@@ -28,9 +28,21 @@ function getHeatmapColor(level: number): string {
   return `color-mix(in oklch, var(--color-chart-1) ${opacities[level - 1]}, transparent)`;
 }
 
-function fmtMoney(n: number): string {
-  if (n >= 100) return `$${n.toFixed(0)}`;
-  return `$${n.toFixed(2)}`;
+function currencySymbol(currency?: string): string {
+  switch (currency?.toUpperCase()) {
+    case "CNY": return "¥";
+    case "USD": return "$";
+    case "EUR": return "€";
+    case "GBP": return "£";
+    case "JPY": return "¥";
+    default: return currency ? `${currency} ` : "$";
+  }
+}
+
+function fmtMoney(n: number, currency?: string): string {
+  const symbol = currencySymbol(currency);
+  if (n >= 100) return `${symbol}${n.toFixed(0)}`;
+  return `${symbol}${n.toFixed(2)}`;
 }
 
 function fmtDate(iso: string): string {
@@ -53,9 +65,11 @@ interface Insights {
 export function ActivityHeatmap({
   usage,
   tz,
+  currency,
 }: {
   usage: RuntimeUsage[];
   tz: string;
+  currency?: string;
 }) {
   const { t } = useT("runtimes");
   // Memo dep — estimateCost (called inside the body below) consults the
@@ -284,19 +298,19 @@ function InsightsRow({ insights }: { insights: Insights }) {
       <Insight
         label="Busiest day"
         value={busiestDay ? fmtDate(busiestDay.date) : "—"}
-        sub={busiestDay ? fmtMoney(busiestDay.cost) : null}
+        sub={busiestDay ? fmtMoney(busiestDay.cost, currency) : null}
       />
       <Insight
         label="Most active weekday"
         value={busyDayName ?? "—"}
-        sub={busyDayName ? `avg ${fmtMoney(busyDayAvg)}` : null}
+        sub={busyDayName ? `avg ${fmtMoney(busyDayAvg, currency)}` : null}
       />
       <Insight
         label="Quietest weekday"
         value={quietDayName ?? "—"}
-        sub={quietDayName ? `avg ${fmtMoney(quietDayAvg)}` : null}
+        sub={quietDayName ? `avg ${fmtMoney(quietDayAvg, currency)}` : null}
       />
-      <Insight label={`${windowDays}-day total`} value={fmtMoney(totalCost)} />
+      <Insight label={`${windowDays}-day total`} value={fmtMoney(totalCost, currency)} />
     </dl>
   );
 }

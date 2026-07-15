@@ -28,6 +28,8 @@ import {
   deriveRuntimeHealth,
   runtimeProfileListOptions,
   runtimeUsageOptions,
+  modelPricingOptions,
+  buildPricingMap,
 } from "@multica/core/runtimes";
 import { useWorkspacePaths } from "@multica/core/paths";
 import {
@@ -330,6 +332,17 @@ function HealthCell({
   );
 }
 
+function currencySymbol(currency?: string): string {
+  switch (currency?.toUpperCase()) {
+    case "CNY": return "¥";
+    case "USD": return "$";
+    case "EUR": return "€";
+    case "GBP": return "£";
+    case "JPY": return "¥";
+    default: return currency ? `${currency} ` : "$";
+  }
+}
+
 // Per-row cost — only renders a 7d total + delta vs the prior 7d, so we
 // only need 14 days of usage. Previously this fetched a 180-day window to
 // share the cache key with the runtime-detail page, but that turned the
@@ -342,14 +355,19 @@ const COST_CELL_DAYS = 14;
 
 export function CostCell({ runtimeId }: { runtimeId: string }) {
   const { t } = useT("runtimes");
+  const wsId = useWorkspaceId();
   const tz = useViewingTimezone();
   const { data: usage = [] } = useQuery(
     runtimeUsageOptions(runtimeId, COST_CELL_DAYS, tz),
   );
-  const cost7d = useMemo(() => computeCostInWindow(usage, 7, tz), [usage, tz]);
+  const { data: dbPricingData = [] } = useQuery(modelPricingOptions(wsId));
+  const dbPricing = useMemo(() => buildPricingMap(dbPricingData), [dbPricingData]);
+  const primaryCurrency = dbPricingData?.[0]?.currency ?? "USD";
+  const symbol = currencySymbol(primaryCurrency);
+  const cost7d = useMemo(() => computeCostInWindow(usage, 7, tz, undefined, dbPricing), [usage, tz, dbPricing]);
   const costPrev7d = useMemo(
-    () => computeCostInWindow(usage, 7, tz, 7),
-    [usage, tz],
+    () => computeCostInWindow(usage, 7, tz, 7, dbPricing),
+    [usage, tz, dbPricing],
   );
   const delta = pctChange(cost7d, costPrev7d);
 
@@ -360,7 +378,7 @@ export function CostCell({ runtimeId }: { runtimeId: string }) {
       </div>
     );
   }
-  const fmt = cost7d >= 100 ? `$${cost7d.toFixed(0)}` : `$${cost7d.toFixed(2)}`;
+  const fmt = cost7d >= 100 ? `${symbol}${cost7d.toFixed(0)}` : `${symbol}${cost7d.toFixed(2)}`;
   const deltaTone =
     delta == null
       ? "text-muted-foreground"

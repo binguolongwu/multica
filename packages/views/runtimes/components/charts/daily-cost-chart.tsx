@@ -14,6 +14,17 @@ import {
 import type { DailyCostStackData } from "../../utils";
 import { useT } from "../../../i18n";
 
+function currencySymbol(currency?: string): string {
+  switch (currency?.toUpperCase()) {
+    case "CNY": return "¥";
+    case "USD": return "$";
+    case "EUR": return "€";
+    case "GBP": return "£";
+    case "JPY": return "¥";
+    default: return currency ? `${currency} ` : "$";
+  }
+}
+
 // Three-segment stack (input / output / cache write) — keeps the user's
 // attention on what's actually driving spend. Cache reads are excluded
 // because their per-token rate is two orders of magnitude smaller and
@@ -29,8 +40,9 @@ export const costStackConfig = {
   cacheWrite: { label: "Cache write", color: "var(--chart-3)" },
 } satisfies ChartConfig;
 
-export function DailyCostChart({ data }: { data: DailyCostStackData[] }) {
+export function DailyCostChart({ data, currency }: { data: DailyCostStackData[]; currency?: string }) {
   const { t } = useT("runtimes");
+  const symbol = currencySymbol(currency);
   // No internal empty-state — the parent decides what to show in place of
   // the chart (often a diagnostic explaining *why* there's no cost). Letting
   // recharts render an empty axis would be both ugly and uninformative.
@@ -49,7 +61,7 @@ export function DailyCostChart({ data }: { data: DailyCostStackData[] }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(v: number) => `$${v}`}
+          tickFormatter={(v: number) => `${symbol}${v}`}
           width={50}
         />
         <ChartTooltip
@@ -57,7 +69,7 @@ export function DailyCostChart({ data }: { data: DailyCostStackData[] }) {
             <ChartTooltipContent
               formatter={(value, name) =>
                 typeof value === "number"
-                  ? `$${value.toFixed(2)} ${name}`
+                  ? `${symbol}${value.toFixed(2)} ${name}`
                   : `${value} ${name}`
               }
               footer={(payload) => {
@@ -71,7 +83,7 @@ export function DailyCostChart({ data }: { data: DailyCostStackData[] }) {
                   <div className="flex items-center justify-between gap-2 font-medium">
                     <span>{t(($) => $.charts.tooltip_total)}</span>
                     <span className="font-mono tabular-nums">
-                      ${total.toFixed(2)}
+                      {symbol}{total.toFixed(2)}
                     </span>
                   </div>
                 );

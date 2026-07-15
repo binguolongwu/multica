@@ -15,6 +15,17 @@ import {
 import type { WeeklyCostStackData } from "../../utils";
 import { useT } from "../../../i18n";
 
+function currencySymbol(currency?: string): string {
+  switch (currency?.toUpperCase()) {
+    case "CNY": return "¥";
+    case "USD": return "$";
+    case "EUR": return "€";
+    case "GBP": return "£";
+    case "JPY": return "¥";
+    default: return currency ? `${currency} ` : "$";
+  }
+}
+
 // Same three-segment stack as DailyCostChart — keeping series, colours, and
 // ordering identical so the user reads "Weekly" as a coarser cut of the same
 // chart, not a different chart. Partial-week bars render at half-opacity so
@@ -25,8 +36,9 @@ export const weeklyCostStackConfig = {
   cacheWrite: { label: "Cache write", color: "var(--chart-3)" },
 } satisfies ChartConfig;
 
-export function WeeklyCostChart({ data }: { data: WeeklyCostStackData[] }) {
+export function WeeklyCostChart({ data, currency }: { data: WeeklyCostStackData[]; currency?: string }) {
   const { t } = useT("runtimes");
+  const symbol = currencySymbol(currency);
   return (
     <ChartContainer config={weeklyCostStackConfig} className="aspect-[3/1] w-full">
       <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
@@ -42,7 +54,7 @@ export function WeeklyCostChart({ data }: { data: WeeklyCostStackData[] }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(v: number) => `$${v}`}
+          tickFormatter={(v: number) => `${symbol}${v}`}
           width={50}
         />
         <ChartTooltip
@@ -61,7 +73,7 @@ export function WeeklyCostChart({ data }: { data: WeeklyCostStackData[] }) {
               }}
               formatter={(value, name) =>
                 typeof value === "number"
-                  ? `$${value.toFixed(2)} ${name}`
+                  ? `${symbol}${value.toFixed(2)} ${name}`
                   : `${value} ${name}`
               }
               footer={(payload) => {
@@ -74,7 +86,7 @@ export function WeeklyCostChart({ data }: { data: WeeklyCostStackData[] }) {
                   <div className="flex items-center justify-between gap-2 font-medium">
                     <span>{t(($) => $.charts.tooltip_total)}</span>
                     <span className="font-mono tabular-nums">
-                      ${total.toFixed(2)}
+                      {symbol}{total.toFixed(2)}
                     </span>
                   </div>
                 );

@@ -113,9 +113,21 @@ function Segmented<T extends string | number>({
   );
 }
 
-function fmtMoney(n: number): string {
-  if (n >= 100) return `$${n.toFixed(0)}`;
-  return `$${n.toFixed(2)}`;
+function currencySymbol(currency: string): string {
+  switch (currency?.toUpperCase()) {
+    case "CNY": return "¥";
+    case "USD": return "$";
+    case "EUR": return "€";
+    case "GBP": return "£";
+    case "JPY": return "¥";
+    default: return currency ? `${currency} ` : "$";
+  }
+}
+
+function fmtMoney(n: number, currency: string = "USD"): string {
+  const symbol = currencySymbol(currency);
+  if (n >= 100) return `${symbol}${n.toFixed(0)}`;
+  return `${symbol}${n.toFixed(2)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +186,26 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
   const totals = computeTotals(filtered, dbPricing);
   const prevTotals = computeTotals(prevFiltered, dbPricing);
 
+  // Determine the primary currency from dbPricing (most common currency)
+  const primaryCurrency = useMemo(() => {
+    if (!dbPricingData || dbPricingData.length === 0) return "USD";
+    const counts = new Map<string, number>();
+    for (const p of dbPricingData) {
+      if (p.currency) {
+        counts.set(p.currency, (counts.get(p.currency) ?? 0) + 1);
+      }
+    }
+    let maxCount = 0;
+    let maxCurrency = "USD";
+    for (const [currency, count] of counts) {
+      if (count > maxCount) {
+        maxCount = count;
+        maxCurrency = currency;
+      }
+    }
+    return maxCurrency;
+  }, [dbPricingData]);
+
   const tokensTotal =
     totals.input + totals.output + totals.cacheRead + totals.cacheWrite;
   const cacheableTokens = totals.input + totals.cacheRead;
@@ -230,7 +262,7 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
       <div className="grid grid-cols-3 divide-x rounded-lg border bg-card">
         <KpiCard
           label={t(($) => $.usage.kpi_cost_label, { days })}
-          value={fmtMoney(totals.cost)}
+          value={fmtMoney(totals.cost, primaryCurrency)}
           hint={
             costDelta == null ? undefined : (
               <span
@@ -252,7 +284,7 @@ export function UsageSection({ runtime }: { runtime: AgentRuntime }) {
         />
         <KpiCard
           label={t(($) => $.usage.kpi_cache_label, { days })}
-          value={fmtMoney(totals.cacheSavings)}
+          value={fmtMoney(totals.cacheSavings, primaryCurrency)}
           accent={totals.cacheSavings > 0 ? "success" : "default"}
           hint={
             <span>
@@ -404,13 +436,14 @@ function WhenChart({
 
       <div className="min-h-[260px]">
         {showHeatmap ? (
-          <ActivityHeatmap usage={usage} tz={tz} />
+          <ActivityHeatmap usage={usage} tz={tz} currency={dbPricingData?.[0]?.currency} />
         ) : dim === "daily" ? (
           <DailyTab
             metric={chartMetric}
             costData={dailyCostStack}
             tokensData={dailyTokens}
             usage={filtered}
+            currency={dbPricingData?.[0]?.currency}
           />
         ) : (
           <WeeklyTab
@@ -418,6 +451,7 @@ function WhenChart({
             costData={weeklyCostStack}
             tokensData={weeklyTokens}
             usage={filtered}
+            currency={dbPricingData?.[0]?.currency}
           />
         )}
       </div>
@@ -430,11 +464,13 @@ function DailyTab({
   costData,
   tokensData,
   usage,
+  currency,
 }: {
   metric: DailyMetric;
   costData: Parameters<typeof DailyCostChart>[0]["data"];
   tokensData: Parameters<typeof DailyTokensChart>[0]["data"];
   usage: RuntimeUsage[];
+  currency?: string;
 }) {
   if (metric === "tokens") {
     // Token chart fires its own empty state: if no tokens were recorded the
@@ -449,7 +485,7 @@ function DailyTab({
   }
   const totalCost = costData.reduce((s, d) => s + d.total, 0);
   if (totalCost === 0) return <EmptyChartState usage={usage} />;
-  return <DailyCostChart data={costData} />;
+  return <DailyCostChart data={costData} currency={currency} />;
 }
 
 function WeeklyTab({
@@ -457,11 +493,13 @@ function WeeklyTab({
   costData,
   tokensData,
   usage,
+  currency,
 }: {
   metric: DailyMetric;
   costData: Parameters<typeof WeeklyCostChart>[0]["data"];
   tokensData: Parameters<typeof WeeklyTokensChart>[0]["data"];
   usage: RuntimeUsage[];
+  currency?: string;
 }) {
   if (metric === "tokens") {
     const totalTokens = tokensData.reduce(
@@ -473,7 +511,7 @@ function WeeklyTab({
   }
   const totalCost = costData.reduce((s, d) => s + d.total, 0);
   if (totalCost === 0) return <EmptyChartState usage={usage} />;
-  return <WeeklyCostChart data={costData} />;
+  return <WeeklyCostChart data={costData} currency={currency} />;
 }
 
 // ---------------------------------------------------------------------------
