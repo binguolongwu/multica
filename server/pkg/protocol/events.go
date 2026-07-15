@@ -84,10 +84,12 @@ const (
 	EventProjectResourceDeleted = "project_resource:deleted"
 
 	// Label events
-	EventLabelCreated       = "label:created"
-	EventLabelUpdated       = "label:updated"
-	EventLabelDeleted       = "label:deleted"
-	EventIssueLabelsChanged = "issue_labels:changed"
+	EventLabelCreated        = "label:created"
+	EventLabelUpdated        = "label:updated"
+	EventLabelDeleted        = "label:deleted"
+	EventIssueLabelsChanged  = "issue_labels:changed"
+	EventAgentLabelsChanged  = "agent_labels:changed"
+	EventSkillLabelsChanged  = "skill_labels:changed"
 
 	// Pin events
 	EventPinCreated   = "pin:created"

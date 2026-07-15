@@ -73,7 +73,7 @@ export function InboxPage() {
   const { data: rawItems = [], isLoading: loading } = useQuery(inboxListOptions(wsId));
   const items = useMemo(() => deduplicateInboxItems(rawItems), [rawItems]);
 
-  const selected = items.find((i) => (i.issue_id ?? i.id) === selectedKey) ?? null;
+  const selected = useMemo(() => items.find((i) => (i.issue_id ?? i.id) === selectedKey) ?? null, [items, selectedKey]);
 
   // Track the last key we actually resolved against the inbox list. Lets the
   // fallback effect distinguish "shared-link to a notification not in our
@@ -135,6 +135,7 @@ export function InboxPage() {
   const selectedRead = selected?.read;
   useEffect(() => {
     if (!selectedId || selectedRead) return;
+    if (markReadMutation.isPending) return;
     markReadMutate(selectedId, {
       onError: (err) =>
         toast.error(
@@ -143,7 +144,7 @@ export function InboxPage() {
             : t(($) => $.errors.mark_read_failed),
         ),
     });
-  }, [selectedId, selectedRead, markReadMutate, t]);
+  }, [selectedId, selectedRead, markReadMutate, markReadMutation.isPending, t]);
 
   const handleSelect = (item: InboxItem) => {
     setSelectedKey(item.issue_id ?? item.id);

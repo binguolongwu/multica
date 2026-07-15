@@ -20,8 +20,11 @@ export function useMarkInboxRead() {
     onError: (_err, _id, ctx) => {
       if (ctx?.prev) qc.setQueryData(inboxKeys.list(wsId), ctx.prev);
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: inboxKeys.list(wsId) });
+    onSettled: (_data, error) => {
+      // Only invalidate on success to avoid retry loops when the item is not found
+      if (!error) {
+        qc.invalidateQueries({ queryKey: inboxKeys.list(wsId) });
+      }
     },
   });
 }

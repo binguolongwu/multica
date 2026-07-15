@@ -2079,8 +2079,8 @@ export class ApiClient {
   }
 
   // Labels
-  async listLabels(): Promise<ListLabelsResponse> {
-    return this.fetch(`/api/labels`);
+  async listLabels(resourceType: string = "issue"): Promise<ListLabelsResponse> {
+    return this.fetch(`/api/labels?resource_type=${resourceType}`);
   }
 
   async getLabel(id: string): Promise<Label> {
@@ -2105,6 +2105,7 @@ export class ApiClient {
     await this.fetch(`/api/labels/${id}`, { method: "DELETE" });
   }
 
+  // Issue labels
   async listLabelsForIssue(issueId: string): Promise<IssueLabelsResponse> {
     return this.fetch(`/api/issues/${issueId}/labels`);
   }
@@ -2118,6 +2119,42 @@ export class ApiClient {
 
   async detachLabel(issueId: string, labelId: string): Promise<IssueLabelsResponse> {
     return this.fetch(`/api/issues/${issueId}/labels/${labelId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // Agent labels
+  async listLabelsForAgent(agentId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/agents/${agentId}/labels`);
+  }
+
+  async attachLabelToAgent(agentId: string, labelId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/agents/${agentId}/labels`, {
+      method: "POST",
+      body: JSON.stringify({ label_id: labelId }),
+    });
+  }
+
+  async detachLabelFromAgent(agentId: string, labelId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/agents/${agentId}/labels/${labelId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // Skill labels
+  async listLabelsForSkill(skillId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/skills/${skillId}/labels`);
+  }
+
+  async attachLabelToSkill(skillId: string, labelId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/skills/${skillId}/labels`, {
+      method: "POST",
+      body: JSON.stringify({ label_id: labelId }),
+    });
+  }
+
+  async detachLabelFromSkill(skillId: string, labelId: string): Promise<{ labels: Label[] }> {
+    return this.fetch(`/api/skills/${skillId}/labels/${labelId}`, {
       method: "DELETE",
     });
   }

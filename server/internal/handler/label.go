@@ -23,22 +23,26 @@ import (
 // ---------------------------------------------------------------------------
 
 type LabelResponse struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	Name        string `json:"name"`
-	Color       string `json:"color"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID           string `json:"id"`
+	WorkspaceID  string `json:"workspace_id"`
+	Name         string `json:"name"`
+	Color        string `json:"color"`
+	ResourceType string `json:"resource_type"`
+	Description  string `json:"description"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 func labelToResponse(l db.IssueLabel) LabelResponse {
 	return LabelResponse{
-		ID:          uuidToString(l.ID),
-		WorkspaceID: uuidToString(l.WorkspaceID),
-		Name:        l.Name,
-		Color:       l.Color,
-		CreatedAt:   timestampToString(l.CreatedAt),
-		UpdatedAt:   timestampToString(l.UpdatedAt),
+		ID:           uuidToString(l.ID),
+		WorkspaceID:  uuidToString(l.WorkspaceID),
+		Name:         l.Name,
+		Color:        l.Color,
+		ResourceType: l.ResourceType,
+		Description:  l.Description,
+		CreatedAt:    timestampToString(l.CreatedAt),
+		UpdatedAt:    timestampToString(l.UpdatedAt),
 	}
 }
 
@@ -51,13 +55,16 @@ func labelsToResponse(list []db.IssueLabel) []LabelResponse {
 }
 
 type CreateLabelRequest struct {
-	Name  string `json:"name"`
-	Color string `json:"color"`
+	Name         string `json:"name"`
+	Color        string `json:"color"`
+	ResourceType string `json:"resource_type"`
+	Description  string `json:"description"`
 }
 
 type UpdateLabelRequest struct {
-	Name  *string `json:"name"`
-	Color *string `json:"color"`
+	Name        *string `json:"name"`
+	Color       *string `json:"color"`
+	Description *string `json:"description"`
 }
 
 // 6-digit hex, with or without leading '#'.
@@ -106,7 +113,21 @@ func validateLabelName(raw string) (string, error) {
 
 func (h *Handler) ListLabels(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
-	labels, err := h.Queries.ListLabels(r.Context(), parseUUID(workspaceID))
+	resourceType := r.URL.Query().Get("resource_type")
+	if resourceType == "" {
+		resourceType = "issue"
+	}
+	// Validate resource_type
+	validTypes := map[string]bool{"issue": true, "agent": true, "skill": true}
+	if !validTypes[resourceType] {
+		writeError(w, http.StatusBadRequest, "invalid resource_type: must be issue, agent, or skill")
+		return
+	}
+
+	labels, err := h.Queries.ListLabels(r.Context(), db.ListLabelsParams{
+		WorkspaceID:  parseUUID(workspaceID),
+		ResourceType: resourceType,
+	})
 	if err != nil {
 		slog.Warn("ListLabels failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to list labels")
@@ -158,6 +179,18 @@ func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// Validate resource_type
+	resourceType := req.ResourceType
+	if resourceType == "" {
+		resourceType = "issue"
+	}
+	validTypes := map[string]bool{"issue": true, "agent": true, "skill": true}
+	if !validTypes[resourceType] {
+		writeError(w, http.StatusBadRequest, "invalid resource_type: must be issue, agent, or skill")
+		return
+	}
+
 	workspaceID := h.resolveWorkspaceID(r)
 	userID, ok := requireUserID(w, r)
 	if !ok {
@@ -165,9 +198,11 @@ func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	label, err := h.Queries.CreateLabel(r.Context(), db.CreateLabelParams{
-		WorkspaceID: parseUUID(workspaceID),
-		Name:        name,
-		Color:       color,
+		WorkspaceID:  parseUUID(workspaceID),
+		Name:         name,
+		Color:        color,
+		ResourceType: resourceType,
+		Description:  req.Description,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -224,6 +259,9 @@ func (h *Handler) UpdateLabel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		params.Color = pgtype.Text{String: color, Valid: true}
+	}
+	if req.Description != nil {
+		params.Description = pgtype.Text{String: *req.Description, Valid: true}
 	}
 
 	// Branch on pgx.ErrNoRows directly from the UPDATE — the WHERE clause
@@ -445,6 +483,296 @@ func (h *Handler) DetachLabel(w http.ResponseWriter, r *http.Request) {
 	resp := labelsToResponse(labels)
 	h.publish(protocol.EventIssueLabelsChanged, uuidToString(issue.WorkspaceID), "member", userID, map[string]any{
 		"issue_id": uuidToString(issue.ID),
+		"labels":   resp,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"labels": resp})
+}
+
+// ---------------------------------------------------------------------------
+// Handlers — agent↔label attach/detach
+// ---------------------------------------------------------------------------
+
+func (h *Handler) listLabelsForAgentSafe(r *http.Request, agentID, workspaceID pgtype.UUID) ([]db.IssueLabel, bool) {
+	labels, err := h.Queries.ListLabelsByAgent(r.Context(), db.ListLabelsByAgentParams{
+		AgentID:     agentID,
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		slog.Warn("ListLabelsByAgent failed after mutation", append(logger.RequestAttrs(r), "error", err, "agent_id", uuidToString(agentID))...)
+		return nil, false
+	}
+	return labels, true
+}
+
+func (h *Handler) ListLabelsForAgent(w http.ResponseWriter, r *http.Request) {
+	agentID := chi.URLParam(r, "id")
+	agent, ok := h.loadAgentForUser(w, r, agentID)
+	if !ok {
+		return
+	}
+	labels, err := h.Queries.ListLabelsByAgent(r.Context(), db.ListLabelsByAgentParams{
+		AgentID:     agent.ID,
+		WorkspaceID: agent.WorkspaceID,
+	})
+	if err != nil {
+		slog.Warn("ListLabelsForAgent failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to list labels")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"labels": labelsToResponse(labels)})
+}
+
+func (h *Handler) AttachLabelToAgent(w http.ResponseWriter, r *http.Request) {
+	agentID := chi.URLParam(r, "id")
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	var req AttachLabelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.LabelID == "" {
+		writeError(w, http.StatusBadRequest, "label_id is required")
+		return
+	}
+
+	agent, ok := h.loadAgentForUser(w, r, agentID)
+	if !ok {
+		return
+	}
+	labelID, ok := parseUUIDOrBadRequest(w, req.LabelID, "label_id")
+	if !ok {
+		return
+	}
+	if _, err := h.Queries.GetLabel(r.Context(), db.GetLabelParams{
+		ID: labelID, WorkspaceID: agent.WorkspaceID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "label not found")
+			return
+		}
+		slog.Warn("GetLabel in AttachLabelToAgent failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+
+	if err := h.Queries.AttachLabelToAgent(r.Context(), db.AttachLabelToAgentParams{
+		AgentID:     agent.ID,
+		LabelID:     labelID,
+		WorkspaceID: agent.WorkspaceID,
+	}); err != nil {
+		slog.Warn("AttachLabelToAgent failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+
+	labels, ok2 := h.listLabelsForAgentSafe(r, agent.ID, agent.WorkspaceID)
+	if !ok2 {
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+	resp := labelsToResponse(labels)
+	h.publish(protocol.EventAgentLabelsChanged, uuidToString(agent.WorkspaceID), "member", userID, map[string]any{
+		"agent_id": uuidToString(agent.ID),
+		"labels":   resp,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"labels": resp})
+}
+
+func (h *Handler) DetachLabelFromAgent(w http.ResponseWriter, r *http.Request) {
+	agentID := chi.URLParam(r, "id")
+	labelID := chi.URLParam(r, "labelId")
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	agent, ok := h.loadAgentForUser(w, r, agentID)
+	if !ok {
+		return
+	}
+	labelUUID, ok := parseUUIDOrBadRequest(w, labelID, "label id")
+	if !ok {
+		return
+	}
+	if _, err := h.Queries.GetLabel(r.Context(), db.GetLabelParams{
+		ID: labelUUID, WorkspaceID: agent.WorkspaceID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "label not found")
+			return
+		}
+		slog.Warn("GetLabel in DetachLabelFromAgent failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+
+	if err := h.Queries.DetachLabelFromAgent(r.Context(), db.DetachLabelFromAgentParams{
+		AgentID:     agent.ID,
+		LabelID:     labelUUID,
+		WorkspaceID: agent.WorkspaceID,
+	}); err != nil {
+		slog.Warn("DetachLabelFromAgent failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+
+	labels, ok2 := h.listLabelsForAgentSafe(r, agent.ID, agent.WorkspaceID)
+	if !ok2 {
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+	resp := labelsToResponse(labels)
+	h.publish(protocol.EventAgentLabelsChanged, uuidToString(agent.WorkspaceID), "member", userID, map[string]any{
+		"agent_id": uuidToString(agent.ID),
+		"labels":   resp,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"labels": resp})
+}
+
+// ---------------------------------------------------------------------------
+// Handlers — skill↔label attach/detach
+// ---------------------------------------------------------------------------
+
+func (h *Handler) listLabelsForSkillSafe(r *http.Request, skillID, workspaceID pgtype.UUID) ([]db.IssueLabel, bool) {
+	labels, err := h.Queries.ListLabelsBySkill(r.Context(), db.ListLabelsBySkillParams{
+		SkillID:     skillID,
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		slog.Warn("ListLabelsBySkill failed after mutation", append(logger.RequestAttrs(r), "error", err, "skill_id", uuidToString(skillID))...)
+		return nil, false
+	}
+	return labels, true
+}
+
+func (h *Handler) ListLabelsForSkill(w http.ResponseWriter, r *http.Request) {
+	skillID := chi.URLParam(r, "id")
+	skill, ok := h.loadSkillForUser(w, r, skillID)
+	if !ok {
+		return
+	}
+	labels, err := h.Queries.ListLabelsBySkill(r.Context(), db.ListLabelsBySkillParams{
+		SkillID:     skill.ID,
+		WorkspaceID: skill.WorkspaceID,
+	})
+	if err != nil {
+		slog.Warn("ListLabelsForSkill failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to list labels")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"labels": labelsToResponse(labels)})
+}
+
+func (h *Handler) AttachLabelToSkill(w http.ResponseWriter, r *http.Request) {
+	skillID := chi.URLParam(r, "id")
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	var req AttachLabelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.LabelID == "" {
+		writeError(w, http.StatusBadRequest, "label_id is required")
+		return
+	}
+
+	skill, ok := h.loadSkillForUser(w, r, skillID)
+	if !ok {
+		return
+	}
+	labelID, ok := parseUUIDOrBadRequest(w, req.LabelID, "label_id")
+	if !ok {
+		return
+	}
+	if _, err := h.Queries.GetLabel(r.Context(), db.GetLabelParams{
+		ID: labelID, WorkspaceID: skill.WorkspaceID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "label not found")
+			return
+		}
+		slog.Warn("GetLabel in AttachLabelToSkill failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+
+	if err := h.Queries.AttachLabelToSkill(r.Context(), db.AttachLabelToSkillParams{
+		SkillID:     skill.ID,
+		LabelID:     labelID,
+		WorkspaceID: skill.WorkspaceID,
+	}); err != nil {
+		slog.Warn("AttachLabelToSkill failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+
+	labels, ok2 := h.listLabelsForSkillSafe(r, skill.ID, skill.WorkspaceID)
+	if !ok2 {
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+	resp := labelsToResponse(labels)
+	h.publish(protocol.EventSkillLabelsChanged, uuidToString(skill.WorkspaceID), "member", userID, map[string]any{
+		"skill_id": uuidToString(skill.ID),
+		"labels":   resp,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"labels": resp})
+}
+
+func (h *Handler) DetachLabelFromSkill(w http.ResponseWriter, r *http.Request) {
+	skillID := chi.URLParam(r, "id")
+	labelID := chi.URLParam(r, "labelId")
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	skill, ok := h.loadSkillForUser(w, r, skillID)
+	if !ok {
+		return
+	}
+	labelUUID, ok := parseUUIDOrBadRequest(w, labelID, "label id")
+	if !ok {
+		return
+	}
+	if _, err := h.Queries.GetLabel(r.Context(), db.GetLabelParams{
+		ID: labelUUID, WorkspaceID: skill.WorkspaceID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "label not found")
+			return
+		}
+		slog.Warn("GetLabel in DetachLabelFromSkill failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+
+	if err := h.Queries.DetachLabelFromSkill(r.Context(), db.DetachLabelFromSkillParams{
+		SkillID:     skill.ID,
+		LabelID:     labelUUID,
+		WorkspaceID: skill.WorkspaceID,
+	}); err != nil {
+		slog.Warn("DetachLabelFromSkill failed", append(logger.RequestAttrs(r), "error", err)...)
+		writeError(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+
+	labels, ok2 := h.listLabelsForSkillSafe(r, skill.ID, skill.WorkspaceID)
+	if !ok2 {
+		writeJSON(w, http.StatusOK, map[string]any{})
+		return
+	}
+	resp := labelsToResponse(labels)
+	h.publish(protocol.EventSkillLabelsChanged, uuidToString(skill.WorkspaceID), "member", userID, map[string]any{
+		"skill_id": uuidToString(skill.ID),
 		"labels":   resp,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{"labels": resp})

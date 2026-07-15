@@ -18,14 +18,18 @@ export function useCreateLabel() {
   return useMutation({
     mutationFn: (data: CreateLabelRequest) => api.createLabel(data),
     onSuccess: (label) => {
-      qc.setQueryData<ListLabelsResponse>(labelKeys.list(wsId), (old) =>
-        old && !old.labels.some((l) => l.id === label.id)
-          ? { ...old, labels: [...old.labels, label], total: old.total + 1 }
-          : old,
+      const resourceType = label.resource_type || "issue";
+      qc.setQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, resourceType),
+        (old) =>
+          old && !old.labels.some((l) => l.id === label.id)
+            ? { ...old, labels: [...old.labels, label], total: old.total + 1 }
+            : old,
       );
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: labelKeys.list(wsId) });
+    onSettled: (_err, _vars, data) => {
+      const resourceType = data?.resource_type || "issue";
+      qc.invalidateQueries({ queryKey: labelKeys.list(wsId, resourceType) });
     },
   });
 }
@@ -39,23 +43,33 @@ export function useUpdateLabel() {
   const qc = useQueryClient();
   const wsId = useWorkspaceId();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string } & UpdateLabelRequest) =>
+    mutationFn: ({
+      id,
+      resource_type: _rt,
+      ...data
+    }: { id: string; resource_type?: string } & UpdateLabelRequest) =>
       api.updateLabel(id, data),
-    onMutate: async ({ id, ...data }) => {
-      await qc.cancelQueries({ queryKey: labelKeys.list(wsId) });
-      const prevList = qc.getQueryData<ListLabelsResponse>(labelKeys.list(wsId));
-      qc.setQueryData<ListLabelsResponse>(labelKeys.list(wsId), (old) =>
+    onMutate: async ({ id, resource_type, ...data }) => {
+      const rt = resource_type || "issue";
+      await qc.cancelQueries({ queryKey: labelKeys.list(wsId, rt) });
+      const prevList = qc.getQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, rt),
+      );
+      qc.setQueryData<ListLabelsResponse>(labelKeys.list(wsId, rt), (old) =>
         old
           ? {
               ...old,
-              labels: old.labels.map((l) => (l.id === id ? { ...l, ...data } : l)),
+              labels: old.labels.map((l) =>
+                l.id === id ? { ...l, ...data } : l,
+              ),
             }
           : old,
       );
-      return { prevList, id };
+      return { prevList, rt };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prevList) qc.setQueryData(labelKeys.list(wsId), ctx.prevList);
+      if (ctx?.prevList)
+        qc.setQueryData(labelKeys.list(wsId, ctx.rt), ctx.prevList);
     },
     onSettled: () => {
       // Invalidate the entire labels scope so any byIssue cache holding a
@@ -73,19 +87,28 @@ export function useDeleteLabel() {
   const qc = useQueryClient();
   const wsId = useWorkspaceId();
   return useMutation({
-    mutationFn: (id: string) => api.deleteLabel(id),
-    onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: labelKeys.list(wsId) });
-      const prev = qc.getQueryData<ListLabelsResponse>(labelKeys.list(wsId));
-      qc.setQueryData<ListLabelsResponse>(labelKeys.list(wsId), (old) =>
+    mutationFn: ({ id }: { id: string; resource_type?: string }) =>
+      api.deleteLabel(id),
+    onMutate: async ({ id, resource_type }) => {
+      const rt = resource_type || "issue";
+      await qc.cancelQueries({ queryKey: labelKeys.list(wsId, rt) });
+      const prev = qc.getQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, rt),
+      );
+      qc.setQueryData<ListLabelsResponse>(labelKeys.list(wsId, rt), (old) =>
         old
-          ? { ...old, labels: old.labels.filter((l) => l.id !== id), total: old.total - 1 }
+          ? {
+              ...old,
+              labels: old.labels.filter((l) => l.id !== id),
+              total: old.total - 1,
+            }
           : old,
       );
-      return { prev };
+      return { prev, rt };
     },
     onError: (_err, _id, ctx) => {
-      if (ctx?.prev) qc.setQueryData(labelKeys.list(wsId), ctx.prev);
+      if (ctx?.prev)
+        qc.setQueryData(labelKeys.list(wsId, ctx.rt), ctx.prev);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: labelKeys.all(wsId) });
@@ -103,7 +126,9 @@ export function useAttachLabel(issueId: string) {
     mutationFn: (labelId: string) => api.attachLabel(issueId, labelId),
     onMutate: async (labelId) => {
       await qc.cancelQueries({ queryKey: labelKeys.byIssue(wsId, issueId) });
-      const prev = qc.getQueryData<IssueLabelsResponse>(labelKeys.byIssue(wsId, issueId));
+      const prev = qc.getQueryData<IssueLabelsResponse>(
+        labelKeys.byIssue(wsId, issueId),
+      );
       // Only patch when we already know the current label set — otherwise
       // appending `[label]` to an empty array would wipe denormalized
       // labels in issue list/detail caches and rollback couldn't restore
@@ -111,11 +136,19 @@ export function useAttachLabel(issueId: string) {
       // fetched), skip the optimistic patch and rely on onSettled refetch.
       if (!prev) return { prev };
       if (prev.labels.some((l) => l.id === labelId)) return { prev };
-      const list = qc.getQueryData<ListLabelsResponse>(labelKeys.list(wsId));
+      const list = qc.getQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, "issue"),
+      );
       const label = list?.labels.find((l) => l.id === labelId);
       if (!label) return { prev };
-      const next: IssueLabelsResponse = { ...prev, labels: [...prev.labels, label] };
-      qc.setQueryData<IssueLabelsResponse>(labelKeys.byIssue(wsId, issueId), next);
+      const next: IssueLabelsResponse = {
+        ...prev,
+        labels: [...prev.labels, label],
+      };
+      qc.setQueryData<IssueLabelsResponse>(
+        labelKeys.byIssue(wsId, issueId),
+        next,
+      );
       onIssueLabelsChanged(qc, wsId, issueId, next.labels);
       return { prev };
     },
@@ -131,7 +164,10 @@ export function useAttachLabel(issueId: string) {
       // when the backend gave us one — otherwise the optimistic patch from
       // onMutate stands until onSettled's invalidation refetches.
       if (data && Array.isArray(data.labels)) {
-        qc.setQueryData<IssueLabelsResponse>(labelKeys.byIssue(wsId, issueId), data);
+        qc.setQueryData<IssueLabelsResponse>(
+          labelKeys.byIssue(wsId, issueId),
+          data,
+        );
         onIssueLabelsChanged(qc, wsId, issueId, data.labels);
       }
     },
@@ -148,12 +184,20 @@ export function useDetachLabel(issueId: string) {
     mutationFn: (labelId: string) => api.detachLabel(issueId, labelId),
     onMutate: async (labelId) => {
       await qc.cancelQueries({ queryKey: labelKeys.byIssue(wsId, issueId) });
-      const prev = qc.getQueryData<IssueLabelsResponse>(labelKeys.byIssue(wsId, issueId));
+      const prev = qc.getQueryData<IssueLabelsResponse>(
+        labelKeys.byIssue(wsId, issueId),
+      );
       const next = prev
-        ? { ...prev, labels: prev.labels.filter((l: Label) => l.id !== labelId) }
+        ? {
+            ...prev,
+            labels: prev.labels.filter((l: Label) => l.id !== labelId),
+          }
         : undefined;
       if (next) {
-        qc.setQueryData<IssueLabelsResponse>(labelKeys.byIssue(wsId, issueId), next);
+        qc.setQueryData<IssueLabelsResponse>(
+          labelKeys.byIssue(wsId, issueId),
+          next,
+        );
         onIssueLabelsChanged(qc, wsId, issueId, next.labels);
       }
       return { prev };
@@ -166,6 +210,126 @@ export function useDetachLabel(issueId: string) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: labelKeys.byIssue(wsId, issueId) });
+    },
+  });
+}
+
+// Agent label mutations
+
+export function useAttachAgentLabel(agentId: string) {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (labelId: string) => api.attachLabelToAgent(agentId, labelId),
+    onMutate: async (labelId) => {
+      await qc.cancelQueries({ queryKey: labelKeys.byAgent(wsId, agentId) });
+      const prev = qc.getQueryData<{ labels: Label[] }>(
+        labelKeys.byAgent(wsId, agentId),
+      );
+      if (!prev) return { prev };
+      if (prev.labels.some((l) => l.id === labelId)) return { prev };
+      const list = qc.getQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, "agent"),
+      );
+      const label = list?.labels.find((l) => l.id === labelId);
+      if (!label) return { prev };
+      const next = { labels: [...prev.labels, label] };
+      qc.setQueryData(labelKeys.byAgent(wsId, agentId), next);
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev)
+        qc.setQueryData(labelKeys.byAgent(wsId, agentId), ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: labelKeys.byAgent(wsId, agentId) });
+    },
+  });
+}
+
+export function useDetachAgentLabel(agentId: string) {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (labelId: string) => api.detachLabelFromAgent(agentId, labelId),
+    onMutate: async (labelId) => {
+      await qc.cancelQueries({ queryKey: labelKeys.byAgent(wsId, agentId) });
+      const prev = qc.getQueryData<{ labels: Label[] }>(
+        labelKeys.byAgent(wsId, agentId),
+      );
+      const next = prev
+        ? { labels: prev.labels.filter((l) => l.id !== labelId) }
+        : undefined;
+      if (next)
+        qc.setQueryData(labelKeys.byAgent(wsId, agentId), next);
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev)
+        qc.setQueryData(labelKeys.byAgent(wsId, agentId), ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: labelKeys.byAgent(wsId, agentId) });
+    },
+  });
+}
+
+// Skill label mutations
+
+export function useAttachSkillLabel(skillId: string) {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (labelId: string) => api.attachLabelToSkill(skillId, labelId),
+    onMutate: async (labelId) => {
+      await qc.cancelQueries({ queryKey: labelKeys.bySkill(wsId, skillId) });
+      const prev = qc.getQueryData<{ labels: Label[] }>(
+        labelKeys.bySkill(wsId, skillId),
+      );
+      if (!prev) return { prev };
+      if (prev.labels.some((l) => l.id === labelId)) return { prev };
+      const list = qc.getQueryData<ListLabelsResponse>(
+        labelKeys.list(wsId, "skill"),
+      );
+      const label = list?.labels.find((l) => l.id === labelId);
+      if (!label) return { prev };
+      const next = { labels: [...prev.labels, label] };
+      qc.setQueryData(labelKeys.bySkill(wsId, skillId), next);
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev)
+        qc.setQueryData(labelKeys.bySkill(wsId, skillId), ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: labelKeys.bySkill(wsId, skillId) });
+    },
+  });
+}
+
+export function useDetachSkillLabel(skillId: string) {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (labelId: string) => api.detachLabelFromSkill(skillId, labelId),
+    onMutate: async (labelId) => {
+      await qc.cancelQueries({ queryKey: labelKeys.bySkill(wsId, skillId) });
+      const prev = qc.getQueryData<{ labels: Label[] }>(
+        labelKeys.bySkill(wsId, skillId),
+      );
+      const next = prev
+        ? { labels: prev.labels.filter((l) => l.id !== labelId) }
+        : undefined;
+      if (next)
+        qc.setQueryData(labelKeys.bySkill(wsId, skillId), next);
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev)
+        qc.setQueryData(labelKeys.bySkill(wsId, skillId), ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: labelKeys.bySkill(wsId, skillId) });
     },
   });
 }

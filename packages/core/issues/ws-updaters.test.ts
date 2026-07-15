@@ -43,6 +43,8 @@ const labelA: Label = {
   workspace_id: WS_ID,
   name: "bug",
   color: "#ef4444",
+  resource_type: "issue",
+  description: "",
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",
 };
@@ -52,6 +54,8 @@ const labelB: Label = {
   workspace_id: WS_ID,
   name: "feature",
   color: "#22c55e",
+  resource_type: "issue",
+  description: "",
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",
 };

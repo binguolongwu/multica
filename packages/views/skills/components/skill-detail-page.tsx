@@ -494,6 +494,12 @@ export function SkillDetailPage({ skillId }: { skillId: string }) {
     setSelectedPath(SKILL_MD);
   };
 
+  const handleAddFile = (path: string) => {
+    setFiles((prev) => [...prev, { path, content: "" }]);
+    setSelectedPath(path);
+    setAddingFile(false);
+  };
+
   const handleFileContentChange = (newContent: string) => {
     if (!canEdit) return;
     if (selectedPath === SKILL_MD) {

@@ -1178,6 +1178,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// internal/handler/agent_env.go.
 					r.Get("/env", h.GetAgentEnv)
 					r.Put("/env", h.UpdateAgentEnv)
+					// Agent labels
+					r.Get("/labels", h.ListLabelsForAgent)
+					r.Post("/labels", h.AttachLabelToAgent)
+					r.Delete("/labels/{labelId}", h.DetachLabelFromAgent)
 				})
 			})
 
@@ -1222,6 +1226,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 						r.Get("/files", h.ListSkillFiles)
 						r.Put("/files", h.UpsertSkillFile)
 						r.Delete("/files/{fileId}", h.DeleteSkillFile)
+						// Skill labels
+						r.Get("/labels", h.ListLabelsForSkill)
+						r.Post("/labels", h.AttachLabelToSkill)
+						r.Delete("/labels/{labelId}", h.DetachLabelFromSkill)
 					})
 				})
 
